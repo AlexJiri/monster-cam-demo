@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monster Cam – Test Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Phase 0 test bench: camera stage on the left, simulator / settings / log on the right. Dark by design. */
+  :root {
+    --night: #0d0f14;
+    --panel: #171a22;
+    --line: #2a2f3c;
+    --text: #e8e6e1;
+    --muted: #8d93a3;
+    --blood: #e0393e;
+    --moss: #5fbf7a;
+    --lamp: #f2c14e;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--night); color: var(--text); font: 15px/1.45 'Rubik', system-ui, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+  button.primary { background: var(--blood); border-color: var(--blood); color: #fff; font-weight: 700; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  h1 { font-family: 'Creepster', cursive; font-weight: 400; font-size: 42px; margin: 0; color: var(--blood); letter-spacing: 1px; }
+  header p { margin: 0; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  section + section { margin-top: 16px; }
+  h2 { margin: 0 0 10px; font-size: 16px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .stage { position: relative; aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; }
+  .stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+  .stage .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+  .facebox { position: absolute; border: 2px dashed rgba(242, 193, 78, 0.6); border-radius: 12px; pointer-events: none; display: none; }
+  .hud { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
+  .lives { font-size: 22px; }
+  .status { background: rgba(0, 0, 0, 0.6); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
+  .curses { position: absolute; left: 10px; bottom: 10px; display: grid; gap: 6px; width: min(260px, 70%); pointer-events: none; }
+  .curse { background: rgba(0, 0, 0, 0.65); border-radius: 8px; padding: 4px 8px; font-size: 14px; }
+  .curse .bar { height: 6px; background: #333; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .curse .bar i { display: block; height: 100%; background: var(--blood); }
+  .curse.wait { opacity: 0.75; }
+  .curse.wait .bar i { background: var(--lamp); }
+  .caught { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(224, 57, 62, 0.45); font-family: 'Creepster', cursive; font-size: 64px; color: #fff; text-shadow: 0 4px 0 #000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .caught.on { opacity: 1; }
+  .notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); border-radius: 14px; padding: 14px 22px; text-align: center; font-size: 20px; font-weight: 700; display: none; max-width: 85%; }
+  .notice.on { display: block; }
+  .notice big { display: block; font-size: 56px; color: var(--lamp); line-height: 1.1; }
+  .notice .dare { display: block; margin: 10px 0 12px; font-size: 18px; font-weight: 500; color: var(--text); }
+  .notice button { pointer-events: auto; }
+  .notice.win big { color: var(--moss); }
+  .notice.lose big { color: var(--blood); }
+  .timer { background: rgba(0, 0, 0, 0.6); border-radius: 999px; padding: 2px 12px; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .timer.low { color: var(--blood); }
+  textarea { width: 100%; min-height: 90px; background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; font-size: 13px; color: inherit; resize: vertical; }
+  .curse .plus { color: var(--lamp); font-weight: 700; margin-left: 4px; }
+
+  .meters { display: grid; gap: 8px; margin-top: 12px; }
+  .meter { display: grid; grid-template-columns: 110px 1fr 46px; gap: 8px; align-items: center; font-size: 14px; }
+  .meter .track { position: relative; height: 12px; background: #000; border-radius: 6px; overflow: hidden; }
+  .meter .fill { height: 100%; width: 0; background: var(--moss); transition: width 0.05s linear; }
+  .meter .fill.hot { background: var(--blood); }
+  .meter .mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--lamp); }
+  .meter .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  label.field { display: grid; grid-template-columns: 170px 1fr 48px; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0; }
+  label.field output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  input[type=text], input[type=number], select { background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { padding: 4px; text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  td input, td select { width: 100%; }
+  .log { height: 180px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; }
+  .log b { color: var(--text); font-weight: 500; }
+  details summary { cursor: pointer; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Monster Cam</h1>
+    <p>Phase 0 test bench: camera detection, gift simulator and settings. <a href="index.html" style="color:var(--lamp)">Play Lights On →</a></p>
+  </header>
+
+  <div class="grid">
+    <div>
+      <section>
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted></video>
+          <div class="empty" id="empty">Start the camera to begin.<br>Everything runs on this computer; no video is sent anywhere.</div>
+          <div class="facebox" id="facebox"></div>
+          <div class="hud"><span class="lives" id="lives"></span><span class="timer" id="timer" hidden></span><span class="status" id="status">Camera off</span></div>
+          <div class="curses" id="curses"></div>
+          <div class="caught" id="caught">CAUGHT!</div>
+          <div class="notice" id="notice" aria-live="polite"></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="startBtn">Start camera</button>
+          <button id="calBtn" disabled>Calibrate (3 s neutral face)</button>
+          <button id="roundBtn">▶ Start round</button>
+          <button id="resetBtn">Reset lives</button>
+        </div>
+        <div class="meters" id="meters"></div>
+        <p class="hint">Yellow line = threshold. Calibrate with a relaxed face first: smile and blink are measured against it.</p>
+        <details style="margin-top:10px">
+          <summary>No camera? Drive the detector by hand</summary>
+          <div class="row" style="margin-top:8px"><button id="fakeBtn">Use sliders instead of camera</button></div>
+          <div id="fakeSliders"></div>
+        </details>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <h2>Simulator</h2>
+        <div class="row">
+          <input type="text" id="viewer" value="Ion" aria-label="Viewer name" style="width:120px">
+          <button data-sim="comment">💬 Comment</button>
+          <button data-sim="like">❤️ 10 likes</button>
+          <button data-sim="follow">➕ Follow</button>
+        </div>
+        <div class="row" id="giftBtns" style="margin-top:8px"></div>
+      </section>
+
+      <section>
+        <h2>Settings</h2>
+        <div id="sliders"></div>
+        <h2 style="margin-top:12px">Gifts</h2>
+        <table>
+          <thead><tr><th>Gift</th><th>Effect</th><th>Every N</th><th></th></tr></thead>
+          <tbody id="giftRows"></tbody>
+        </table>
+        <div class="row" style="margin-top:8px">
+          <button id="addGift">+ Add gift</button>
+          <button id="defaults">Restore defaults</button>
+        </div>
+        <h2 style="margin-top:12px">Dares</h2>
+        <label for="loseDares" class="hint" style="display:block">If the streamer loses (one per line, keep them harmless)</label>
+        <textarea id="loseDares"></textarea>
+        <label for="winDares" class="hint" style="display:block;margin-top:6px">If the streamer wins: a dare for chat (one per line)</label>
+        <textarea id="winDares"></textarea>
+        <h2 style="margin-top:12px">Curse timers</h2>
+        <div id="curseTimes"></div>
+      </section>
+
+      <section>
+        <h2>Log</h2>
+        <div class="log" id="log" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="src/settings.js"></script>
+<script src="src/events.js"></script>
+<script src="src/face.js"></script>
+<script src="src/curses.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let S = MC.settings.load();
+  const face = new MC.Face();
+  let lives = S.lives;
+  const giftCount = {};
+
+  // ---------- Log ----------
+  function log(html) {
+    const t = new Date().toLocaleTimeString();
+    $('log').insertAdjacentHTML('afterbegin', `<div>${t} · ${html}</div>`);
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- Curses ----------
+  const curses = new MC.Curses(S, {
+    onCaught(c) {
+      lives = Math.max(0, lives - 1);
+      renderLives();
+      $('caught').textContent = lives ? 'CAUGHT!' : 'GAME OVER';
+      $('caught').classList.add('on');
+      setTimeout(() => $('caught').classList.remove('on'), 1200);
+      log(`🩸 <b>Caught</b> breaking “${S.curses[c.type].label}” (sent by ${esc(c.by)}). Lives: ${lives}`);
+      if (!lives) { curses.clear(); if (round.running) endRound(false); }
+    },
+    onChange() {},
+  });
+
+  function renderCurses(now) {
+    $('curses').innerHTML = curses.active.map((c) => {
+      const cfg = S.curses[c.type];
+      const waiting = now < c.starts;
+      const left = Math.max(0, c.ends - Math.max(now, c.starts));
+      const bump = c.bumped && now - c.bumped < 1200 ? `<span class="plus">${c.capped ? 'MAX' : `+${cfg.seconds} s`}</span>` : '';
+      return `<div class="curse ${waiting ? 'wait' : ''}">${cfg.icon} ${cfg.label} ${waiting ? '– get ready' : `${(left / 1000).toFixed(1)} s`}${bump}<small style="color:var(--muted)"> · ${esc(c.by)}</small>
+        <div class="bar"><i style="width:${waiting ? 100 : Math.min(100, (left / (cfg.maxSeconds * 1000)) * 100)}%"></i></div></div>`;
+    }).join('') + (curses.queue.length ? `<div class="curse">+${curses.queue.length} waiting</div>` : '');
+  }
+
+  function renderLives() { $('lives').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, S.lives - lives)); }
+
+  // ---------- Meters ----------
+  const METERS = [
+    { key: 'smile', label: '😀 Smile', th: () => S.smileThreshold, max: 1 },
+    { key: 'blink', label: '👁️ Blink', th: () => S.blinkThreshold, max: 1 },
+    { key: 'move', label: '↔️ Movement', th: () => S.moveThreshold, max: 4 },
+  ];
+  $('meters').innerHTML = METERS.map((m) => `<div class="meter"><span>${m.label}</span><div class="track"><div class="fill" id="f-${m.key}"></div><div class="mark" id="m-${m.key}"></div></div><span class="val" id="v-${m.key}">0.00</span></div>`).join('');
+
+  face.onFrame((st) => {
+    const now = performance.now();
+    for (const m of METERS) {
+      const v = st[m.key];
+      $('f-' + m.key).style.width = Math.min(100, (v / m.max) * 100) + '%';
+      $('f-' + m.key).classList.toggle('hot', v > m.th());
+      $('m-' + m.key).style.left = Math.min(100, (m.th() / m.max) * 100) + '%';
+      $('v-' + m.key).textContent = v.toFixed(2);
+    }
+    if (!calibrating) $('status').textContent = ({ loading: 'Loading face model…', ready: st.face ? 'Face found' : 'No face in view', fake: 'Manual sliders' }[st.status] || 'Camera off') + (calibrated ? ' · calibrated ✓' : '');
+    const fb = $('facebox');
+    if (st.box && st.face && st.status === 'ready') {
+      // The video is mirrored, so mirror the box too.
+      Object.assign(fb.style, { display: 'block', left: (1 - st.box.x - st.box.w) * 100 + '%', top: st.box.y * 100 + '%', width: st.box.w * 100 + '%', height: st.box.h * 100 + '%' });
+    } else fb.style.display = 'none';
+    if (lives && !calibrating) curses.tick(st, now);
+    if (round.running) {
+      const left = Math.max(0, round.ends - now);
+      const secs = Math.ceil(left / 1000);
+      $('timer').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      $('timer').classList.toggle('low', left < 10000);
+      if (left <= 0 && lives) endRound(true);
+    }
+    renderCurses(now);
+  });
+
+  // ---------- Camera ----------
+  $('startBtn').onclick = async () => {
+    $('startBtn').disabled = true;
+    try {
+      $('status').textContent = 'Asking for the camera…';
+      await face.start($('video'));
+      $('empty').style.display = 'none';
+      $('calBtn').disabled = false;
+      log('📷 Camera and face model ready. Calibrate next.');
+    } catch (e) {
+      $('startBtn').disabled = false;
+      const msg = e && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser and try again.'
+        : `Could not start: ${esc(e && e.message || e)}. The face model downloads from the internet, so check the connection.`;
+      $('empty').textContent = msg;
+      log('⚠️ ' + msg);
+    }
+  };
+  let calibrating = false, calibrated = false;
+  function notice(html, ms) {
+    $('notice').innerHTML = html;
+    $('notice').classList.add('on');
+    clearTimeout(notice.t);
+    if (ms) notice.t = setTimeout(() => $('notice').classList.remove('on'), ms);
+  }
+  $('calBtn').onclick = async () => {
+    $('calBtn').disabled = true;
+    calibrating = true;
+    $('status').textContent = 'Calibrating…';
+    log('🎯 Calibrating: keep a relaxed, neutral face for 3 seconds.');
+    // Visible countdown while the neutral face is recorded.
+    let n = 3;
+    notice(`Relaxed face, look at the camera<big>${n}</big>`);
+    const timer = setInterval(() => { n--; if (n > 0) notice(`Relaxed face, look at the camera<big>${n}</big>`); }, 1000);
+    const r = await face.calibrate(3000);
+    clearInterval(timer);
+    calibrating = false;
+    $('calBtn').disabled = false;
+    if (r.rejected) {
+      notice(r.rejected === 'smile' ? 'You were smiling 😏<br><small>Relax your face and calibrate again.</small>' : 'Eyes looked half closed<br><small>Open your eyes normally and calibrate again.</small>', 3500);
+      log(`⚠️ Calibration refused: ${r.rejected === 'smile' ? 'smile' : 'eyes'} too far from a neutral face. Previous calibration kept.`);
+    } else if (r.samples) {
+      calibrated = true;
+      notice(`Calibrated ✓<br><small>neutral smile ${r.smile.toFixed(2)} · eyes ${r.blink.toFixed(2)}</small>`, 2500);
+      log(`🎯 Calibrated (${r.samples} frames). Neutral smile ${r.smile.toFixed(2)}, eyes ${r.blink.toFixed(2)}.`);
+    } else {
+      notice('No face seen. Face the camera and try again.', 3000);
+      log('⚠️ No face seen during calibration. Face the camera and try again.');
+    }
+  };
+  $('resetBtn').onclick = () => { lives = S.lives; curses.clear(); renderLives(); log('↺ Lives reset.'); };
+
+  // ---------- Round ----------
+  // Survive the timer = win; lose all lives = lose. Either way someone gets a dare.
+  const round = { running: false, ends: 0 };
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
+  function startRound() {
+    lives = S.lives;
+    curses.clear();
+    renderLives();
+    round.running = true;
+    round.ends = performance.now() + S.roundSeconds * 1000;
+    $('timer').hidden = false;
+    $('notice').className = 'notice';
+    $('roundBtn').textContent = '■ Stop round';
+    log(`▶ Round started: survive ${S.roundSeconds} s.`);
+  }
+  function endRound(won) {
+    round.running = false;
+    curses.clear();
+    $('timer').hidden = true;
+    $('roundBtn').textContent = '▶ Start round';
+    const list = (won ? S.winDares : S.loseDares).filter((d) => d.trim());
+    const dare = list.length ? pick(list) : '';
+    $('notice').className = 'notice on ' + (won ? 'win' : 'lose');
+    $('notice').innerHTML = `<big>${won ? 'You survived!' : 'Eaten!'}</big>` +
+      (dare ? `<span class="dare">${won ? '' : 'Dare: '}${esc(dare)}</span>` : '') +
+      `<button class="primary" id="againBtn">Play again</button>`;
+    $('againBtn').onclick = () => { $('notice').className = 'notice'; startRound(); };
+    log(won ? `🏆 Streamer survived the round. ${dare ? 'Chat dare: ' + esc(dare) : ''}` : `💀 Streamer lost the round. ${dare ? 'Dare: ' + esc(dare) : ''}`);
+  }
+  $('roundBtn').onclick = () => {
+    if (round.running) { round.running = false; curses.clear(); $('timer').hidden = true; $('roundBtn').textContent = '▶ Start round'; log('■ Round stopped.'); }
+    else startRound();
+  };
+
+  // Manual sliders (debug, no camera)
+  $('fakeBtn').onclick = () => {
+    face.startFake();
+    $('calBtn').disabled = false;
+    $('empty').textContent = 'Manual mode: move the sliders below to act as the face.';
+    $('fakeSliders').innerHTML = ['smile', 'blink', 'move'].map((k) =>
+      `<label class="field"><span>${k}</span><input type="range" min="0" max="${k === 'move' ? 4 : 1}" step="0.01" value="0" data-fake="${k}"><output>0</output></label>`).join('');
+    $('fakeSliders').querySelectorAll('input').forEach((i) => i.oninput = () => { face.fake[i.dataset.fake] = +i.value; i.nextElementSibling.textContent = (+i.value).toFixed(2); });
+    log('🎚️ Manual mode on.');
+  };
+
+  // ---------- Simulator ----------
+  const viewer = () => $('viewer').value.trim() || 'viewer';
+  document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
+    const type = b.dataset.sim;
+    MC.bus.emit(type === 'comment' ? { type, user: viewer(), text: 'hello' } : type === 'like' ? { type, user: viewer(), count: 10 } : { type, user: viewer() });
+  });
+  function renderGiftButtons() {
+    $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.gift)}</button>`).join('');
+    $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift, count: 1 }));
+  }
+
+  // Events → effects
+  MC.bus.on('*', (e) => {
+    if (e.type === 'comment') log(`💬 <b>${esc(e.user)}</b>: ${esc(e.text)}`);
+    if (e.type === 'like') log(`❤️ <b>${esc(e.user)}</b> sent ${e.count} likes`);
+    if (e.type === 'follow') log(`➕ <b>${esc(e.user)}</b> followed`);
+    if (e.type !== 'gift') return;
+    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase());
+    giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
+    if (!rule) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (no effect set)`); return; }
+    const n = giftCount[e.gift];
+    if (n % Math.max(1, rule.every)) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (${n % rule.every}/${rule.every})`); return; }
+    if (rule.curse === 'sweep' || rule.curse === 'stare') { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${rule.curse} (works in Lights On)`); return; }
+    const label = rule.curse === 'all' ? 'all curses' : S.curses[rule.curse].label;
+    log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${label}`);
+    if (lives) curses.add(rule.curse, e.user);
+  });
+
+  // ---------- Settings ----------
+  const SLIDERS = [
+    ['smileThreshold', 'Smile sensitivity', 0.1, 0.9, 0.05],
+    ['blinkThreshold', 'Blink sensitivity', 0.2, 0.9, 0.05],
+    ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1],
+    ['lives', 'Lives', 1, 9, 1],
+    ['maxCurses', 'Curses at once', 1, 5, 1],
+    ['roundSeconds', 'Round length (s)', 30, 600, 30],
+  ];
+  function save() { MC.settings.save(S); curses.s = S; }
+  function renderSettings() {
+    $('sliders').innerHTML = SLIDERS.map(([k, label, min, max, step]) =>
+      `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${S[k]}"><output>${S[k]}</output></label>`).join('');
+    SLIDERS.forEach(([k]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value; if (k === 'lives') { lives = S.lives; renderLives(); } save(); }; });
+
+    const EFFECT_LABEL = { all: 'All curses', sweep: '🔦 Extra sweep', stare: '👁️ Monster stare' };
+    const opts = (sel) => ['blink', 'smile', 'move', 'all', 'sweep', 'stare'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
+    $('giftRows').innerHTML = S.gifts.map((g, i) => `<tr>
+      <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
+      <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>
+      <td><input type="number" id="g-every-${i}" min="1" value="${g.every}" aria-label="Every N gifts" style="width:64px"></td>
+      <td><button data-del="${i}" aria-label="Remove">✕</button></td></tr>`).join('');
+    S.gifts.forEach((g, i) => {
+      $('g-name-' + i).onchange = (e) => { g.gift = e.target.value.trim(); save(); renderGiftButtons(); };
+      $('g-curse-' + i).onchange = (e) => { g.curse = e.target.value; save(); };
+      $('g-every-' + i).onchange = (e) => { g.every = Math.max(1, +e.target.value || 1); save(); };
+    });
+    $('giftRows').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); renderGiftButtons(); });
+
+    $('curseTimes').innerHTML = `<p class="hint" style="margin:0 0 4px">Per gift = time each gift adds. Max = most time that can be on the clock at once.${'<br>'}Keep “Don't blink” short: holding the eyes open for long gets uncomfortable fast.</p>` + Object.entries(S.curses).map(([k, c]) =>
+      `<label class="field"><span>${c.icon} ${c.label} · per gift</span><input type="range" id="c-${k}" min="1" max="30" step="1" value="${c.seconds}"><output>${c.seconds} s</output></label>
+       <label class="field"><span>${c.icon} ${c.label} · max</span><input type="range" id="cm-${k}" min="3" max="${k === 'blink' ? 20 : 60}" step="1" value="${c.maxSeconds}"><output>${c.maxSeconds} s</output></label>`).join('');
+    Object.keys(S.curses).forEach((k) => {
+      const per = $('c-' + k), max = $('cm-' + k);
+      const sync = () => {
+        // Per-gift time can't exceed the max.
+        if (+per.value > +max.value) per.value = max.value;
+        S.curses[k].seconds = +per.value;
+        S.curses[k].maxSeconds = +max.value;
+        per.nextElementSibling.textContent = per.value + ' s';
+        max.nextElementSibling.textContent = max.value + ' s';
+        save();
+      };
+      per.oninput = sync;
+      max.oninput = sync;
+    });
+  }
+  function renderDares() {
+    $('loseDares').value = S.loseDares.join('\n');
+    $('winDares').value = S.winDares.join('\n');
+    $('loseDares').onchange = () => { S.loseDares = $('loseDares').value.split('\n').map((x) => x.trim()).filter(Boolean); save(); };
+    $('winDares').onchange = () => { S.winDares = $('winDares').value.split('\n').map((x) => x.trim()).filter(Boolean); save(); };
+  }
+  renderDares();
+  $('addGift').onclick = () => { S.gifts.push({ gift: 'New gift', curse: 'blink', every: 1 }); save(); renderSettings(); renderGiftButtons(); };
+  $('defaults').onclick = () => { S = MC.settings.defaults(); save(); lives = S.lives; renderSettings(); renderDares(); renderGiftButtons(); renderLives(); log('Settings restored to defaults.'); };
+
+  renderSettings();
+  renderGiftButtons();
+  renderLives();
+  log('Ready. Start the camera, or open “No camera?” to test with sliders.');
+</script>
+</body>
+</html>
