@@ -7,13 +7,14 @@
     smileThreshold: 0.45, // 0..1 above the calibrated neutral face
     blinkThreshold: 0.55,
     moveThreshold: 1.5, // head movement speed
+    soundThreshold: 0.3, // 0..1 above the room's background noise
     lives: 3,
     maxCurses: 3, // active at once, the rest wait in a queue
     graceMs: 1200, // warning time before a new curse starts counting
     roundSeconds: 180, // survive this long to win the round
     volume: 0.8,
     // Lights On: what counts as "moving" while the flashlight is on you.
-    lightRules: { move: true, smile: true, blink: false },
+    lightRules: { move: true, smile: true, blink: false, sound: true },
     patrolGap: [4, 9], // seconds of darkness between flashlight sweeps (random in this range)
     sweepSeconds: 5, // how long one sweep across the room takes
     warnSeconds: 1.5, // footsteps before the light arrives
@@ -35,10 +36,12 @@
     curses: {
       blink: { label: "Don't blink", icon: '👁️', seconds: 5, maxSeconds: 10 },
       smile: { label: "Don't smile", icon: '😐', seconds: 10, maxSeconds: 20 },
-      move: { label: 'Freeze', icon: '🧊', seconds: 5, maxSeconds: 10 },
+      move: { label: 'Freeze', icon: '🧊', seconds: 5, maxSeconds: 10 }, // no moving and no sound
+      sound: { label: 'Silence', icon: '🤫', seconds: 5, maxSeconds: 15 },
     },
     // `every`: trigger once per N gifts of that kind (e.g. a curse every 10 roses).
-    // `curse`: blink | smile | move | all (curses) or sweep | stare (Lights On flashlight).
+    // `curse`: blink | smile | move | sound | all (curses) or sweep | stare (Lights On flashlight).
+    // Gift names must match TikTok's; rename them in the settings to the gifts you want.
     gifts: [
       { gift: 'Rose', curse: 'blink', every: 1 },
       { gift: 'Ice Cream Cone', curse: 'smile', every: 1 },
@@ -46,6 +49,7 @@
       { gift: 'Galaxy', curse: 'all', every: 1 },
       { gift: 'Doughnut', curse: 'sweep', every: 1 },
       { gift: 'Lion', curse: 'stare', every: 1 },
+      { gift: 'Microphone', curse: 'sound', every: 1 },
     ],
   };
 
@@ -57,7 +61,7 @@
       if (saved) {
         const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules } };
         // Saves from before Lights On have no gift for the flashlight effects: add the defaults.
-        for (const eff of ['sweep', 'stare']) {
+        for (const eff of ['sweep', 'stare', 'sound']) {
           if (!s.gifts.some((g) => g.curse === eff)) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.curse === eff)));
         }
         return s;

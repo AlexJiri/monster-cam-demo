@@ -2,6 +2,8 @@
 // The browser only allows audio after a click, so call MC.sfx.unlock() from a button handler.
 (function (MC) {
   let ctx = null, master = null;
+  // The microphone ignores sound until this time (ms, performance.now()), so the game doesn't "hear" itself.
+  const busy = (ms) => { api.busyUntil = Math.max(api.busyUntil || 0, performance.now() + ms); };
 
   function unlock() {
     if (!ctx) {
@@ -24,6 +26,7 @@
   // One heavy footstep: low thump plus a short scrape.
   function footstep(volume = 1) {
     if (!ctx) return;
+    busy(300);
     const t = ctx.currentTime;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.setValueAtTime(90, t);
@@ -51,6 +54,7 @@
   // Low, rumbling growl.
   function growl(seconds = 1.2, volume = 1) {
     if (!ctx) return;
+    busy(seconds * 1000);
     const t = ctx.currentTime;
     const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     n.buffer = noiseBuffer(seconds);
@@ -73,6 +77,7 @@
   // Sudden scare when caught: dissonant screech + crunch.
   function caught() {
     if (!ctx) return;
+    busy(1600);
     const t = ctx.currentTime;
     [311, 330, 466].forEach((hz) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
@@ -91,6 +96,7 @@
   // Click of the flashlight switching on.
   function click() {
     if (!ctx) return;
+    busy(120);
     const t = ctx.currentTime;
     const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     n.buffer = noiseBuffer(0.03);
@@ -102,5 +108,6 @@
 
   function setVolume(v) { if (master) master.gain.value = v; }
 
-  MC.sfx = { unlock, footstep, approach, growl, caught, click, setVolume };
+  const api = { unlock, footstep, approach, growl, caught, click, setVolume, busyUntil: 0 };
+  MC.sfx = api;
 })(window.MC = window.MC || {});

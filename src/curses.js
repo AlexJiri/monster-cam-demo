@@ -1,7 +1,7 @@
 // Curses: rules with their own timer ("don't blink 5 s"). Gifts add them, the camera checks them.
 // Breaking an active curse = caught. Same curse again extends its timer up to a cap.
 (function (MC) {
-  const TYPES = ['blink', 'smile', 'move'];
+  const TYPES = ['blink', 'smile', 'move', 'sound'];
 
   class Curses {
     constructor(settings, { onCaught, onChange }) {
@@ -24,10 +24,12 @@
         cur.ends = Math.min(cur.ends + cfg.seconds * 1000, cap);
         cur.capped = cur.ends >= cap;
         cur.bumped = now;
-        cur.by = by;
+        // Everyone who fed this curse shares the credit if it catches the streamer.
+        if (!cur.users.includes(by)) cur.users.push(by);
+        cur.by = cur.users.join(' + ');
       } else if (this.active.length < this.s.maxCurses) {
         const starts = now + this.s.graceMs;
-        this.active.push({ type, starts, ends: starts + cfg.seconds * 1000, by });
+        this.active.push({ type, starts, ends: starts + cfg.seconds * 1000, by, users: [by] });
       } else {
         this.queue.push({ type, by });
       }
@@ -43,14 +45,18 @@
         this.add(next.type, next.by, now);
       }
       if (this.active.length !== before) this.onChange();
-      if (!face.face || now < this.immuneUntil) return;
+      if (now < this.immuneUntil) return;
 
       for (const c of this.active) {
         if (now < c.starts) continue; // still in the warning period
+        // Face rules need a face in view; sound counts even when the face is lost.
+        const loud = face.sound > this.s.soundThreshold;
         const broke =
-          (c.type === 'blink' && face.blink > this.s.blinkThreshold) ||
-          (c.type === 'smile' && face.smile > this.s.smileThreshold) ||
-          (c.type === 'move' && face.move > this.s.moveThreshold);
+          (face.face && c.type === 'blink' && face.blink > this.s.blinkThreshold) ||
+          (face.face && c.type === 'smile' && face.smile > this.s.smileThreshold) ||
+          // Freeze = no moving and no sound; Silence = no sound.
+          (c.type === 'move' && ((face.face && face.move > this.s.moveThreshold) || loud)) ||
+          (c.type === 'sound' && loud);
         if (broke) {
           this.active = this.active.filter((x) => x !== c);
           this.immuneUntil = now + 2000; // short breather after getting caught

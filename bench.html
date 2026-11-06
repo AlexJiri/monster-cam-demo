@@ -166,6 +166,8 @@
 <script src="src/events.js"></script>
 <script src="src/face.js"></script>
 <script src="src/curses.js"></script>
+<script src="src/sfx.js"></script>
+<script src="src/mic.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -212,6 +214,7 @@
     { key: 'smile', label: '😀 Smile', th: () => S.smileThreshold, max: 1 },
     { key: 'blink', label: '👁️ Blink', th: () => S.blinkThreshold, max: 1 },
     { key: 'move', label: '↔️ Movement', th: () => S.moveThreshold, max: 4 },
+    { key: 'sound', label: '🎤 Sound', th: () => S.soundThreshold, max: 1 },
   ];
   $('meters').innerHTML = METERS.map((m) => `<div class="meter"><span>${m.label}</span><div class="track"><div class="fill" id="f-${m.key}"></div><div class="mark" id="m-${m.key}"></div></div><span class="val" id="v-${m.key}">0.00</span></div>`).join('');
 
@@ -250,6 +253,8 @@
       $('empty').style.display = 'none';
       $('calBtn').disabled = false;
       log('📷 Camera and face model ready. Calibrate next.');
+      try { const mic = new MC.Mic(); await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); }
+      catch (err) { log('🎤 No microphone access: the sound meter stays at 0.'); }
     } catch (e) {
       $('startBtn').disabled = false;
       const msg = e && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser and try again.'
@@ -272,8 +277,8 @@
     log('🎯 Calibrating: keep a relaxed, neutral face for 3 seconds.');
     // Visible countdown while the neutral face is recorded.
     let n = 3;
-    notice(`Relaxed face, look at the camera<big>${n}</big>`);
-    const timer = setInterval(() => { n--; if (n > 0) notice(`Relaxed face, look at the camera<big>${n}</big>`); }, 1000);
+    notice(`Relaxed face, stay quiet<big>${n}</big>`);
+    const timer = setInterval(() => { n--; if (n > 0) notice(`Relaxed face, stay quiet<big>${n}</big>`); }, 1000);
     const r = await face.calibrate(3000);
     clearInterval(timer);
     calibrating = false;
@@ -283,6 +288,7 @@
       log(`⚠️ Calibration refused: ${r.rejected === 'smile' ? 'smile' : 'eyes'} too far from a neutral face. Previous calibration kept.`);
     } else if (r.samples) {
       calibrated = true;
+      if (r.noiseFloor != null) log(`🎤 Room noise measured: ${r.noiseFloor.toFixed(2)}`);
       notice(`Calibrated ✓<br><small>neutral smile ${r.smile.toFixed(2)} · eyes ${r.blink.toFixed(2)}</small>`, 2500);
       log(`🎯 Calibrated (${r.samples} frames). Neutral smile ${r.smile.toFixed(2)}, eyes ${r.blink.toFixed(2)}.`);
     } else {
@@ -331,7 +337,7 @@
     face.startFake();
     $('calBtn').disabled = false;
     $('empty').textContent = 'Manual mode: move the sliders below to act as the face.';
-    $('fakeSliders').innerHTML = ['smile', 'blink', 'move'].map((k) =>
+    $('fakeSliders').innerHTML = ['smile', 'blink', 'move', 'sound'].map((k) =>
       `<label class="field"><span>${k}</span><input type="range" min="0" max="${k === 'move' ? 4 : 1}" step="0.01" value="0" data-fake="${k}"><output>0</output></label>`).join('');
     $('fakeSliders').querySelectorAll('input').forEach((i) => i.oninput = () => { face.fake[i.dataset.fake] = +i.value; i.nextElementSibling.textContent = (+i.value).toFixed(2); });
     log('🎚️ Manual mode on.');
@@ -370,6 +376,7 @@
     ['smileThreshold', 'Smile sensitivity', 0.1, 0.9, 0.05],
     ['blinkThreshold', 'Blink sensitivity', 0.2, 0.9, 0.05],
     ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1],
+    ['soundThreshold', 'Sound sensitivity', 0.05, 0.9, 0.05],
     ['lives', 'Lives', 1, 9, 1],
     ['maxCurses', 'Curses at once', 1, 5, 1],
     ['roundSeconds', 'Round length (s)', 30, 600, 30],
@@ -381,7 +388,7 @@
     SLIDERS.forEach(([k]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value; if (k === 'lives') { lives = S.lives; renderLives(); } save(); }; });
 
     const EFFECT_LABEL = { all: 'All curses', sweep: '🔦 Extra sweep', stare: '👁️ Monster stare' };
-    const opts = (sel) => ['blink', 'smile', 'move', 'all', 'sweep', 'stare'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
+    const opts = (sel) => ['blink', 'smile', 'move', 'sound', 'all', 'sweep', 'stare'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
     $('giftRows').innerHTML = S.gifts.map((g, i) => `<tr>
       <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
       <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>

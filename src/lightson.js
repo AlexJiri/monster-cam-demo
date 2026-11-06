@@ -44,7 +44,12 @@
         if (this.phase === 'idle') this.nextAt = now;
         return true;
       }
-      if (effect === 'stare' && this.phase !== 'stare' && this.phase !== 'stareWarn') {
+      if (effect === 'stare') {
+        if (this.phase === 'stare' || this.phase === 'stareWarn') {
+          // Another viewer joins the stare: they share the credit.
+          if (user && !(this.by || '').split(' + ').includes(user)) this.by = this.by ? `${this.by} + ${user}` : user;
+          return true;
+        }
         MC.sfx.growl(0.9, 0.8);
         this.set('stareWarn', now, { end: now + 900, by: user, hunting: false });
         return true;
@@ -123,12 +128,14 @@
       else if (this.beam && box) lit = this.inBeam(box);
       if (lit && !this.lit) this.litSince = now;
       this.lit = lit;
-      if (!lit || !face.face || now - this.litSince < 350) return; // short reaction time when the light lands
+      if (!lit || now - this.litSince < 350) return; // short reaction time when the light lands
+      if (!face.face && !(this.s.lightRules.sound && face.sound > this.s.soundThreshold)) return;
       const r = this.s.lightRules;
       const broke =
         (r.move && face.move > this.s.moveThreshold && 'moved') ||
         (r.smile && face.smile > this.s.smileThreshold && 'smiled') ||
-        (r.blink && face.blink > this.s.blinkThreshold && 'blinked');
+        (r.blink && face.blink > this.s.blinkThreshold && 'blinked') ||
+        (r.sound && face.sound > this.s.soundThreshold && 'made a sound');
       if (broke) this.onCaught(broke, this.by);
     }
 

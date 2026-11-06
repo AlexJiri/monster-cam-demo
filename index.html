@@ -117,6 +117,7 @@
         <label class="check"><input type="checkbox" id="r-move"> move</label>
         <label class="check"><input type="checkbox" id="r-smile"> smile</label>
         <label class="check"><input type="checkbox" id="r-blink"> blink</label>
+        <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
         <label class="check">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:90px"></label>
         <label class="check">🌑 <input type="range" id="dark" min="0.5" max="0.97" step="0.01" aria-label="Darkness" style="width:90px"></label>
       </div>
@@ -140,6 +141,7 @@
 <script src="src/face.js"></script>
 <script src="src/curses.js"></script>
 <script src="src/sfx.js"></script>
+<script src="src/mic.js"></script>
 <script src="src/lightson.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -252,7 +254,7 @@
     }
     game.draw(now, video, st);
     $('lit').classList.toggle('on', round.running && game.lit && game.phase !== 'eaten');
-    if (!calibrating) $('status').textContent = { loading: 'Loading face model…', ready: st.face ? 'Face found' : 'No face in view', fake: 'Manual sliders' }[st.status] || 'Camera off';
+    if (!calibrating) $('status').textContent = ({ loading: 'Loading face model…', ready: st.face ? 'Face found' : 'No face in view', fake: 'Manual sliders' }[st.status] || 'Camera off') + (face.mic || face.fake ? (st.sound > S.soundThreshold ? ' · 🔊' : ' · 🎤') : '');
     $('curses').innerHTML = curses.active.map((c) => {
       const cfg = S.curses[c.type], wait = now < c.starts;
       const left = Math.max(0, c.ends - Math.max(now, c.starts));
@@ -272,7 +274,14 @@
     MC.sfx.unlock(); MC.sfx.setVolume(S.volume);
     $('startBtn').disabled = true;
     notice('Loading camera and face model…');
-    try { await face.start(video); ready(); log('📷 Camera ready.'); }
+    try {
+      await face.start(video);
+      ready();
+      log('📷 Camera ready.');
+      // Microphone is optional: without it the sound rules simply never trigger.
+      try { const mic = new MC.Mic(); await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); }
+      catch (err) { log('🎤 No microphone access: the "silence" rules are off. Allow the microphone and reload to use them.'); }
+    }
     catch (e) {
       $('startBtn').disabled = false;
       notice(e && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser and try again.' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
@@ -282,7 +291,7 @@
     MC.sfx.unlock(); MC.sfx.setVolume(S.volume);
     face.startFake();
     ready();
-    $('fakeSliders').innerHTML = [['x', 'position', 1, 0.5], ['move', 'move', 4, 0], ['smile', 'smile', 1, 0], ['blink', 'blink', 1, 0]].map(([k, l, max, v]) =>
+    $('fakeSliders').innerHTML = [['x', 'position', 1, 0.5], ['move', 'move', 4, 0], ['smile', 'smile', 1, 0], ['blink', 'blink', 1, 0], ['sound', 'sound', 1, 0]].map(([k, l, max, v]) =>
       `<label>${l}<input type="range" min="0" max="${max}" step="0.01" value="${v}" data-fake="${k}"></label>`).join('');
     $('fakeSliders').querySelectorAll('input').forEach((i) => i.oninput = () => { face.fake[i.dataset.fake] = +i.value; });
     log('🎚️ Manual mode: the sliders act as the face.');
@@ -290,8 +299,8 @@
   $('calBtn').onclick = async () => {
     calibrating = true; $('calBtn').disabled = true;
     let n = 3;
-    notice(`Relaxed face, look at the camera<big>${n}</big>`);
-    const t = setInterval(() => { if (--n > 0) notice(`Relaxed face, look at the camera<big>${n}</big>`); }, 1000);
+    notice(`Relaxed face, stay quiet<big>${n}</big>`);
+    const t = setInterval(() => { if (--n > 0) notice(`Relaxed face, stay quiet<big>${n}</big>`); }, 1000);
     const r = await face.calibrate(3000);
     clearInterval(t); calibrating = false; $('calBtn').disabled = false;
     if (r.rejected) notice(r.rejected === 'smile' ? 'You were smiling 😏<br><small>Relax and calibrate again.</small>' : 'Eyes looked half closed<br><small>Calibrate again.</small>');
@@ -300,7 +309,7 @@
   };
 
   // ---------- Settings on this page ----------
-  ['move', 'smile', 'blink'].forEach((k) => {
+  ['move', 'smile', 'blink', 'sound'].forEach((k) => {
     const c = $('r-' + k);
     c.checked = !!S.lightRules[k];
     c.onchange = () => { S.lightRules[k] = c.checked; save(); };
@@ -333,6 +342,7 @@
     }
     else curses.add(rule.curse, e.user, now);
     const what = EFFECT_TEXT[rule.curse] || `cursed you: ${S.curses[rule.curse].label}`;
+    if (rule.curse === 'sound' && !face.mic && !face.fake) log('🎤 Silence curse sent, but the microphone is off.');
     feed(`🎁 <b>${esc(e.user)}</b> ${what}`);
     log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → ${rule.curse}`);
   });

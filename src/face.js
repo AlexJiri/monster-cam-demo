@@ -15,7 +15,8 @@
 
   class Face {
     constructor() {
-      this.state = { status: 'off', face: false, smile: 0, blink: 0, move: 0, box: null, raw: { smile: 0, blink: 0 } };
+      this.state = { status: 'off', face: false, smile: 0, blink: 0, move: 0, sound: 0, box: null, raw: { smile: 0, blink: 0 } };
+      this.mic = null; // optional MC.Mic; its level becomes state.sound
       this.base = { smile: 0, blink: 0 };
       this.listeners = [];
       this.fake = null; // debug values used when there is no camera
@@ -51,7 +52,7 @@
 
     // Debug: drive the detector by hand (no camera needed).
     startFake() {
-      this.fake = { smile: 0, blink: 0, move: 0, x: 0.5 };
+      this.fake = { smile: 0, blink: 0, move: 0, sound: 0, x: 0.5 };
       this.state.status = 'fake';
       this.loop();
     }
@@ -66,12 +67,14 @@
           this.state.smile = this.fake.smile;
           this.state.blink = this.fake.blink;
           this.state.move = this.fake.move;
+          this.state.sound = this.fake.sound;
           // A pretend face in the middle of the frame; `x` (0..1, as seen on screen) slides it sideways.
           this.state.box = { x: 1 - this.fake.x - 0.14, y: 0.3, w: 0.28, h: 0.4 };
         } else if (this.landmarker && this.video.currentTime !== lastTime) {
           lastTime = this.video.currentTime;
           this.read(this.landmarker.detectForVideo(this.video, performance.now()));
         }
+        if (this.mic && !this.fake) { this.state.sound = this.mic.read(); this.mic.sample(); }
         this.listeners.forEach((fn) => fn(this.state));
         requestAnimationFrame(tick);
       };
@@ -108,9 +111,11 @@
       return new Promise((resolve) => {
         const samples = [];
         const take = (st) => { if (st.face) samples.push({ ...st.raw }); };
+        if (this.mic) this.mic.calibrateStart(); // the room's background noise, measured at the same time
         this.onFrame(take);
         setTimeout(() => {
           this.listeners = this.listeners.filter((f) => f !== take);
+          const noiseFloor = this.mic ? this.mic.calibrateEnd() : null;
           if (!samples.length) { resolve({ ...this.base, samples: 0 }); return; }
           const avg = (list, k) => list.reduce((a, b) => a + b[k], 0) / list.length;
           // Ignore the frames where the eyes were closed, so a natural blink doesn't raise the baseline.
@@ -125,7 +130,7 @@
           }
           this.base.smile = smile;
           this.base.blink = blink;
-          resolve({ ...this.base, samples: samples.length });
+          resolve({ ...this.base, samples: samples.length, noiseFloor });
         }, ms);
       });
     }
