@@ -18,6 +18,7 @@
       this.phase = 'off';
       this.pending = []; // hunts requested by gifts: names of the viewers who sent them
       this.by = null; // viewer behind the current hunt or stare (null = the monster's own patrol)
+      this.shieldUntil = 0; // monster chained by helpers until this time
       this.lit = false;
       this.litSince = 0;
       this.beam = null;
@@ -129,6 +130,7 @@
       if (lit && !this.lit) this.litSince = now;
       this.lit = lit;
       if (!lit || now - this.litSince < 350) return; // short reaction time when the light lands
+      if (now < this.shieldUntil) return; // chained: it sees you but can't get you
       if (!face.face && !(this.s.lightRules.sound && face.sound > this.s.soundThreshold)) return;
       const r = this.s.lightRules;
       const broke =
@@ -171,6 +173,7 @@
       if (this.phase !== 'stare') this.drawHunter(now, W, H);
       if (this.phase === 'stare' || this.phase === 'stareWarn') this.drawStare(now, W, H);
       if (this.phase === 'eaten') this.drawJaws(now, W, H);
+      if (now < this.shieldUntil) this.drawChains(now, W, H);
       ctx.restore();
     }
 
@@ -334,6 +337,27 @@
         else { ctx.moveTo(i * w, y); ctx.lineTo(i * w + w / 2, y + size); ctx.lineTo((i + 1) * w, y); }
         ctx.closePath(); ctx.fill(); ctx.stroke();
       }
+    }
+
+    // Helpers chained the monster: chains across the top and a cold glow around the frame.
+    drawChains(now, W, H) {
+      const ctx = this.ctx;
+      const left = this.shieldUntil - now;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, left / 400);
+      const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.7);
+      g.addColorStop(0, 'rgba(90,170,255,0)'); g.addColorStop(1, 'rgba(90,170,255,0.35)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#c9d3e0'; ctx.lineWidth = W * 0.008;
+      for (const y of [0.1, 0.16]) {
+        for (let x = -0.02; x < 1.02; x += 0.045) {
+          const sag = Math.sin(x * Math.PI) * 0.025;
+          ctx.beginPath();
+          ctx.ellipse(x * W, (y + sag) * H, W * 0.022, H * 0.016, ((x * 40) % 2 ? 0.3 : -0.3), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
     }
 
     // Caught: jaws close over the face, red flash.

@@ -162,12 +162,12 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1793961202"></script>
-<script src="src/events.js?v=1793961202"></script>
-<script src="src/face.js?v=1793961202"></script>
-<script src="src/curses.js?v=1793961202"></script>
-<script src="src/sfx.js?v=1793961202"></script>
-<script src="src/mic.js?v=1793961202"></script>
+<script src="src/settings.js?v=1793961615"></script>
+<script src="src/events.js?v=1793961615"></script>
+<script src="src/face.js?v=1793961615"></script>
+<script src="src/curses.js?v=1793961615"></script>
+<script src="src/sfx.js?v=1793961615"></script>
+<script src="src/mic.js?v=1793961615"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -365,7 +365,7 @@
     if (!rule) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (no effect set)`); return; }
     const n = giftCount[e.gift];
     if (n % Math.max(1, rule.every)) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (${n % rule.every}/${rule.every})`); return; }
-    if (rule.curse === 'sweep' || rule.curse === 'stare') { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${rule.curse} (works in Lights On)`); return; }
+    if (['sweep', 'stare', 'shield', 'cleanse'].includes(rule.curse)) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${rule.curse} (works in Lights On)`); return; }
     const label = rule.curse === 'all' ? 'all curses' : S.curses[rule.curse].label;
     log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${label}`);
     if (lives) curses.add(rule.curse, e.user);
@@ -387,8 +387,8 @@
       `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${S[k]}"><output>${S[k]}</output></label>`).join('');
     SLIDERS.forEach(([k]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value; if (k === 'lives') { lives = S.lives; renderLives(); } save(); }; });
 
-    const EFFECT_LABEL = { all: 'All curses', sweep: '🔦 Extra sweep', stare: '👁️ Monster stare' };
-    const opts = (sel) => ['blink', 'smile', 'move', 'sound', 'all', 'sweep', 'stare'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
+    const EFFECT_LABEL = { all: 'All curses', sweep: '🔦 Hunt the streamer', stare: '👁️ Monster stare', shield: '🛡️ Chain the monster', cleanse: '🧹 Remove curses' };
+    const opts = (sel) => ['blink', 'smile', 'move', 'sound', 'all', 'sweep', 'stare', 'shield', 'cleanse'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
     $('giftRows').innerHTML = S.gifts.map((g, i) => `<tr>
       <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
       <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>

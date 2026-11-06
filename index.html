@@ -40,6 +40,10 @@
   .lives { font-size: 24px; }
   .timer { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .timer.low { color: var(--blood); }
+  .helpers { position: absolute; left: 12px; top: 54px; display: grid; gap: 6px; justify-items: start; pointer-events: none; }
+  .helpers .pill { font-size: 13px; }
+  #shieldPill { background: rgba(90, 170, 255, 0.85); color: #04121f; font-weight: 700; }
+  .banner.help { background: rgba(60, 140, 230, 0.92); }
   .banner { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: rgba(224, 57, 62, 0.92); color: #fff; font-weight: 700; border-radius: 10px; padding: 6px 16px; font-size: 18px; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; display: none; pointer-events: none; }
   .banner.on { display: block; animation: pop 0.25s ease-out; }
   @keyframes pop { from { transform: translate(-50%, -8px) scale(0.9); opacity: 0; } }
@@ -96,6 +100,10 @@
       <span class="pill timer" id="timer" hidden></span>
       <span class="pill" id="status">Camera off</span>
     </div>
+    <div class="helpers">
+      <span class="pill" id="shieldPill" hidden></span>
+      <span class="pill" id="likeBar" title="Likes chain the monster when the bar is full"></span>
+    </div>
     <div class="feed" id="feed"></div>
     <div class="curses" id="curses"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
@@ -127,7 +135,7 @@
       <h2>Simulator</h2>
       <div class="row">
         <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
-        <button data-sim="like">❤️ 10 likes</button>
+        <button data-sim="like">❤️ 25 likes</button>
         <button data-sim="follow">➕ Follow</button>
       </div>
       <div class="row" id="giftBtns"></div>
@@ -136,13 +144,13 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1793961202"></script>
-<script src="src/events.js?v=1793961202"></script>
-<script src="src/face.js?v=1793961202"></script>
-<script src="src/curses.js?v=1793961202"></script>
-<script src="src/sfx.js?v=1793961202"></script>
-<script src="src/mic.js?v=1793961202"></script>
-<script src="src/lightson.js?v=1793961202"></script>
+<script src="src/settings.js?v=1793961615"></script>
+<script src="src/events.js?v=1793961615"></script>
+<script src="src/face.js?v=1793961615"></script>
+<script src="src/curses.js?v=1793961615"></script>
+<script src="src/sfx.js?v=1793961615"></script>
+<script src="src/mic.js?v=1793961615"></script>
+<script src="src/lightson.js?v=1793961615"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -170,8 +178,19 @@
   // ---------- Game ----------
   // Who caught the streamer this round, in order. `by` is a viewer name, or null for the monster's own patrol.
   let catches = [];
-  function banner(html) {
+  // Viewers who helped: chained the monster or cleared curses.
+  let savers = [];
+  let likes = 0;
+  function chain(user, now) {
+    game.shieldUntil = Math.max(now, game.shieldUntil) + S.shieldSeconds * 1000;
+    curses.immuneUntil = Math.max(curses.immuneUntil, game.shieldUntil); // curses can't catch either
+    if (!savers.includes(user)) savers.push(user);
+    banner(`🛡️ ${esc(user)} chained the monster!`, true);
+    log(`🛡️ ${esc(user)} chained the monster for ${S.shieldSeconds} s.`);
+  }
+  function banner(html, help) {
     $('banner').innerHTML = html;
+    $('banner').classList.toggle('help', !!help);
     $('banner').classList.remove('on'); void $('banner').offsetWidth; $('banner').classList.add('on');
     clearTimeout(banner.t);
     banner.t = setTimeout(() => $('banner').classList.remove('on'), 2600);
@@ -207,6 +226,10 @@
     MC.sfx.unlock();
     lives = S.lives; renderLives();
     catches = [];
+    savers = [];
+    likes = 0;
+    game.shieldUntil = 0;
+    renderLikes();
     curses.clear();
     round.running = true;
     round.ends = performance.now() + S.roundSeconds * 1000;
@@ -229,9 +252,10 @@
     const last = catches[catches.length - 1];
     const eater = last && last.by ? `${esc(last.by)} ate the streamer!` : 'The hunter ate the streamer!';
     const who = catches.map((c) => (c.by ? esc(c.by) : 'the hunter')).join(', ');
+    const saved = savers.length ? `<span class="catches">🛡️ Saved by: ${savers.map(esc).join(', ')}</span>` : '';
     notice(won
-      ? `<big>You survived!</big>${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
-      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span><span class="catches">Caught by: ${who}</span>${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
+      ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
+      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span><span class="catches">Caught by: ${who}</span>${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
@@ -246,6 +270,9 @@
     if (round.running && !calibrating) {
       game.update(now, st);
       if (game.phase !== 'eaten' && lives) curses.tick(st, now);
+      const shieldLeft = game.shieldUntil - now;
+      $('shieldPill').hidden = shieldLeft <= 0;
+      if (shieldLeft > 0) $('shieldPill').textContent = `🛡️ Monster chained ${Math.ceil(shieldLeft / 1000)} s`;
       const left = Math.max(0, round.ends - now);
       const secs = Math.ceil(left / 1000);
       $('timer').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
@@ -322,13 +349,20 @@
   // ---------- Simulator / live events ----------
   const viewer = () => $('viewer').value.trim() || 'viewer';
   document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () =>
-    MC.bus.emit(b.dataset.sim === 'like' ? { type: 'like', user: viewer(), count: 10 } : { type: 'follow', user: viewer() }));
+    MC.bus.emit(b.dataset.sim === 'like' ? { type: 'like', user: viewer(), count: 25 } : { type: 'follow', user: viewer() }));
   $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.gift)}</button>`).join('');
   $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift, count: 1 }));
 
   const EFFECT_TEXT = { sweep: 'sent the hunter', stare: 'made it look at you', all: 'cursed you with everything' };
   MC.bus.on('*', (e) => {
-    if (e.type === 'like') { feed(`❤️ ${esc(e.user)} ×${e.count}`); return; }
+    if (e.type === 'like') {
+      feed(`❤️ ${esc(e.user)} ×${e.count}`);
+      if (!round.running) return;
+      likes += e.count || 1;
+      if (likes >= S.likesForShield) { likes -= S.likesForShield; chain('Chat', performance.now()); }
+      renderLikes();
+      return;
+    }
     if (e.type === 'follow') { feed(`➕ ${esc(e.user)} followed`); return; }
     if (e.type !== 'gift') return;
     const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase());
@@ -336,6 +370,15 @@
     if (!rule || giftCount[e.gift] % Math.max(1, rule.every)) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); return; }
     if (!round.running) { log(`🎁 ${esc(e.gift)} ignored: start a round first.`); return; }
     const now = performance.now();
+    if (rule.curse === 'shield') { chain(e.user, now); return; }
+    if (rule.curse === 'cleanse') {
+      const n = curses.active.length + curses.queue.length;
+      curses.clear();
+      if (!savers.includes(e.user)) savers.push(e.user);
+      banner(`🧹 ${esc(e.user)} removed ${n} curse${n === 1 ? '' : 's'}!`, true);
+      log(`🧹 ${esc(e.user)} cleared the curses.`);
+      return;
+    }
     if (rule.curse === 'sweep' || rule.curse === 'stare') {
       game.gift(rule.curse, now, e.user);
       banner(rule.curse === 'sweep' ? `🔦 ${esc(e.user)} sent the hunter after you!` : `👁️ ${esc(e.user)} made it look at you!`);
@@ -347,6 +390,8 @@
     log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → ${rule.curse}`);
   });
 
+  function renderLikes() { $('likeBar').textContent = `❤️ ${Math.min(likes, S.likesForShield)}/${S.likesForShield} likes to chain it`; }
+  renderLikes();
   renderLives();
   face.loop(); // draw the stage even before the camera starts
 </script>

@@ -20,6 +20,8 @@
     warnSeconds: 1.5, // footsteps before the light arrives
     darkness: 0.85, // 0 = no darkness, 1 = pitch black between sweeps
     stareSeconds: 3, // big gift: the monster looks straight into the camera
+    shieldSeconds: 6, // helper gift: the monster is chained and can't catch the streamer
+    likesForShield: 100, // chat fills a bar with likes; when full, the monster is chained
     // Dares are written by the streamer: keep them harmless (TikTok removes lives with dangerous challenges).
     loseDares: [
       'Talk like a pirate for 1 minute',
@@ -40,7 +42,8 @@
       sound: { label: 'Silence', icon: '🤫', seconds: 5, maxSeconds: 15 },
     },
     // `every`: trigger once per N gifts of that kind (e.g. a curse every 10 roses).
-    // `curse`: blink | smile | move | sound | all (curses) or sweep | stare (Lights On flashlight).
+    // `curse`: blink | smile | move | sound | all (curses), sweep | stare (Lights On flashlight),
+    // shield | cleanse (help the streamer: chain the monster, remove all curses).
     // Gift names must match TikTok's; rename them in the settings to the gifts you want.
     gifts: [
       { gift: 'Rose', curse: 'blink', every: 1 },
@@ -50,6 +53,8 @@
       { gift: 'Doughnut', curse: 'sweep', every: 1 },
       { gift: 'Lion', curse: 'stare', every: 1 },
       { gift: 'Microphone', curse: 'sound', every: 1 },
+      { gift: 'Hand Hearts', curse: 'shield', every: 1 },
+      { gift: 'Heart Me', curse: 'cleanse', every: 1 },
     ],
   };
 
@@ -61,7 +66,7 @@
       if (saved) {
         const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules } };
         // Saves from before Lights On have no gift for the flashlight effects: add the defaults.
-        for (const eff of ['sweep', 'stare', 'sound']) {
+        for (const eff of ['sweep', 'stare', 'sound', 'shield', 'cleanse']) {
           if (!s.gifts.some((g) => g.curse === eff)) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.curse === eff)));
         }
         return s;
