@@ -144,13 +144,13 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1793961994"></script>
-<script src="src/events.js?v=1793961994"></script>
-<script src="src/face.js?v=1793961994"></script>
-<script src="src/curses.js?v=1793961994"></script>
-<script src="src/sfx.js?v=1793961994"></script>
-<script src="src/mic.js?v=1793961994"></script>
-<script src="src/lightson.js?v=1793961994"></script>
+<script src="src/settings.js?v=1793962089"></script>
+<script src="src/events.js?v=1793962089"></script>
+<script src="src/face.js?v=1793962089"></script>
+<script src="src/curses.js?v=1793962089"></script>
+<script src="src/sfx.js?v=1793962089"></script>
+<script src="src/mic.js?v=1793962089"></script>
+<script src="src/lightson.js?v=1793962089"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -181,12 +181,17 @@
   // Viewers who helped: chained the monster or cleared curses.
   let savers = [];
   let likes = 0;
-  function chain(user, now) {
+  let likers = {}; // likes per viewer in the current bar
+  // `users`: one name, or several (the top likers who filled the bar).
+  function chain(users, now) {
+    users = [].concat(users);
     game.shieldUntil = Math.max(now, game.shieldUntil) + S.shieldSeconds * 1000;
     curses.immuneUntil = Math.max(curses.immuneUntil, game.shieldUntil); // curses can't catch either
-    if (!savers.includes(user)) savers.push(user);
-    banner(`🛡️ ${esc(user)} chained the monster!`, true);
-    log(`🛡️ ${esc(user)} chained the monster for ${S.shieldSeconds} s.`);
+    users.forEach((u) => { if (!savers.includes(u)) savers.push(u); });
+    const names = users.map(esc);
+    const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}` : names[0];
+    banner(`🛡️ ${who} chained the monster!`, true);
+    log(`🛡️ ${who} chained the monster for ${S.shieldSeconds} s.`);
   }
   function banner(html, help) {
     $('banner').innerHTML = html;
@@ -228,6 +233,7 @@
     catches = [];
     savers = [];
     likes = 0;
+    likers = {};
     game.shieldUntil = 0;
     renderLikes();
     curses.clear();
@@ -359,8 +365,14 @@
       feed(`❤️ ${esc(e.user)} ×${e.count}`);
       if (!round.running) return;
       likes += e.count || 1;
-      // The viewer whose likes fill the bar gets the credit.
-      if (likes >= S.likesForShield) { likes -= S.likesForShield; chain(e.user, performance.now()); }
+      likers[e.user] = (likers[e.user] || 0) + (e.count || 1);
+      // When the bar is full, the top 3 likers of this bar get the credit.
+      if (likes >= S.likesForShield) {
+        const top = Object.entries(likers).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([u]) => u);
+        likes -= S.likesForShield;
+        likers = {};
+        chain(top, performance.now());
+      }
       renderLikes();
       return;
     }
