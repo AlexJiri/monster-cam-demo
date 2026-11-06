@@ -16,7 +16,8 @@
       this.onCaught = onCaught;
       this.onPhase = onPhase || (() => {});
       this.phase = 'off';
-      this.pending = 0; // extra sweeps requested by gifts
+      this.pending = []; // hunts requested by gifts: names of the viewers who sent them
+      this.by = null; // viewer behind the current hunt or stare (null = the monster's own patrol)
       this.lit = false;
       this.litSince = 0;
       this.beam = null;
@@ -34,15 +35,21 @@
       this.onPhase(phase);
     }
 
-    gift(effect, now) {
-      if (this.phase === 'off' || this.phase === 'eaten') return;
+    // sweep: the hunter comes looking for the streamer (the beam homes in on the face).
+    // stare: the monster looks straight into the camera.
+    gift(effect, now, user) {
+      if (this.phase === 'off' || this.phase === 'eaten') return false;
       if (effect === 'sweep') {
-        if (this.phase === 'idle') this.nextAt = now; else this.pending++;
+        this.pending.push(user);
+        if (this.phase === 'idle') this.nextAt = now;
+        return true;
       }
       if (effect === 'stare' && this.phase !== 'stare' && this.phase !== 'stareWarn') {
         MC.sfx.growl(0.9, 0.8);
-        this.set('stareWarn', now, { end: now + 900 });
+        this.set('stareWarn', now, { end: now + 900, by: user, hunting: false });
+        return true;
       }
+      return false;
     }
 
     // Called by the game when the streamer gets caught (by the light or by a curse).
@@ -57,11 +64,14 @@
       switch (this.phase) {
         case 'idle':
           this.beam = null;
-          if (now >= this.nextAt || this.pending > 0) {
-            if (this.pending > 0) this.pending--;
+          if (now >= this.nextAt || this.pending.length) {
+            // A gift turns the next pass into a hunt that homes in on the streamer.
+            const hunting = this.pending.length > 0;
+            const by = hunting ? this.pending.shift() : null;
             const dir = Math.random() < 0.5 ? 1 : -1;
             MC.sfx.approach(s.warnSeconds);
-            this.set('warn', now, { dir, end: now + s.warnSeconds * 1000, swing: rand(0, TAU) });
+            if (hunting) MC.sfx.growl(s.warnSeconds, 0.6);
+            this.set('warn', now, { dir, end: now + s.warnSeconds * 1000, swing: rand(0, TAU), by, hunting });
           }
           break;
         case 'warn':
@@ -72,8 +82,17 @@
           const p = Math.min(1, (now - this.t0) / (this.end - this.t0));
           this.monster.x = this.dir > 0 ? lerp(-0.15, 1.15, p) : lerp(1.15, -0.15, p);
           // The beam swings left and right while the monster walks.
-          const angle = Math.sin(p * TAU * 1.3 + this.swing) * 0.55;
-          this.beam = { ox: this.monster.x + 0.05 * this.dir, oy: 0.17, angle, half: 0.2 };
+          let angle = Math.sin(p * TAU * 1.3 + this.swing) * 0.55;
+          const ox = this.monster.x + 0.05 * this.dir, oy = 0.17;
+          const box = this.hunting && this.screenBox(face);
+          if (box) {
+            // Hunt: in the middle of the pass the beam locks onto the face.
+            const W = this.cv.width, H = this.cv.height;
+            const target = Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H);
+            const lock = Math.sin(p * Math.PI) ** 0.6; // 0 at the edges, 1 in the middle
+            angle = lerp(angle, target, lock);
+          }
+          this.beam = { ox, oy, angle, half: this.hunting ? 0.24 : 0.2 };
           if (now >= this.end) {
             this.beam = null;
             this.set('idle', now);
@@ -110,7 +129,7 @@
         (r.move && face.move > this.s.moveThreshold && 'moved') ||
         (r.smile && face.smile > this.s.smileThreshold && 'smiled') ||
         (r.blink && face.blink > this.s.blinkThreshold && 'blinked');
-      if (broke) this.onCaught(broke);
+      if (broke) this.onCaught(broke, this.by);
     }
 
     inBeam(box) {

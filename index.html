@@ -40,6 +40,10 @@
   .lives { font-size: 24px; }
   .timer { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .timer.low { color: var(--blood); }
+  .banner { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: rgba(224, 57, 62, 0.92); color: #fff; font-weight: 700; border-radius: 10px; padding: 6px 16px; font-size: 18px; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; display: none; pointer-events: none; }
+  .banner.on { display: block; animation: pop 0.25s ease-out; }
+  @keyframes pop { from { transform: translate(-50%, -8px) scale(0.9); opacity: 0; } }
+  .notice .catches { display: block; font-size: 14px; font-weight: 400; color: var(--muted); margin-top: 4px; }
   .lit { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(242, 193, 78, 0.92); color: #1b1400; font-weight: 700; border-radius: 999px; padding: 4px 16px; font-size: 18px; display: none; pointer-events: none; }
   .lit.on { display: block; }
   .curses { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 6px; width: min(240px, 60%); pointer-events: none; }
@@ -94,6 +98,7 @@
     </div>
     <div class="feed" id="feed"></div>
     <div class="curses" id="curses"></div>
+    <div class="banner" id="banner" aria-live="polite"></div>
     <div class="lit" id="lit">🔦 The light is on you. Freeze!</div>
     <div class="notice on" id="notice">Start the camera, calibrate, then start a round.<br><small style="font-weight:400;color:var(--muted)">Everything runs on this computer; no video is sent anywhere.</small></div>
   </div>
@@ -161,28 +166,36 @@
   const renderLives = () => { $('lives').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, S.lives - lives)); };
 
   // ---------- Game ----------
-  let lastCaughtBy = '';
+  // Who caught the streamer this round, in order. `by` is a viewer name, or null for the monster's own patrol.
+  let catches = [];
+  function banner(html) {
+    $('banner').innerHTML = html;
+    $('banner').classList.remove('on'); void $('banner').offsetWidth; $('banner').classList.add('on');
+    clearTimeout(banner.t);
+    banner.t = setTimeout(() => $('banner').classList.remove('on'), 2600);
+  }
   const game = new MC.LightsOn($('cv'), S, {
-    onCaught: (why) => caught(`you ${why} in the light`),
+    onCaught: (why, by) => caught(`${why} in the light`, by),
     onPhase: (p) => {
       if (p === 'warn') feed('👣 Footsteps…');
       if (p === 'stare') feed('👁️ It is looking at you');
     },
   });
   const curses = new MC.Curses(S, {
-    onCaught: (c) => { lastCaughtBy = c.by; caught(`you broke “${S.curses[c.type].label}”`); },
+    onCaught: (c) => caught(`broke “${S.curses[c.type].label}”`, c.by),
     onChange() {},
   });
 
-  function caught(why) {
+  function caught(why, by = null) {
     if (!round.running || game.phase === 'eaten') return;
     const now = performance.now();
     lives = Math.max(0, lives - 1);
     renderLives();
     game.eat(now, face.state);
     curses.clear();
-    log(`🩸 Caught: ${why}${lastCaughtBy ? ` (curse from ${esc(lastCaughtBy)})` : ''}. Lives left: ${lives}`);
-    lastCaughtBy = '';
+    catches.push({ by, why });
+    banner(by ? `🩸 ${esc(by)} got the streamer!` : '🩸 The hunter got the streamer!');
+    log(`🩸 Caught: ${why}${by ? ` (thanks to ${esc(by)})` : ''}. Lives left: ${lives}`);
     if (!lives) setTimeout(() => endRound(false), 1600);
   }
 
@@ -191,6 +204,7 @@
   function startRound() {
     MC.sfx.unlock();
     lives = S.lives; renderLives();
+    catches = [];
     curses.clear();
     round.running = true;
     round.ends = performance.now() + S.roundSeconds * 1000;
@@ -209,7 +223,13 @@
     $('roundBtn').textContent = '▶ Start round';
     const list = (won ? S.winDares : S.loseDares).filter(Boolean);
     const dare = list.length ? pick(list) : '';
-    notice(`<big>${won ? 'You survived!' : 'Eaten!'}</big>${dare ? `<span class="dare">${won ? '' : 'Dare: '}${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
+    // Lost: the viewer behind the final catch "ate" the streamer; list everyone who caught them.
+    const last = catches[catches.length - 1];
+    const eater = last && last.by ? `${esc(last.by)} ate the streamer!` : 'The hunter ate the streamer!';
+    const who = catches.map((c) => (c.by ? esc(c.by) : 'the hunter')).join(', ');
+    notice(won
+      ? `<big>You survived!</big>${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
+      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span><span class="catches">Caught by: ${who}</span>${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
@@ -307,7 +327,10 @@
     if (!rule || giftCount[e.gift] % Math.max(1, rule.every)) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); return; }
     if (!round.running) { log(`🎁 ${esc(e.gift)} ignored: start a round first.`); return; }
     const now = performance.now();
-    if (rule.curse === 'sweep' || rule.curse === 'stare') game.gift(rule.curse, now);
+    if (rule.curse === 'sweep' || rule.curse === 'stare') {
+      game.gift(rule.curse, now, e.user);
+      banner(rule.curse === 'sweep' ? `🔦 ${esc(e.user)} sent the hunter after you!` : `👁️ ${esc(e.user)} made it look at you!`);
+    }
     else curses.add(rule.curse, e.user, now);
     const what = EFFECT_TEXT[rule.curse] || `cursed you: ${S.curses[rule.curse].label}`;
     feed(`🎁 <b>${esc(e.user)}</b> ${what}`);
