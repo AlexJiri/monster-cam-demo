@@ -144,13 +144,13 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1793962089"></script>
-<script src="src/events.js?v=1793962089"></script>
-<script src="src/face.js?v=1793962089"></script>
-<script src="src/curses.js?v=1793962089"></script>
-<script src="src/sfx.js?v=1793962089"></script>
-<script src="src/mic.js?v=1793962089"></script>
-<script src="src/lightson.js?v=1793962089"></script>
+<script src="src/settings.js?v=1793962431"></script>
+<script src="src/events.js?v=1793962431"></script>
+<script src="src/face.js?v=1793962431"></script>
+<script src="src/curses.js?v=1793962431"></script>
+<script src="src/sfx.js?v=1793962431"></script>
+<script src="src/mic.js?v=1793962431"></script>
+<script src="src/lightson.js?v=1793962431"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -257,11 +257,15 @@
     // Lost: the viewer behind the final catch "ate" the streamer; list everyone who caught them.
     const last = catches[catches.length - 1];
     const eater = last && last.by ? `${esc(last.by)} ate the streamer!` : 'The hunter ate the streamer!';
-    const who = catches.map((c) => (c.by ? esc(c.by) : 'the hunter')).join(', ');
+    // Group repeat catchers ("Ion ×2"); skip the line when one catcher did everything (already named above).
+    const counts = {};
+    catches.forEach((c) => { const k = c.by || 'the hunter'; counts[k] = (counts[k] || 0) + 1; });
+    const names = Object.keys(counts);
+    const who = names.length > 1 ? names.map((k) => esc(k) + (counts[k] > 1 ? ` ×${counts[k]}` : '')).join(', ') : '';
     const saved = savers.length ? `<span class="catches">🛡️ Saved by: ${savers.map(esc).join(', ')}</span>` : '';
     notice(won
       ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
-      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span><span class="catches">Caught by: ${who}</span>${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
+      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
