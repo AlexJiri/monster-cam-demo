@@ -209,6 +209,7 @@
 
   <section class="panel" id="p-test" hidden>
     <h2>Test <small>· play one round with your settings</small></h2>
+    <p class="hint" id="fileNote" hidden>⚠️ This page is open as a file, so the test opens full page. Start the game with <b>start-bridge.bat</b> (http://127.0.0.1:8787) to test right here.</p>
     <p>A 60-second round with fake viewers sending your gifts and taps, right here. TikTok stays off and it doesn't count as a free round. You can also send gifts yourself from the test buttons.</p>
     <div class="row">
       <button class="primary bigBtn" id="testBtn">🧪 Start test round</button>
@@ -225,10 +226,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794345847"></script>
-<script src="src/events.js?v=1794345847"></script>
-<script src="src/face.js?v=1794345847"></script>
-<script src="src/mic.js?v=1794345847"></script>
+<script src="src/settings.js?v=1794345977"></script>
+<script src="src/events.js?v=1794345977"></script>
+<script src="src/face.js?v=1794345977"></script>
+<script src="src/mic.js?v=1794345977"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -493,6 +494,9 @@
   // The test round runs inside this tab (the Play page in test mode), with the settings just saved.
   $('testBtn').onclick = async () => {
     tidy();
+    // Opened as a file (file:///…): Chrome treats every file as a separate site, so a test round inside this page
+    // can't get the camera. Run it full page instead (best: open the game through start-bridge.bat).
+    if (location.protocol === 'file:') { location.href = 'index.html#preview'; return; }
     // Ask for the camera and microphone here, once; the test round reuses them.
     try { await MC.media.get('video'); }
     catch (e) {
@@ -509,6 +513,7 @@
   window.addEventListener('pagehide', tidy);
   $('restoreAll').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderAll(); log('All settings restored to defaults.'); };
   renderAll();
+  $('fileNote').hidden = location.protocol !== 'file:';
   log('Start the camera to test detection.');
 </script>
 </body>
