@@ -208,10 +208,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794343377"></script>
-<script src="src/events.js?v=1794343377"></script>
-<script src="src/face.js?v=1794343377"></script>
-<script src="src/mic.js?v=1794343377"></script>
+<script src="src/settings.js?v=1794343633"></script>
+<script src="src/events.js?v=1794343633"></script>
+<script src="src/face.js?v=1794343633"></script>
+<script src="src/mic.js?v=1794343633"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -443,7 +443,7 @@
   $('testBtn').onclick = () => {
     tidy();
     $('testFrame').hidden = false;
-    $('testFrame').src = 'index.html#preview-embed&' + Date.now();
+    $('testFrame').src = 'index.html?t=' + Date.now() + '#preview-embed'; // ?t: always the latest page, never a cached one
     $('testBtn').textContent = '🔁 Restart test round';
     $('testFrame').scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
