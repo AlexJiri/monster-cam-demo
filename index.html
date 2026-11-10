@@ -187,15 +187,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794339914"></script>
-<script src="src/settings.js?v=1794339914"></script>
-<script src="src/events.js?v=1794339914"></script>
-<script src="src/face.js?v=1794339914"></script>
-<script src="src/curses.js?v=1794339914"></script>
-<script src="src/sfx.js?v=1794339914"></script>
-<script src="src/mic.js?v=1794339914"></script>
-<script src="src/lightson.js?v=1794339914"></script>
-<script src="src/live.js?v=1794339914"></script>
+<script src="src/edition.js?v=1794340429"></script>
+<script src="src/settings.js?v=1794340429"></script>
+<script src="src/events.js?v=1794340429"></script>
+<script src="src/face.js?v=1794340429"></script>
+<script src="src/curses.js?v=1794340429"></script>
+<script src="src/sfx.js?v=1794340429"></script>
+<script src="src/mic.js?v=1794340429"></script>
+<script src="src/lightson.js?v=1794340429"></script>
+<script src="src/live.js?v=1794340429"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -337,13 +337,25 @@
     hideNotice();
     log(`▶ Round started: survive ${S.roundSeconds} s.`);
   }
-  function endRound(won) {
-    if (!round.running) return;
+  // Round over (won, lost or stopped): clear everything that was active on screen.
+  function clearRound() {
     round.running = false;
     game.stop(performance.now());
+    game.shieldUntil = 0;
     curses.clear();
+    $('curses').innerHTML = '';
+    $('shieldPill').hidden = true;
+    $('lit').classList.remove('on');
+    $('banner').classList.remove('on');
+    likes = 0;
+    likers = {};
+    renderLikes();
     $('timer').hidden = true;
     $('roundBtn').textContent = '▶ Start round';
+  }
+  function endRound(won) {
+    if (!round.running) return;
+    clearRound();
     const list = (won ? S.winDares : S.loseDares).filter(Boolean);
     const dare = list.length ? pick(list) : '';
     // Lost: the viewer behind the final catch "ate" the streamer; list everyone who caught them.
@@ -364,7 +376,7 @@
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
   $('roundBtn').onclick = () => {
-    if (round.running) { round.running = false; game.stop(performance.now()); curses.clear(); $('timer').hidden = true; $('roundBtn').textContent = '▶ Start round'; log('■ Round stopped.'); }
+    if (round.running) { clearRound(); hideNotice(); log('■ Round stopped.'); }
     else startRound();
   };
 
