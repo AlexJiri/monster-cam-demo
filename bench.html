@@ -141,6 +141,7 @@
           <thead><tr><th>Gift</th><th>Effect</th><th>Every N</th><th></th></tr></thead>
           <tbody id="giftRows"></tbody>
         </table>
+        <p class="hint">Use the exact TikTok gift name (the bridge window shows each gift's name as it arrives). <b>*</b> = any other gift.</p>
         <div class="row" style="margin-top:8px">
           <button id="addGift">+ Add gift</button>
           <button id="defaults">Restore defaults</button>
@@ -162,12 +163,12 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1794336549"></script>
-<script src="src/events.js?v=1794336549"></script>
-<script src="src/face.js?v=1794336549"></script>
-<script src="src/curses.js?v=1794336549"></script>
-<script src="src/sfx.js?v=1794336549"></script>
-<script src="src/mic.js?v=1794336549"></script>
+<script src="src/settings.js?v=1794336932"></script>
+<script src="src/events.js?v=1794336932"></script>
+<script src="src/face.js?v=1794336932"></script>
+<script src="src/curses.js?v=1794336932"></script>
+<script src="src/sfx.js?v=1794336932"></script>
+<script src="src/mic.js?v=1794336932"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -350,8 +351,8 @@
     MC.bus.emit(type === 'comment' ? { type, user: viewer(), text: 'hello' } : type === 'like' ? { type, user: viewer(), count: 10 } : { type, user: viewer() });
   });
   function renderGiftButtons() {
-    $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.gift)}</button>`).join('');
-    $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift, count: 1 }));
+    $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${g.gift === '*' ? 'Any other gift' : esc(g.gift)}</button>`).join('');
+    $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift === '*' ? 'Pink Cowboy' : S.gifts[+b.dataset.gift].gift, count: 1 }));
   }
 
   // Events → effects
@@ -360,7 +361,7 @@
     if (e.type === 'like') log(`❤️ <b>${esc(e.user)}</b> sent ${e.count} likes`);
     if (e.type === 'follow') log(`➕ <b>${esc(e.user)}</b> followed`);
     if (e.type !== 'gift') return;
-    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase());
+    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase()) || S.gifts.find((g) => g.gift === '*');
     giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
     if (!rule) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (no effect set)`); return; }
     const n = giftCount[e.gift];

@@ -44,7 +44,7 @@
     // `every`: trigger once per N gifts of that kind (e.g. a curse every 10 roses).
     // `curse`: blink | smile | move | sound | all (curses), sweep | stare (Lights On flashlight),
     // shield | cleanse (help the streamer: chain the monster, remove all curses).
-    // Gift names must match TikTok's; rename them in the settings to the gifts you want.
+    // Gift names must match TikTok's; rename them in the settings to the gifts you want. "*" = any other gift.
     gifts: [
       { gift: 'Rose', curse: 'blink', every: 1 },
       { gift: 'Ice Cream Cone', curse: 'smile', every: 1 },
@@ -55,6 +55,7 @@
       { gift: 'Microphone', curse: 'sound', every: 1 },
       { gift: 'Hand Hearts', curse: 'shield', every: 1 },
       { gift: 'Heart Me', curse: 'cleanse', every: 1 },
+      { gift: '*', curse: 'sweep', every: 3 }, // any other gift: every 3rd one sends the hunter
     ],
   };
 
@@ -69,6 +70,8 @@
         for (const eff of ['sweep', 'stare', 'sound', 'shield', 'cleanse']) {
           if (!s.gifts.some((g) => g.curse === eff)) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.curse === eff)));
         }
+        // Saves from before the "any other gift" rule.
+        if (!s.anyGiftAdded) { if (!s.gifts.some((g) => g.gift === '*')) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.gift === '*'))); s.anyGiftAdded = true; }
         return s;
       }
     } catch (e) {}

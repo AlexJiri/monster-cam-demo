@@ -2,7 +2,7 @@
 // The paid build replaces `PAID` with true. Free rounds are counted in this browser only (Phase 3, option A);
 // an online counter per TikTok username can replace `rounds` later without touching the game.
 (function (MC) {
-  const VERSION = '0.3.1';
+  const VERSION = '0.3.2';
   const PAID = false;
   const FREE_ROUNDS = 3;
   const COOLDOWN_HOURS = 24;

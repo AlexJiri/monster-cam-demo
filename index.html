@@ -190,15 +190,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794336549"></script>
-<script src="src/settings.js?v=1794336549"></script>
-<script src="src/events.js?v=1794336549"></script>
-<script src="src/face.js?v=1794336549"></script>
-<script src="src/curses.js?v=1794336549"></script>
-<script src="src/sfx.js?v=1794336549"></script>
-<script src="src/mic.js?v=1794336549"></script>
-<script src="src/lightson.js?v=1794336549"></script>
-<script src="src/live.js?v=1794336549"></script>
+<script src="src/edition.js?v=1794336932"></script>
+<script src="src/settings.js?v=1794336932"></script>
+<script src="src/events.js?v=1794336932"></script>
+<script src="src/face.js?v=1794336932"></script>
+<script src="src/curses.js?v=1794336932"></script>
+<script src="src/sfx.js?v=1794336932"></script>
+<script src="src/mic.js?v=1794336932"></script>
+<script src="src/lightson.js?v=1794336932"></script>
+<script src="src/live.js?v=1794336932"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -448,8 +448,8 @@
   const viewer = () => $('viewer').value.trim() || 'viewer';
   document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () =>
     MC.bus.emit(b.dataset.sim === 'like' ? { type: 'like', user: viewer(), count: 25 } : { type: 'follow', user: viewer() }));
-  $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.gift)}</button>`).join('');
-  $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift, count: 1 }));
+  $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${g.gift === '*' ? 'Any other gift' : esc(g.gift)}</button>`).join('');
+  $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift === '*' ? 'Pink Cowboy' : S.gifts[+b.dataset.gift].gift, count: 1 }));
 
   const EFFECT_TEXT = { sweep: 'sent the hunter', stare: 'made it look at you', all: 'cursed you with everything' };
   MC.bus.on('*', (e) => {
@@ -470,10 +470,11 @@
     }
     if (e.type === 'follow') { feed(`➕ ${esc(e.user)} followed`); return; }
     if (e.type !== 'gift') return;
-    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase());
+    // A gift without its own rule uses the "*" rule (any other gift), if there is one.
+    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase()) || S.gifts.find((g) => g.gift === '*');
     giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
     if (!rule || giftCount[e.gift] % Math.max(1, rule.every)) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); return; }
-    if (!round.running) { log(`🎁 ${esc(e.gift)} ignored: start a round first.`); return; }
+    if (!round.running) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); log(`🎁 ${esc(e.gift)} from ${esc(e.user)}: no effect between rounds. Start a round to play.`); return; }
     const now = performance.now();
     if (rule.curse === 'shield') { chain(e.user, now); return; }
     if (rule.curse === 'cleanse') {
