@@ -46,7 +46,7 @@
   .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
   header { align-items: center; }
-  /* Gift guide for viewers: one group at a time, right side of the stage. */
+  /* Gift guide for viewers, right side of the stage. */
   .guide { position: absolute; right: 12px; top: 54px; width: min(250px, 34%); background: rgba(0, 0, 0, 0.62); border-radius: 10px; padding: 8px 10px; font-size: 14px; pointer-events: none; transition: opacity 0.4s; }
   .guide.fade { opacity: 0; }
   .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
@@ -110,7 +110,6 @@
   .log { height: 110px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   .hint a, .notice a { color: var(--lamp); }
-  #fakeSliders label { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; font-size: 13px; }
   @media (prefers-reduced-motion: reduce) { .feed div { animation: none; } }
 </style>
 </head>
@@ -160,9 +159,7 @@
       <div class="row">
         <button class="primary" id="startBtn">Start camera</button>
         <button id="calBtn" disabled>Calibrate</button>
-        <button id="fakeBtn" title="Test without a camera">No camera</button>
       </div>
-      <div id="fakeSliders"></div>
     </section>
     <section class="step" id="step3">
       <h2><b>3</b> Play</h2>
@@ -176,34 +173,32 @@
       </div>
       <p class="hint" id="edition"></p>
     </section>
+    <section id="testBox" hidden>
+      <h2>🧪 Test viewers <small class="hint">· only on this computer</small></h2>
+      <label class="check"><input type="checkbox" id="autoViewers" checked> Fake viewers play on their own</label>
+      <div class="row">
+        <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
+        <button data-sim="like">❤️ 25 taps</button>
+        <button data-sim="follow">➕ Follow</button>
+      </div>
+      <div class="row" id="giftBtns"></div>
+    </section>
     <section>
-      <details>
-        <summary>Test with fake viewers</summary>
-        <p class="hint" id="simNote" style="margin:0 0 8px">Only on this computer, nothing is sent to TikTok.</p>
-        <div id="simBox">
-        <div class="row">
-          <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
-          <button data-sim="like">❤️ 25 likes</button>
-          <button data-sim="follow">➕ Follow</button>
-        </div>
-        <div class="row" id="giftBtns"></div>
-        </div>
-      </details>
       <div class="log" id="log" aria-live="polite"></div>
     </section>
   </div>
   </div>
 </div>
 
-<script src="src/edition.js?v=1794341448"></script>
-<script src="src/settings.js?v=1794341448"></script>
-<script src="src/events.js?v=1794341448"></script>
-<script src="src/face.js?v=1794341448"></script>
-<script src="src/curses.js?v=1794341448"></script>
-<script src="src/sfx.js?v=1794341448"></script>
-<script src="src/mic.js?v=1794341448"></script>
-<script src="src/lightson.js?v=1794341448"></script>
-<script src="src/live.js?v=1794341448"></script>
+<script src="src/edition.js?v=1794342120"></script>
+<script src="src/settings.js?v=1794342120"></script>
+<script src="src/events.js?v=1794342120"></script>
+<script src="src/face.js?v=1794342120"></script>
+<script src="src/curses.js?v=1794342120"></script>
+<script src="src/sfx.js?v=1794342120"></script>
+<script src="src/mic.js?v=1794342120"></script>
+<script src="src/lightson.js?v=1794342120"></script>
+<script src="src/live.js?v=1794342120"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -323,7 +318,7 @@
     return false;
   }
 
-  // Preview (from the Settings page): a 60 s round with fake viewers, TikTok off, not counted as a free round.
+  // Test (from Settings & Test): a 60 s round with fake viewers, TikTok off, not counted as a free round.
   const PREVIEW = location.hash === '#preview';
   const PREVIEW_SECONDS = 60;
   function startRound() {
@@ -348,7 +343,7 @@
     $('timer').hidden = false;
     $('roundBtn').textContent = '■ Stop round';
     hideNotice();
-    log(PREVIEW ? `👁️ Preview: ${PREVIEW_SECONDS} s with fake viewers. Not counted as a round.` : `▶ Round started: survive ${S.roundSeconds} s.`);
+    log(PREVIEW ? `🧪 Test: ${PREVIEW_SECONDS} s with fake viewers. Not counted as a round.` : `▶ Round started: survive ${S.roundSeconds} s.`);
   }
   // Round over (won, lost or stopped): clear everything that was active on screen.
   function clearRound() {
@@ -425,7 +420,6 @@
     $('calBtn').disabled = false;
     $('roundBtn').disabled = false;
     $('startBtn').disabled = true;
-    $('fakeBtn').disabled = true;
     notice('Calibrate with a relaxed face, then start a round.');
   }
   $('startBtn').onclick = async () => {
@@ -444,15 +438,6 @@
       $('startBtn').disabled = false;
       notice(e && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser and try again.' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
     }
-  };
-  $('fakeBtn').onclick = () => {
-    MC.sfx.unlock(); MC.sfx.setVolume(S.volume);
-    face.startFake();
-    ready();
-    $('fakeSliders').innerHTML = [['x', 'position', 1, 0.5], ['move', 'move', 4, 0], ['smile', 'smile', 1, 0], ['blink', 'blink', 1, 0], ['sound', 'sound', 1, 0]].map(([k, l, max, v]) =>
-      `<label>${l}<input type="range" min="0" max="${max}" step="0.01" value="${v}" data-fake="${k}"></label>`).join('');
-    $('fakeSliders').querySelectorAll('input').forEach((i) => i.oninput = () => { face.fake[i.dataset.fake] = +i.value; });
-    log('🎚️ Manual mode: the sliders act as the face.');
   };
   $('calBtn').onclick = async () => {
     calibrating = true; $('calBtn').disabled = true;
@@ -478,17 +463,13 @@
   document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () =>
     MC.bus.emit(b.dataset.sim === 'like' ? { type: 'like', user: viewer(), count: 25 } : { type: 'follow', user: viewer() }));
   // The streamer's gifts, cheapest first.
-  const simGifts = [...S.gifts].sort((a, b) => (a.coins || 0) - (b.coins || 0)).map((g) => ({ label: g.gift, gift: g.gift, coins: g.coins || 1 }));
-  $('giftBtns').innerHTML = simGifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.label)}</button>`).join('');
+  const info = MC.settings.giftInfo;
+  const simGifts = [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).map((g) => ({ label: `${info(g.gift).icon} ${g.gift}`, gift: g.gift, coins: info(g.gift).coins || 1 }));
+  $('giftBtns').innerHTML = simGifts.map((g, i) => `<button data-gift="${i}">${esc(g.label)}</button>`).join('');
   $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => {
     const g = simGifts[+b.dataset.gift];
     MC.bus.emit({ type: 'gift', user: viewer(), gift: g.gift, count: 1, diamonds: g.coins });
   });
-  // Fake viewers only while not connected to a real live, so nobody can chain the monster for themselves on stream.
-  function lockSimulator(live) {
-    document.querySelectorAll('#simBox button, #simBox input').forEach((el) => { el.disabled = live; });
-    $('simNote').textContent = live ? 'Off while connected to a live: only real viewers can play.' : 'Only on this computer, nothing is sent to TikTok.';
-  }
 
   const EFFECT_TEXT = { sweep: 'sent the hunter', stare: 'made it look at you', all: 'cursed you with everything', rampage: 'broke the chains and sent the hunter', eat: 'fed you to the monster' };
   const CURSE_TYPES = ['blink', 'smile', 'move', 'sound'];
@@ -592,7 +573,6 @@
     $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
     if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
     done('step1', st.state === 'connected');
-    lockSimulator(st.state === 'connected' || st.state === 'connecting');
   });
   $('ttUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ttConnect').click(); });
 
@@ -628,15 +608,14 @@
   window.addEventListener('beforeunload', () => { if (streamWin) streamWin.close(); });
 
   // ---------- Gift guide on stream ----------
-  // Shows viewers which gifts curse, hunt, eat or save the streamer, one group every few seconds, plus the likes.
+  // Tells viewers what each gift does: "🌹 Rose → don't blink". Long lists rotate, 8 lines at a time.
+  const effectShort = (k) => (MC.settings.EFFECTS[k] || '').replace(/^\S+\s/, '').replace(/^Curse: /, '').replace(/ \(helps\)$/, '').toLowerCase();
   const guideCards = () => {
-    const cards = MC.settings.GROUPS.map((gr) => {
-      const gifts = S.gifts.filter((g) => gr.effects.includes(g.curse)).sort((a, b) => (a.coins || 0) - (b.coins || 0));
-      if (!gifts.length) return '';
-      return `<b>${gr.viewers}</b>` + gifts.slice(0, 6).map((g) =>
-        `<span>🎁 ${esc(g.gift)}${g.every > 1 ? ` ×${g.every}` : ''} <small>· ${esc((MC.settings.EFFECTS[g.curse] || '').replace(/^\S+\s/, '').replace(/^(Curse|Helper): /, '').toLowerCase())}</small></span>`).join('');
-    }).filter(Boolean);
-    cards.push(`<b>❤️ Likes</b><span>${S.likesForShield} likes chain the monster</span>`);
+    const lines = [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).map((g) =>
+      `<span>${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${esc(g.gift)} <small>→ ${esc(effectShort(g.curse))}</small></span>`);
+    lines.push(`<span>❤️ ${S.likesForShield} taps <small>→ chain the monster</small></span>`);
+    const cards = [];
+    for (let i = 0; i < lines.length; i += 8) cards.push('<b>🎁 Gifts</b>' + lines.slice(i, i + 8).join(''));
     return cards;
   };
   let guideI = 0;
@@ -644,39 +623,38 @@
     const el = $('guide');
     if (!S.showGiftGuide) { el.hidden = true; return; }
     const cards = guideCards();
+    if (cards.length === 1) { el.innerHTML = cards[0]; return; }
     el.classList.add('fade');
     setTimeout(() => { el.innerHTML = cards[guideI++ % cards.length]; el.classList.remove('fade'); }, 400);
   }
   showGuide();
   setInterval(showGuide, 6000);
 
-  // ---------- Preview run ----------
+  // ---------- Test run (from Settings & Test) ----------
   if (PREVIEW) {
-    document.title = 'Monster Cam – Preview';
-    document.querySelector('h1').textContent = 'Preview';
+    document.title = 'Monster Cam – Test';
+    document.querySelector('h1').textContent = 'Test';
+    $('ttStatus').textContent = '🧪 Test: TikTok is off, fake viewers play instead.';
     $('ttConnect').disabled = $('ttDisconnect').disabled = $('ttUser').disabled = true;
-    $('ttStatus').textContent = '👁️ Preview: TikTok is off, fake viewers are playing.';
-    lockSimulator(true);
-    $('simNote').textContent = 'Preview: the fake viewers play on their own.';
+    $('testBox').hidden = false;
     const names = ['Ion', 'Maria', 'Ana', 'Vlad', 'Elena', 'userx', 'Radu'];
     const pickW = () => {
       // Cheap gifts come often, big ones rarely, like on a real live.
-      const w = S.gifts.map((g) => 1 / (1 + Math.log10(1 + (g.coins || 1))) ** 3);
+      const w = S.gifts.map((g) => 1 / (1 + Math.log10(1 + (info(g.gift).coins || 1))) ** 3);
       let r = Math.random() * w.reduce((a, b) => a + b, 0);
       return S.gifts.find((g, i) => (r -= w[i]) <= 0) || S.gifts[0];
     };
     setInterval(() => {
-      if (!round.running) return;
+      if (!round.running || !$('autoViewers').checked) return;
       const user = pick(names), r = Math.random();
-      if (r < 0.45 && S.gifts.length) { const g = pickW(); MC.bus.emit({ type: 'gift', user, gift: g.gift, count: 1, diamonds: g.coins || 1 }); }
-      else if (r < 0.75) MC.bus.emit({ type: 'like', user, count: 10 + Math.floor(Math.random() * 15) });
+      if (r < 0.45 && S.gifts.length) { const g = pickW(); MC.bus.emit({ type: 'gift', user, gift: g.gift, count: 1, diamonds: info(g.gift).coins || 1 }); }
+      else if (r < 0.8) MC.bus.emit({ type: 'like', user, count: 10 + Math.floor(Math.random() * 15) });
       else MC.bus.emit({ type: 'comment', user, text: pick(['run!', 'behind you [cry]', 'feed him [heart]', 'monster', '😂']) });
     }, 2200);
-    // Use the camera if it's allowed, otherwise the stand-in figure.
+    // The test needs the camera, like the real game; the round starts once it's on.
     (async () => {
       await $('startBtn').onclick();
-      if (face.state.status !== 'ready') $('fakeBtn').onclick();
-      setTimeout(startRound, 800);
+      if (face.state.status === 'ready') setTimeout(startRound, 800);
     })();
   }
 

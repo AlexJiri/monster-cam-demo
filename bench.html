@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  /* Settings & test: camera test on the left, every setting on the right. Dark by design. */
+  /* Settings & Test: a few steps, one tab each (Camera → Gifts → Game → Dares → Test). Dark by design. */
   :root {
     --night: #0d0f14;
     --panel: #171a22;
@@ -30,8 +30,36 @@
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   h1 { font-family: 'Creepster', cursive; font-weight: 400; font-size: 42px; margin: 0; color: var(--blood); letter-spacing: 1px; }
   header p { margin: 0; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .wrap { max-width: 1000px; }
+  label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
+  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
+  .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
+  .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
+  header { align-items: center; }
+  h1 { color: var(--lamp); }
+  .saved { color: var(--moss); font-size: 13px; }
+  /* Steps: numbered tabs, a tick when done. */
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .steps button { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 14px 6px 6px; }
+  .steps button b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--line); font-size: 13px; }
+  .steps button.on { border-color: var(--lamp); }
+  .steps button.on b { background: var(--lamp); color: #1b1400; }
+  .steps button.done b { background: var(--moss); color: #062010; }
+  .panel[hidden] { display: none; }
+  .next { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .camGrid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .camGrid { grid-template-columns: 1fr; } }
+  details > summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
+  /* Gift rules read like a sentence: [1] × [🌹 Rose] → [don't blink] */
+  .rule { display: grid; grid-template-columns: 64px 18px minmax(0, 1fr) 18px minmax(0, 1.2fr) 36px; gap: 6px; align-items: center; margin: 6px 0; }
+  .rule .x, .rule .arrow { color: var(--muted); text-align: center; }
+  .rule .other { grid-column: 3 / 4; }
+  .rule select, .rule input { width: 100%; }
+  .dares { display: grid; gap: 6px; margin-bottom: 6px; }
+  .dares .row input { flex: 1; width: auto; }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .bigBtn { font-size: 17px; padding: 10px 18px; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
   section + section { margin-top: 16px; }
   h2 { margin: 0 0 10px; font-size: 16px; }
@@ -64,113 +92,122 @@
   td input, td select { width: 100%; }
   .log { height: 180px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; }
   .log b { color: var(--text); font-weight: 500; }
-  details summary { cursor: pointer; color: var(--muted); }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-  label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
-  .tabs { display: flex; gap: 6px; }
-  .previewBtn { margin-left: auto; text-decoration: none; background: var(--blood); color: #fff; font-weight: 700; border-radius: 8px; padding: 6px 14px; }
-  .previewBtn:hover { filter: brightness(1.1); }
-  .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
-  .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
-  .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
-  header { align-items: center; }
-  h1 { color: var(--lamp); }
-  .saved { color: var(--moss); font-size: 13px; }
-  section h2 small { font-weight: 400; color: var(--muted); }
-  h3 { font-size: 14px; margin: 14px 0 6px; }
-  .group + .group { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
-  .group p { margin: 0 0 6px; }
-  .group select { min-width: 190px; }
-  .dares { display: grid; gap: 6px; margin-bottom: 6px; }
-  .dares .row input { flex: 1; width: auto; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Settings</h1>
-    <p>Everything is set here and saved on this computer. <span class="saved" id="saved"></span></p>
-    <a class="previewBtn" href="index.html#preview" title="See the game with your settings: 60 s, fake viewers, not counted">👁️ Preview</a>
+    <span class="saved" id="saved"></span>
     <nav class="tabs" aria-label="Pages"><a href="index.html">🎮 Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
   </header>
 
-  <div class="grid">
-    <div>
-      <section>
-        <h2>Camera test <small>· check that smiles, blinks, movement and sound are picked up</small></h2>
-        <div class="stage" id="stage">
-          <video id="video" playsinline muted></video>
-          <div class="empty" id="empty">Start the camera to test detection.<br>Everything runs on this computer; no video is sent anywhere.</div>
-          <div class="facebox" id="facebox"></div>
-          <div class="hud"><span></span><span class="status" id="status">Camera off</span></div>
-          <div class="notice" id="notice" aria-live="polite"></div>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button class="primary" id="startBtn">Start camera</button>
-          <button id="calBtn" disabled>Calibrate (3 s relaxed face)</button>
-          <button id="fakeBtn">No camera: sliders</button>
-        </div>
-        <div class="meters" id="meters"></div>
-        <p class="hint">A bar turns red when it crosses its yellow line: that would get you caught. Move the lines with the sensitivity settings.</p>
-        <div id="fakeSliders"></div>
-      </section>
-      <section>
-        <h2>Log</h2>
-        <div class="log" id="log" aria-live="polite"></div>
-      </section>
-    </div>
+  <nav class="steps" aria-label="Steps">
+    <button data-step="camera" id="step-camera"><b>1</b> Camera</button>
+    <button data-step="gifts" id="step-gifts"><b>2</b> Gifts</button>
+    <button data-step="game" id="step-game"><b>3</b> Game</button>
+    <button data-step="dares" id="step-dares"><b>4</b> Dares</button>
+    <button data-step="test" id="step-test"><b>5</b> Test</button>
+  </nav>
 
-    <div>
-      <section>
-        <h2>Gifts <small>· what each TikTok gift does</small></h2>
-        <div id="giftGroups"></div>
-        <p class="hint">Gift names must match TikTok's exactly: the bridge window shows each gift's name and price as it arrives. Gifts not listed only show on screen.</p>
-      </section>
-
-      <section>
-        <h2>Lights On</h2>
+  <section class="panel" id="p-camera">
+    <h2>Camera <small>· check that smiles, blinks, movement and sound are picked up</small></h2>
+    <div class="camGrid">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <div class="empty" id="empty">Start the camera to test detection.<br>Everything runs on this computer; no video is sent anywhere.</div>
+        <div class="facebox" id="facebox"></div>
+        <div class="hud"><span></span><span class="status" id="status">Camera off</span></div>
+        <div class="notice" id="notice" aria-live="polite"></div>
+      </div>
+      <div>
         <div class="row">
-          <span class="hint" style="margin:0">While the light is on you, don't:</span>
-          <label class="check"><input type="checkbox" id="r-move"> move</label>
-          <label class="check"><input type="checkbox" id="r-smile"> smile</label>
-          <label class="check"><input type="checkbox" id="r-blink"> blink</label>
-          <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
+          <button class="primary" id="startBtn">Start camera</button>
+          <button id="calBtn" disabled>Calibrate</button>
         </div>
-        <div class="row"><label class="check"><input type="checkbox" id="showGuide"> Show viewers which gift does what (on stream)</label></div>
-        <div id="sliders"></div>
-      </section>
-
-      <section>
-        <h2>Curse timers</h2>
-        <div id="curseTimes"></div>
-      </section>
-
-      <section>
-        <h2>Dares <small>· one is picked at random when the round ends</small></h2>
-        <h3>If the streamer loses</h3>
-        <div id="loseDares" class="dares"></div>
-        <button data-adddare="loseDares">+ Add dare</button>
-        <h3>If the streamer wins (a dare for chat)</h3>
-        <div id="winDares" class="dares"></div>
-        <button data-adddare="winDares">+ Add dare</button>
-        <p class="hint">Keep dares harmless: TikTok ends lives with dangerous challenges.</p>
-      </section>
-
-      <section class="row">
-        <button class="primary" id="saveBtn">💾 Save</button>
-        <a class="previewBtn" style="margin-left:0" href="index.html#preview">👁️ Preview</a>
-        <button id="defaults">Restore all defaults</button>
-        <span class="hint" style="margin:0">Changes also save on their own.</span>
-      </section>
+        <p class="hint">Calibrate with a relaxed face and stay quiet for 3 seconds.</p>
+        <div class="meters" id="meters"></div>
+        <p class="hint">A bar turns red past its yellow line: that would get you caught.</p>
+        <details>
+          <summary>Sensitivity</summary>
+          <div id="sensSliders"></div>
+        </details>
+      </div>
     </div>
-  </div>
+    <div class="next"><button class="primary" data-go="gifts">Next: Gifts →</button></div>
+  </section>
+
+  <section class="panel" id="p-gifts" hidden>
+    <h2>Gifts <small>· keep it short: viewers have to remember it</small></h2>
+    <div id="rules"></div>
+    <div class="rule">
+      <input type="number" id="likesForShield" min="10" step="10" aria-label="Taps needed">
+      <span class="x">×</span><span>❤️ taps (likes)</span>
+      <span class="arrow">→</span><span>🛡️ Chain the monster (helps)</span><span></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="addRule">+ Add gift</button>
+      <button id="defaultGifts">Default gifts</button>
+    </div>
+    <p><label class="check"><input type="checkbox" id="showGuide"> Show this list to viewers on stream</label></p>
+    <p class="hint">“Other gift”: type the name exactly as TikTok shows it; the bridge window prints each gift's name as it arrives.</p>
+    <div class="next"><button data-go="camera">← Back</button><button class="primary" data-go="game">Next: Game →</button></div>
+  </section>
+
+  <section class="panel" id="p-game" hidden>
+    <h2>Game</h2>
+    <div id="gameSliders"></div>
+    <div class="row" style="margin-top:6px">
+      <span class="hint" style="margin:0">While the light is on you, don't:</span>
+      <label class="check"><input type="checkbox" id="r-move"> move</label>
+      <label class="check"><input type="checkbox" id="r-smile"> smile</label>
+      <label class="check"><input type="checkbox" id="r-blink"> blink</label>
+      <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
+    </div>
+    <details>
+      <summary>Advanced</summary>
+      <div id="advSliders"></div>
+      <h3>Curse timers</h3>
+      <div id="curseTimes"></div>
+    </details>
+    <div class="next"><button data-go="gifts">← Back</button><button class="primary" data-go="dares">Next: Dares →</button></div>
+  </section>
+
+  <section class="panel" id="p-dares" hidden>
+    <h2>Dares <small>· one is picked at random when the round ends</small></h2>
+    <h3>If the streamer loses</h3>
+    <div id="loseDares" class="dares"></div>
+    <button data-adddare="loseDares">+ Add dare</button>
+    <h3>If the streamer wins (a dare for chat)</h3>
+    <div id="winDares" class="dares"></div>
+    <button data-adddare="winDares">+ Add dare</button>
+    <p class="hint">Keep dares harmless: TikTok ends lives with dangerous challenges.</p>
+    <div class="next"><button data-go="game">← Back</button><button class="primary" data-go="test">Next: Test →</button></div>
+  </section>
+
+  <section class="panel" id="p-test" hidden>
+    <h2>Test <small>· play one round with your settings</small></h2>
+    <p>A 60-second round with fake viewers sending your gifts and taps. TikTok stays off and it doesn't count as a free round. You can also send gifts yourself from the test buttons.</p>
+    <div class="row">
+      <a class="primary bigBtn" id="testBtn" href="index.html#preview" style="text-decoration:none;border-radius:8px;background:var(--blood);color:#fff;font-weight:700">🧪 Start test round</a>
+      <button id="restoreAll">Restore all defaults</button>
+    </div>
+    <p class="hint">Everything is saved as you go.</p>
+    <div class="next"><button data-go="dares">← Back</button><a href="index.html" style="align-self:center">Done: go to Play →</a></div>
+  </section>
+
+  <section style="margin-top:16px">
+    <h2>Log</h2>
+    <div class="log" id="log" aria-live="polite"></div>
+  </section>
 </div>
 
-<script src="src/settings.js?v=1794341448"></script>
-<script src="src/events.js?v=1794341448"></script>
-<script src="src/face.js?v=1794341448"></script>
-<script src="src/mic.js?v=1794341448"></script>
+<script src="src/settings.js?v=1794342120"></script>
+<script src="src/events.js?v=1794342120"></script>
+<script src="src/face.js?v=1794342120"></script>
+<script src="src/mic.js?v=1794342120"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -183,6 +220,24 @@
     clearTimeout(save.t);
     save.t = setTimeout(() => { $('saved').textContent = ''; }, 1500);
   }
+
+  // ---------- Steps ----------
+  const STEPS = ['camera', 'gifts', 'game', 'dares', 'test'];
+  function go(step) {
+    STEPS.forEach((k) => {
+      $('p-' + k).hidden = k !== step;
+      $('step-' + k).classList.toggle('on', k === step);
+    });
+    // Leaving a step counts as done with it.
+    for (const k of STEPS.slice(0, STEPS.indexOf(step))) $('step-' + k).classList.add('done');
+    try { localStorage.setItem('monstercam-settings-step', step); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('[data-step]').forEach((b) => b.onclick = () => go(b.dataset.step));
+  document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => go(b.dataset.go));
+  let lastStep = 'camera';
+  try { lastStep = localStorage.getItem('monstercam-settings-step') || 'camera'; } catch (e) {}
+  go(STEPS.includes(lastStep) ? lastStep : 'camera');
 
   // ---------- Camera test ----------
   const METERS = [
@@ -252,78 +307,97 @@
     } else if (r.samples) {
       calibrated = true;
       if (r.noiseFloor != null) log(`🎤 Room noise measured: ${r.noiseFloor.toFixed(2)}`);
-      notice(`Calibrated ✓<br><small>neutral smile ${r.smile.toFixed(2)} · eyes ${r.blink.toFixed(2)}</small>`, 2500);
+      notice('Calibrated ✓<br><small>Next: your gifts</small>', 1800);
+      $('step-camera').classList.add('done');
+      setTimeout(() => go('gifts'), 1800); // done here: on to the next step
       log(`🎯 Calibrated (${r.samples} frames). Neutral smile ${r.smile.toFixed(2)}, eyes ${r.blink.toFixed(2)}.`);
     } else {
       notice('No face seen. Face the camera and try again.', 3000);
       log('⚠️ No face seen during calibration. Face the camera and try again.');
     }
   };
-  // Manual sliders (debug, no camera)
-  $('fakeBtn').onclick = () => {
-    face.startFake();
-    $('calBtn').disabled = false;
-    $('empty').textContent = 'Manual mode: move the sliders below to act as the face.';
-    $('fakeSliders').innerHTML = ['smile', 'blink', 'move', 'sound'].map((k) =>
-      `<label class="field"><span>${k}</span><input type="range" min="0" max="${k === 'move' ? 4 : 1}" step="0.01" value="0" data-fake="${k}"><output>0</output></label>`).join('');
-    $('fakeSliders').querySelectorAll('input').forEach((i) => i.oninput = () => { face.fake[i.dataset.fake] = +i.value; i.nextElementSibling.textContent = (+i.value).toFixed(2); });
-    log('🎚️ Manual mode on.');
-  };
 
-  // ---------- Settings ----------
-  // Sliders: [key, label, min, max, step, unit]
-  const SLIDERS = [
+  // ---------- Sliders: [key, label, min, max, step, unit] ----------
+  const SENS = [
+    ['smileThreshold', 'Smile', 0.1, 0.9, 0.05, ''],
+    ['blinkThreshold', 'Blink', 0.2, 0.9, 0.05, ''],
+    ['moveThreshold', 'Movement', 0.3, 4, 0.1, ''],
+    ['soundThreshold', 'Sound', 0.05, 0.9, 0.05, ''],
+  ];
+  const GAME = [
     ['lives', 'Lives', 1, 9, 1, ''],
-    ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
     ['roundMinutes', 'Round length', 1, 10, 0.5, ' min'],
+    ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
+  ];
+  const ADV = [
     ['maxCurses', 'Curses at once', 1, 5, 1, ''],
     ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
-    ['likesForShield', 'Likes to chain it', 25, 1000, 25, ''],
-    ['smileThreshold', 'Smile sensitivity', 0.1, 0.9, 0.05, ''],
-    ['blinkThreshold', 'Blink sensitivity', 0.2, 0.9, 0.05, ''],
-    ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1, ''],
-    ['soundThreshold', 'Sound sensitivity', 0.05, 0.9, 0.05, ''],
   ];
   // The round is stored in seconds and shown in minutes.
   const get = (k) => (k === 'roundMinutes' ? S.roundSeconds / 60 : S[k]);
   const set = (k, v) => { if (k === 'roundMinutes') S.roundSeconds = Math.round(v * 60); else S[k] = v; };
-  const opts = (sel) => Object.entries(MC.settings.EFFECTS).map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label}</option>`).join('');
-
-  function renderSettings() {
-    $('sliders').innerHTML = SLIDERS.map(([k, label, min, max, step, unit]) =>
+  function sliders(el, list) {
+    $(el).innerHTML = list.map(([k, label, min, max, step, unit]) =>
       `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${get(k)}"><output>${get(k)}${unit}</output></label>`).join('');
-    SLIDERS.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
+    list.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
+  }
 
-    $('showGuide').checked = !!S.showGiftGuide;
-    $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
-    ['move', 'smile', 'blink', 'sound'].forEach((k) => {
-      const c = $('r-' + k);
-      c.checked = !!S.lightRules[k];
-      c.onchange = () => { S.lightRules[k] = c.checked; save(); };
-    });
-
-    // Gifts grouped by what they do, cheapest first. Changing a gift's effect moves it to that group.
-    const groupOf = (g) => MC.settings.GROUPS.find((gr) => gr.effects.includes(g.curse)) || MC.settings.GROUPS[0];
-    $('giftGroups').innerHTML = MC.settings.GROUPS.map((gr) => {
-      const rows = S.gifts.map((g, i) => ({ g, i })).filter(({ g }) => groupOf(g) === gr).sort((a, b) => (a.g.coins || 0) - (b.g.coins || 0));
-      return `<div class="group"><h3>${gr.title}</h3><p class="hint">${gr.hint}</p>
-        <table><thead><tr><th>Gift</th><th>Coins</th><th>Effect</th><th>Every</th><th></th></tr></thead><tbody>${rows.map(({ g, i }) => `<tr>
-          <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
-          <td><input type="number" id="g-coins-${i}" min="0" value="${g.coins || 0}" aria-label="Price in coins" style="width:76px"></td>
-          <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>
-          <td><input type="number" id="g-every-${i}" min="1" value="${g.every}" aria-label="Every N gifts" title="Works once per this many gifts" style="width:60px"></td>
-          <td><button data-del="${i}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table>
-        <button data-addgift="${gr.effects[0]}" style="margin-top:6px">+ Add gift</button></div>`;
+  // ---------- Gifts: [count] × [gift] → [effect] ----------
+  const CAT = [...MC.settings.CATALOG].sort((a, b) => a.coins - b.coins);
+  const OTHER = '__other__';
+  const effectOpts = (sel) => Object.entries(MC.settings.EFFECTS).map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label}</option>`).join('');
+  const giftOpts = (name) => {
+    const known = CAT.some((g) => g.name.toLowerCase() === name.toLowerCase());
+    return CAT.map((g) => `<option value="${esc(g.name)}" ${g.name.toLowerCase() === name.toLowerCase() ? 'selected' : ''}>${g.icon} ${esc(g.name)} · ${g.coins.toLocaleString('en')}</option>`).join('') +
+      `<option value="${OTHER}" ${known ? '' : 'selected'}>✏️ Other gift…</option>`;
+  };
+  function renderRules() {
+    $('rules').innerHTML = S.gifts.map((g, i) => {
+      const known = CAT.some((c) => c.name.toLowerCase() === g.gift.toLowerCase());
+      return `<div class="rule">
+        <input type="number" min="1" value="${g.every}" id="r-every-${i}" aria-label="How many gifts" title="How many of this gift it takes">
+        <span class="x">×</span>
+        <select id="r-gift-${i}" aria-label="Gift">${giftOpts(g.gift)}</select>
+        <span class="arrow">→</span>
+        <select id="r-eff-${i}" aria-label="Effect">${effectOpts(g.curse)}</select>
+        <button data-delrule="${i}" aria-label="Remove">✕</button>
+        ${known ? '' : `<span></span><span></span><input type="text" class="other" id="r-name-${i}" value="${esc(g.gift)}" placeholder="Exact TikTok gift name" aria-label="Gift name">`}
+      </div>`;
     }).join('');
     S.gifts.forEach((g, i) => {
-      $('g-name-' + i).onchange = (e) => { g.gift = e.target.value.trim(); save(); };
-      $('g-coins-' + i).onchange = (e) => { g.coins = Math.max(0, Math.round(+e.target.value) || 0); save(); renderSettings(); };
-      $('g-curse-' + i).onchange = (e) => { g.curse = e.target.value; save(); renderSettings(); };
-      $('g-every-' + i).onchange = (e) => { g.every = Math.max(1, +e.target.value || 1); save(); };
+      $('r-every-' + i).onchange = (e) => { g.every = Math.max(1, Math.round(+e.target.value) || 1); save(); };
+      $('r-eff-' + i).onchange = (e) => { g.curse = e.target.value; save(); };
+      $('r-gift-' + i).onchange = (e) => { g.gift = e.target.value === OTHER ? '' : e.target.value; save(); renderRules(); if (e.target.value === OTHER) $('r-name-' + i).focus(); };
+      const n = $('r-name-' + i);
+      if (n) n.onchange = () => { g.gift = n.value.trim(); save(); };
     });
-    $('giftGroups').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); });
-    $('giftGroups').querySelectorAll('[data-addgift]').forEach((b) => b.onclick = () => { S.gifts.push({ gift: 'New gift', coins: 1, curse: b.dataset.addgift, every: 1 }); save(); renderSettings(); });
+    document.querySelectorAll('[data-delrule]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.delrule, 1); save(); renderRules(); });
+  }
+  $('addRule').onclick = () => {
+    // Offer the cheapest gift not used yet.
+    const free = CAT.find((c) => !S.gifts.some((g) => g.gift.toLowerCase() === c.name.toLowerCase()));
+    S.gifts.push({ gift: free ? free.name : '', every: 1, curse: 'curse' });
+    save(); renderRules();
+  };
+  $('defaultGifts').onclick = () => { const d = MC.settings.defaults(); S.gifts = d.gifts; S.likesForShield = d.likesForShield; save(); renderAll(); };
 
+  // ---------- Dares ----------
+  function renderDares() {
+    for (const key of ['loseDares', 'winDares']) {
+      $(key).innerHTML = S[key].map((d, i) => `<div class="row"><input type="text" value="${esc(d)}" data-dare="${key}" data-i="${i}" aria-label="Dare"><button data-deldare="${key}" data-i="${i}" aria-label="Remove">✕</button></div>`).join('');
+    }
+    document.querySelectorAll('[data-dare]').forEach((inp) => inp.onchange = () => { S[inp.dataset.dare][+inp.dataset.i] = inp.value.trim(); save(); });
+    document.querySelectorAll('[data-deldare]').forEach((b) => b.onclick = () => { S[b.dataset.deldare].splice(+b.dataset.i, 1); save(); renderDares(); });
+  }
+  document.querySelectorAll('[data-adddare]').forEach((b) => b.onclick = () => {
+    S[b.dataset.adddare].push('');
+    renderDares();
+    const inputs = $(b.dataset.adddare).querySelectorAll('input');
+    inputs[inputs.length - 1].focus();
+  });
+
+  // ---------- Everything ----------
+  function renderCurseTimes() {
     $('curseTimes').innerHTML = `<p class="hint" style="margin:0 0 4px">Per gift = time each gift adds. Max = most time that can be on the clock at once.${'<br>'}Keep “Don't blink” short: holding the eyes open for long gets uncomfortable fast.</p>` + Object.entries(S.curses).map(([k, c]) =>
       `<label class="field"><span>${c.icon} ${c.label} · per gift</span><input type="range" id="c-${k}" min="1" max="30" step="1" value="${c.seconds}"><output>${c.seconds} s</output></label>
        <label class="field"><span>${c.icon} ${c.label} · max</span><input type="range" id="cm-${k}" min="3" max="${k === 'blink' ? 20 : 60}" step="1" value="${c.maxSeconds}"><output>${c.maxSeconds} s</output></label>`).join('');
@@ -342,26 +416,30 @@
       max.oninput = sync;
     });
   }
-  // Dares: one text field each, + to add, ✕ to remove.
-  function renderDares() {
-    for (const key of ['loseDares', 'winDares']) {
-      $(key).innerHTML = S[key].map((d, i) => `<div class="row"><input type="text" value="${esc(d)}" data-dare="${key}" data-i="${i}" aria-label="Dare"><button data-deldare="${key}" data-i="${i}" aria-label="Remove">✕</button></div>`).join('');
-    }
-    document.querySelectorAll('[data-dare]').forEach((inp) => inp.onchange = () => { S[inp.dataset.dare][+inp.dataset.i] = inp.value.trim(); save(); });
-    document.querySelectorAll('[data-deldare]').forEach((b) => b.onclick = () => { S[b.dataset.deldare].splice(+b.dataset.i, 1); save(); renderDares(); });
-  }
-  document.querySelectorAll('[data-adddare]').forEach((b) => b.onclick = () => {
-    S[b.dataset.adddare].push('');
+  function renderAll() {
+    sliders('sensSliders', SENS);
+    sliders('gameSliders', GAME);
+    sliders('advSliders', ADV);
+    renderCurseTimes();
+    renderRules();
     renderDares();
-    const inputs = $(b.dataset.adddare).querySelectorAll('input');
-    inputs[inputs.length - 1].focus();
-  });
-  renderDares();
-  $('saveBtn').onclick = () => { S.loseDares = S.loseDares.filter(Boolean); S.winDares = S.winDares.filter(Boolean); save(); renderDares(); };
-  $('defaults').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderSettings(); renderDares(); log('All settings restored to defaults.'); };
-
-  renderSettings();
-  log('Start the camera to test detection, or use the sliders without one.');
+    $('likesForShield').value = S.likesForShield;
+    $('likesForShield').onchange = (e) => { S.likesForShield = Math.max(10, Math.round(+e.target.value) || 10); save(); };
+    $('showGuide').checked = !!S.showGiftGuide;
+    $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
+    ['move', 'smile', 'blink', 'sound'].forEach((k) => {
+      const c = $('r-' + k);
+      c.checked = !!S.lightRules[k];
+      c.onchange = () => { S.lightRules[k] = c.checked; save(); };
+    });
+  }
+  // Empty gift names and dares are dropped before testing or playing.
+  const tidy = () => { S.gifts = S.gifts.filter((g) => g.gift); S.loseDares = S.loseDares.filter(Boolean); S.winDares = S.winDares.filter(Boolean); save(); };
+  $('testBtn').onclick = tidy;
+  window.addEventListener('pagehide', tidy);
+  $('restoreAll').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderAll(); log('All settings restored to defaults.'); };
+  renderAll();
+  log('Start the camera to test detection.');
 </script>
 </body>
 </html>

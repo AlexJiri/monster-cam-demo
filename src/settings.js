@@ -23,7 +23,7 @@
     darkness: 0.85, // 0 = no darkness, 1 = pitch black between sweeps
     stareSeconds: 3, // big gift: the monster looks straight into the camera
     shieldSeconds: 6, // helper gift: the monster is chained and can't catch the streamer
-    likesForShield: 100, // chat fills a bar with likes; when full, the monster is chained
+    likesForShield: 200, // chat fills a bar with likes (taps); when full, the monster is chained
     // Dares are written by the streamer: keep them harmless (TikTok removes lives with dangerous challenges).
     loseDares: [
       'Talk like a pirate for 1 minute',
@@ -43,32 +43,17 @@
       move: { label: 'Freeze', icon: '🧊', seconds: 5, maxSeconds: 10 }, // no moving and no sound
       sound: { label: 'Silence', icon: '🤫', seconds: 5, maxSeconds: 15 },
     },
-    // Which gift does what. `every`: trigger once per N gifts of that kind (helpers need more, so the monster usually wins).
-    // `coins`: TikTok's price, only to sort the list (prices can change; the rules go by name).
-    // `curse`: blink | smile | move | sound | all | curse (a random one) – curses,
-    // sweep (hunter comes) | stare (looks into the camera) | rampage (breaks the chains and hunts) | eat (eaten on the spot),
-    // shield (chains the monster) | cleanse (removes all curses) – helpers.
-    // Gift names must match TikTok's exactly; the bridge window prints each gift's name and price as it arrives.
+    // Which gift does what: `every` gifts of `gift` → `curse` (the effect, see EFFECTS below).
+    // Kept short on purpose: viewers have to remember it. Gift names must match TikTok's exactly.
     gifts: [
-      { gift: 'Rose', coins: 1, curse: 'blink', every: 1 },
-      { gift: 'TikTok', coins: 1, curse: 'smile', every: 1 },
-      { gift: 'Blow a kiss', coins: 1, curse: 'curse', every: 1 },
-      { gift: 'Finger Heart', coins: 5, curse: 'move', every: 1 },
-      { gift: 'Panda', coins: 5, curse: 'sound', every: 1 },
-      { gift: 'Perfume', coins: 300, curse: 'all', every: 1 },
-      { gift: 'Doughnut', coins: 30, curse: 'sweep', every: 1 },
-      { gift: 'Confetti', coins: 100, curse: 'stare', every: 1 },
-      { gift: 'Sunglasses', coins: 199, curse: 'sweep', every: 1 },
-      { gift: 'Pink Cowboy', coins: 450, curse: 'stare', every: 1 },
-      { gift: 'Galaxy', coins: 1000, curse: 'rampage', every: 1 },
-      { gift: 'Drama Queen', coins: 5000, curse: 'rampage', every: 1 },
-      { gift: 'Rocket', coins: 20000, curse: 'eat', every: 1 },
-      { gift: 'Lion', coins: 29999, curse: 'eat', every: 1 },
-      { gift: 'Universe', coins: 34999, curse: 'eat', every: 1 },
-      { gift: 'Heart Me', coins: 1, curse: 'cleanse', every: 10 },
-      { gift: 'Hand Hearts', coins: 100, curse: 'shield', every: 3 },
+      { gift: 'Rose', every: 1, curse: 'blink' },
+      { gift: 'TikTok', every: 1, curse: 'smile' },
+      { gift: 'Finger Heart', every: 1, curse: 'move' },
+      { gift: 'Doughnut', every: 1, curse: 'sweep' },
+      { gift: 'Galaxy', every: 1, curse: 'rampage' },
+      { gift: 'Lion', every: 1, curse: 'eat' },
     ],
-    giftsVersion: 2,
+    giftsVersion: 3,
   };
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -78,11 +63,12 @@
       const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved) {
         const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules } };
-        // Saves from before the gift categories (v2): new gift list and 5-minute rounds.
+        // Saves from older gift lists: the new short list, 5-minute rounds and the likes target.
         if (saved.giftsVersion !== DEFAULTS.giftsVersion) {
           s.gifts = clone(DEFAULTS.gifts);
           s.giftsVersion = DEFAULTS.giftsVersion;
           s.roundSeconds = DEFAULTS.roundSeconds;
+          s.likesForShield = DEFAULTS.likesForShield;
         }
         delete s.tiers;
         delete s.anyGiftAdded;
@@ -99,12 +85,37 @@
   // The rule for a gift, by its TikTok name.
   const ruleFor = (s, gift) => s.gifts.find((g) => g.gift.toLowerCase() === String(gift).toLowerCase()) || null;
 
-  // Effects grouped the way the settings page shows them.
+  // TikTok gifts the settings offer in a list (others can be typed in). Coins = price, only to sort; icons are ours.
+  // Prices: ttcalculator.net LIVE gift chart (2026) and gifts seen on lives.
+  const CATALOG = [
+    { name: 'Rose', coins: 1, icon: '🌹' },
+    { name: 'TikTok', coins: 1, icon: '🎵' },
+    { name: 'Heart Me', coins: 1, icon: '💗' },
+    { name: 'Blow a kiss', coins: 1, icon: '😘' },
+    { name: 'Finger Heart', coins: 5, icon: '🫰' },
+    { name: 'Panda', coins: 5, icon: '🐼' },
+    { name: 'Doughnut', coins: 30, icon: '🍩' },
+    { name: 'Hand Hearts', coins: 100, icon: '🫶' },
+    { name: 'Confetti', coins: 100, icon: '🎊' },
+    { name: 'Sunglasses', coins: 199, icon: '🕶️' },
+    { name: 'Corgi', coins: 299, icon: '🐕' },
+    { name: 'Perfume', coins: 300, icon: '🧴' },
+    { name: 'Pink Cowboy', coins: 450, icon: '🤠' },
+    { name: 'Coral', coins: 499, icon: '🪸' },
+    { name: 'Galaxy', coins: 1000, icon: '🌌' },
+    { name: 'Drama Queen', coins: 5000, icon: '👑' },
+    { name: 'Rocket', coins: 20000, icon: '🚀' },
+    { name: 'Lion', coins: 29999, icon: '🦁' },
+    { name: 'Universe', coins: 34999, icon: '🪐' },
+  ];
+  const giftInfo = (name) => CATALOG.find((g) => g.name.toLowerCase() === String(name).toLowerCase()) || { name, coins: 0, icon: '🎁' };
+
+  // Effects grouped (helpers last).
   const GROUPS = [
-    { id: 'curses', title: '😈 Curses', viewers: '😈 Curse the streamer', hint: 'Cheap gifts: a rule with a timer. Break it and you lose a life.', effects: ['curse', 'blink', 'smile', 'move', 'sound', 'all'] },
-    { id: 'hunter', title: '🔦 Hunter', viewers: '🔦 Send the hunter', hint: 'The monster comes looking for you.', effects: ['sweep', 'stare'] },
-    { id: 'big', title: '💥 Big gifts', viewers: '💥 Feed them to the monster', hint: 'Expensive gifts: break the chains, or straight into the jaws.', effects: ['rampage', 'eat'] },
-    { id: 'helpers', title: '🛡️ Helpers', viewers: '🛡️ Save the streamer', hint: 'Save the streamer. Keep "every" high so the monster usually wins.', effects: ['shield', 'cleanse'] },
+    { id: 'curses', effects: ['curse', 'blink', 'smile', 'move', 'sound', 'all'] },
+    { id: 'hunter', effects: ['sweep', 'stare'] },
+    { id: 'big', effects: ['rampage', 'eat'] },
+    { id: 'helpers', effects: ['shield', 'cleanse'] },
   ];
 
   // Every effect a gift can have, in the order the settings list them.
@@ -119,9 +130,9 @@
     stare: '👀 Monster stares at you',
     rampage: '💥 Breaks the chains + hunts',
     eat: '🩸 Eaten on the spot',
-    shield: '🛡️ Helper: chain the monster',
-    cleanse: '🧹 Helper: remove curses',
+    shield: '🛡️ Chain the monster (helps)',
+    cleanse: '🧹 Remove all curses (helps)',
   };
 
-  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS };
+  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo };
 })(window.MC = window.MC || {});
