@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monster Cam – Test Bench</title>
+<title>Monster Cam – Settings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  /* Phase 0 test bench: camera stage on the left, simulator / settings / log on the right. Dark by design. */
+  /* Settings & test: camera test on the left, every setting on the right. Dark by design. */
   :root {
     --night: #0d0f14;
     --panel: #171a22;
@@ -42,27 +42,11 @@
   .stage .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
   .facebox { position: absolute; border: 2px dashed rgba(242, 193, 78, 0.6); border-radius: 12px; pointer-events: none; display: none; }
   .hud { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
-  .lives { font-size: 22px; }
   .status { background: rgba(0, 0, 0, 0.6); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
-  .curses { position: absolute; left: 10px; bottom: 10px; display: grid; gap: 6px; width: min(260px, 70%); pointer-events: none; }
-  .curse { background: rgba(0, 0, 0, 0.65); border-radius: 8px; padding: 4px 8px; font-size: 14px; }
-  .curse .bar { height: 6px; background: #333; border-radius: 3px; margin-top: 3px; overflow: hidden; }
-  .curse .bar i { display: block; height: 100%; background: var(--blood); }
-  .curse.wait { opacity: 0.75; }
-  .curse.wait .bar i { background: var(--lamp); }
-  .caught { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(224, 57, 62, 0.45); font-family: 'Creepster', cursive; font-size: 64px; color: #fff; text-shadow: 0 4px 0 #000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-  .caught.on { opacity: 1; }
   .notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); border-radius: 14px; padding: 14px 22px; text-align: center; font-size: 20px; font-weight: 700; display: none; max-width: 85%; }
   .notice.on { display: block; }
   .notice big { display: block; font-size: 56px; color: var(--lamp); line-height: 1.1; }
-  .notice .dare { display: block; margin: 10px 0 12px; font-size: 18px; font-weight: 500; color: var(--text); }
-  .notice button { pointer-events: auto; }
-  .notice.win big { color: var(--moss); }
-  .notice.lose big { color: var(--blood); }
-  .timer { background: rgba(0, 0, 0, 0.6); border-radius: 999px; padding: 2px 12px; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .timer.low { color: var(--blood); }
   textarea { width: 100%; min-height: 90px; background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; font-size: 13px; color: inherit; resize: vertical; }
-  .curse .plus { color: var(--lamp); font-weight: 700; margin-left: 4px; }
 
   .meters { display: grid; gap: 8px; margin-top: 12px; }
   .meter { display: grid; grid-template-columns: 110px 1fr 46px; gap: 8px; align-items: center; font-size: 14px; }
@@ -84,133 +68,118 @@
   details summary { cursor: pointer; color: var(--muted); }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
+  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
+  .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
+  .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
+  header { align-items: center; }
+  h1 { color: var(--lamp); }
+  .saved { color: var(--moss); font-size: 13px; }
+  section h2 small { font-weight: 400; color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Monster Cam</h1>
-    <p>Phase 0 test bench: camera detection, gift simulator and settings. <a href="index.html" style="color:var(--lamp)">Play Lights On →</a></p>
+    <h1>Settings</h1>
+    <p>Everything is set here and saved on this computer. <span class="saved" id="saved"></span></p>
+    <nav class="tabs" aria-label="Pages"><a href="index.html">🎮 Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; test</a></nav>
   </header>
 
   <div class="grid">
     <div>
       <section>
+        <h2>Camera test <small>· check that smiles, blinks, movement and sound are picked up</small></h2>
         <div class="stage" id="stage">
           <video id="video" playsinline muted></video>
-          <div class="empty" id="empty">Start the camera to begin.<br>Everything runs on this computer; no video is sent anywhere.</div>
+          <div class="empty" id="empty">Start the camera to test detection.<br>Everything runs on this computer; no video is sent anywhere.</div>
           <div class="facebox" id="facebox"></div>
-          <div class="hud"><span class="lives" id="lives"></span><span class="timer" id="timer" hidden></span><span class="status" id="status">Camera off</span></div>
-          <div class="curses" id="curses"></div>
-          <div class="caught" id="caught">CAUGHT!</div>
+          <div class="hud"><span></span><span class="status" id="status">Camera off</span></div>
           <div class="notice" id="notice" aria-live="polite"></div>
         </div>
         <div class="row" style="margin-top:12px">
           <button class="primary" id="startBtn">Start camera</button>
-          <button id="calBtn" disabled>Calibrate (3 s neutral face)</button>
-          <button id="roundBtn">▶ Start round</button>
-          <button id="resetBtn">Reset lives</button>
+          <button id="calBtn" disabled>Calibrate (3 s relaxed face)</button>
+          <button id="fakeBtn">No camera: sliders</button>
         </div>
         <div class="meters" id="meters"></div>
-        <p class="hint">Yellow line = threshold. Calibrate with a relaxed face first: smile and blink are measured against it.</p>
-        <details style="margin-top:10px">
-          <summary>No camera? Drive the detector by hand</summary>
-          <div class="row" style="margin-top:8px"><button id="fakeBtn">Use sliders instead of camera</button></div>
-          <div id="fakeSliders"></div>
-        </details>
+        <p class="hint">A bar turns red when it crosses its yellow line: that would get you caught. Move the lines with the sensitivity settings.</p>
+        <div id="fakeSliders"></div>
       </section>
-    </div>
-
-    <div>
-      <section>
-        <h2>Simulator</h2>
-        <div class="row">
-          <input type="text" id="viewer" value="Ion" aria-label="Viewer name" style="width:120px">
-          <button data-sim="comment">💬 Comment</button>
-          <button data-sim="like">❤️ 10 likes</button>
-          <button data-sim="follow">➕ Follow</button>
-        </div>
-        <div class="row" id="giftBtns" style="margin-top:8px"></div>
-      </section>
-
-      <section>
-        <h2>Settings</h2>
-        <div id="sliders"></div>
-        <h2 style="margin-top:12px">Gifts</h2>
-        <table>
-          <thead><tr><th>Gift</th><th>Effect</th><th>Every N</th><th></th></tr></thead>
-          <tbody id="giftRows"></tbody>
-        </table>
-        <p class="hint">Use the exact TikTok gift name (the bridge window shows each gift's name as it arrives). <b>*</b> = any other gift.</p>
-        <div class="row" style="margin-top:8px">
-          <button id="addGift">+ Add gift</button>
-          <button id="defaults">Restore defaults</button>
-        </div>
-        <h2 style="margin-top:12px">Dares</h2>
-        <label for="loseDares" class="hint" style="display:block">If the streamer loses (one per line, keep them harmless)</label>
-        <textarea id="loseDares"></textarea>
-        <label for="winDares" class="hint" style="display:block;margin-top:6px">If the streamer wins: a dare for chat (one per line)</label>
-        <textarea id="winDares"></textarea>
-        <h2 style="margin-top:12px">Curse timers</h2>
-        <div id="curseTimes"></div>
-      </section>
-
       <section>
         <h2>Log</h2>
         <div class="log" id="log" aria-live="polite"></div>
       </section>
     </div>
+
+    <div>
+      <section>
+        <h2>Gifts by price <small>· any gift without its own rule</small></h2>
+        <table>
+          <thead><tr><th>From (coins)</th><th>Effect</th><th></th></tr></thead>
+          <tbody id="tierRows"></tbody>
+        </table>
+        <div class="row" style="margin-top:8px"><button id="addTier">+ Add price tier</button></div>
+        <h2 style="margin-top:14px">Gifts by name <small>· these override the price</small></h2>
+        <table>
+          <thead><tr><th>Gift</th><th>Effect</th><th>Every N</th><th></th></tr></thead>
+          <tbody id="giftRows"></tbody>
+        </table>
+        <p class="hint">Use the exact TikTok gift name; the bridge window shows each gift's name and price as it arrives.</p>
+        <div class="row" style="margin-top:8px"><button id="addGift">+ Add gift</button></div>
+      </section>
+
+      <section>
+        <h2>Lights On</h2>
+        <div class="row">
+          <span class="hint" style="margin:0">While the light is on you, don't:</span>
+          <label class="check"><input type="checkbox" id="r-move"> move</label>
+          <label class="check"><input type="checkbox" id="r-smile"> smile</label>
+          <label class="check"><input type="checkbox" id="r-blink"> blink</label>
+          <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
+        </div>
+        <div id="sliders"></div>
+      </section>
+
+      <section>
+        <h2>Curse timers</h2>
+        <div id="curseTimes"></div>
+      </section>
+
+      <section>
+        <h2>Dares</h2>
+        <label for="loseDares" class="hint" style="display:block">If the streamer loses (one per line, keep them harmless)</label>
+        <textarea id="loseDares"></textarea>
+        <label for="winDares" class="hint" style="display:block;margin-top:6px">If the streamer wins: a dare for chat (one per line)</label>
+        <textarea id="winDares"></textarea>
+      </section>
+
+      <section>
+        <button id="defaults">Restore all defaults</button>
+      </section>
+    </div>
   </div>
 </div>
 
-<script src="src/settings.js?v=1794336932"></script>
-<script src="src/events.js?v=1794336932"></script>
-<script src="src/face.js?v=1794336932"></script>
-<script src="src/curses.js?v=1794336932"></script>
-<script src="src/sfx.js?v=1794336932"></script>
-<script src="src/mic.js?v=1794336932"></script>
+<script src="src/settings.js?v=1794339606"></script>
+<script src="src/events.js?v=1794339606"></script>
+<script src="src/face.js?v=1794339606"></script>
+<script src="src/mic.js?v=1794339606"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
   const face = new MC.Face();
-  let lives = S.lives;
-  const giftCount = {};
-
-  // ---------- Log ----------
-  function log(html) {
-    const t = new Date().toLocaleTimeString();
-    $('log').insertAdjacentHTML('afterbegin', `<div>${t} · ${html}</div>`);
-  }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-  // ---------- Curses ----------
-  const curses = new MC.Curses(S, {
-    onCaught(c) {
-      lives = Math.max(0, lives - 1);
-      renderLives();
-      $('caught').textContent = lives ? 'CAUGHT!' : 'GAME OVER';
-      $('caught').classList.add('on');
-      setTimeout(() => $('caught').classList.remove('on'), 1200);
-      log(`🩸 <b>Caught</b> breaking “${S.curses[c.type].label}” (sent by ${esc(c.by)}). Lives: ${lives}`);
-      if (!lives) { curses.clear(); if (round.running) endRound(false); }
-    },
-    onChange() {},
-  });
-
-  function renderCurses(now) {
-    $('curses').innerHTML = curses.active.map((c) => {
-      const cfg = S.curses[c.type];
-      const waiting = now < c.starts;
-      const left = Math.max(0, c.ends - Math.max(now, c.starts));
-      const bump = c.bumped && now - c.bumped < 1200 ? `<span class="plus">${c.capped ? 'MAX' : `+${cfg.seconds} s`}</span>` : '';
-      return `<div class="curse ${waiting ? 'wait' : ''}">${cfg.icon} ${cfg.label} ${waiting ? '– get ready' : `${(left / 1000).toFixed(1)} s`}${bump}<small style="color:var(--muted)"> · ${esc(c.by)}</small>
-        <div class="bar"><i style="width:${waiting ? 100 : Math.min(100, (left / (cfg.maxSeconds * 1000)) * 100)}%"></i></div></div>`;
-    }).join('') + (curses.queue.length ? `<div class="curse">+${curses.queue.length} waiting</div>` : '');
+  function log(html) { $('log').insertAdjacentHTML('afterbegin', `<div>${new Date().toLocaleTimeString()} · ${html}</div>`); }
+  function save() {
+    MC.settings.save(S);
+    $('saved').textContent = '✓ Saved';
+    clearTimeout(save.t);
+    save.t = setTimeout(() => { $('saved').textContent = ''; }, 1500);
   }
 
-  function renderLives() { $('lives').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, S.lives - lives)); }
-
-  // ---------- Meters ----------
+  // ---------- Camera test ----------
   const METERS = [
     { key: 'smile', label: '😀 Smile', th: () => S.smileThreshold, max: 1 },
     { key: 'blink', label: '👁️ Blink', th: () => S.blinkThreshold, max: 1 },
@@ -218,9 +187,8 @@
     { key: 'sound', label: '🎤 Sound', th: () => S.soundThreshold, max: 1 },
   ];
   $('meters').innerHTML = METERS.map((m) => `<div class="meter"><span>${m.label}</span><div class="track"><div class="fill" id="f-${m.key}"></div><div class="mark" id="m-${m.key}"></div></div><span class="val" id="v-${m.key}">0.00</span></div>`).join('');
-
+  let calibrating = false, calibrated = false;
   face.onFrame((st) => {
-    const now = performance.now();
     for (const m of METERS) {
       const v = st[m.key];
       $('f-' + m.key).style.width = Math.min(100, (v / m.max) * 100) + '%';
@@ -234,17 +202,7 @@
       // The video is mirrored, so mirror the box too.
       Object.assign(fb.style, { display: 'block', left: (1 - st.box.x - st.box.w) * 100 + '%', top: st.box.y * 100 + '%', width: st.box.w * 100 + '%', height: st.box.h * 100 + '%' });
     } else fb.style.display = 'none';
-    if (lives && !calibrating) curses.tick(st, now);
-    if (round.running) {
-      const left = Math.max(0, round.ends - now);
-      const secs = Math.ceil(left / 1000);
-      $('timer').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-      $('timer').classList.toggle('low', left < 10000);
-      if (left <= 0 && lives) endRound(true);
-    }
-    renderCurses(now);
   });
-
   // ---------- Camera ----------
   $('startBtn').onclick = async () => {
     $('startBtn').disabled = true;
@@ -264,7 +222,6 @@
       log('⚠️ ' + msg);
     }
   };
-  let calibrating = false, calibrated = false;
   function notice(html, ms) {
     $('notice').innerHTML = html;
     $('notice').classList.add('on');
@@ -297,42 +254,6 @@
       log('⚠️ No face seen during calibration. Face the camera and try again.');
     }
   };
-  $('resetBtn').onclick = () => { lives = S.lives; curses.clear(); renderLives(); log('↺ Lives reset.'); };
-
-  // ---------- Round ----------
-  // Survive the timer = win; lose all lives = lose. Either way someone gets a dare.
-  const round = { running: false, ends: 0 };
-  const pick = (list) => list[Math.floor(Math.random() * list.length)];
-  function startRound() {
-    lives = S.lives;
-    curses.clear();
-    renderLives();
-    round.running = true;
-    round.ends = performance.now() + S.roundSeconds * 1000;
-    $('timer').hidden = false;
-    $('notice').className = 'notice';
-    $('roundBtn').textContent = '■ Stop round';
-    log(`▶ Round started: survive ${S.roundSeconds} s.`);
-  }
-  function endRound(won) {
-    round.running = false;
-    curses.clear();
-    $('timer').hidden = true;
-    $('roundBtn').textContent = '▶ Start round';
-    const list = (won ? S.winDares : S.loseDares).filter((d) => d.trim());
-    const dare = list.length ? pick(list) : '';
-    $('notice').className = 'notice on ' + (won ? 'win' : 'lose');
-    $('notice').innerHTML = `<big>${won ? 'You survived!' : 'Eaten!'}</big>` +
-      (dare ? `<span class="dare">${won ? '' : 'Dare: '}${esc(dare)}</span>` : '') +
-      `<button class="primary" id="againBtn">Play again</button>`;
-    $('againBtn').onclick = () => { $('notice').className = 'notice'; startRound(); };
-    log(won ? `🏆 Streamer survived the round. ${dare ? 'Chat dare: ' + esc(dare) : ''}` : `💀 Streamer lost the round. ${dare ? 'Dare: ' + esc(dare) : ''}`);
-  }
-  $('roundBtn').onclick = () => {
-    if (round.running) { round.running = false; curses.clear(); $('timer').hidden = true; $('roundBtn').textContent = '▶ Start round'; log('■ Round stopped.'); }
-    else startRound();
-  };
-
   // Manual sliders (debug, no camera)
   $('fakeBtn').onclick = () => {
     face.startFake();
@@ -344,64 +265,54 @@
     log('🎚️ Manual mode on.');
   };
 
-  // ---------- Simulator ----------
-  const viewer = () => $('viewer').value.trim() || 'viewer';
-  document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
-    const type = b.dataset.sim;
-    MC.bus.emit(type === 'comment' ? { type, user: viewer(), text: 'hello' } : type === 'like' ? { type, user: viewer(), count: 10 } : { type, user: viewer() });
-  });
-  function renderGiftButtons() {
-    $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${g.gift === '*' ? 'Any other gift' : esc(g.gift)}</button>`).join('');
-    $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift === '*' ? 'Pink Cowboy' : S.gifts[+b.dataset.gift].gift, count: 1 }));
-  }
-
-  // Events → effects
-  MC.bus.on('*', (e) => {
-    if (e.type === 'comment') log(`💬 <b>${esc(e.user)}</b>: ${esc(e.text)}`);
-    if (e.type === 'like') log(`❤️ <b>${esc(e.user)}</b> sent ${e.count} likes`);
-    if (e.type === 'follow') log(`➕ <b>${esc(e.user)}</b> followed`);
-    if (e.type !== 'gift') return;
-    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase()) || S.gifts.find((g) => g.gift === '*');
-    giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
-    if (!rule) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (no effect set)`); return; }
-    const n = giftCount[e.gift];
-    if (n % Math.max(1, rule.every)) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} (${n % rule.every}/${rule.every})`); return; }
-    if (['sweep', 'stare', 'shield', 'cleanse'].includes(rule.curse)) { log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${rule.curse} (works in Lights On)`); return; }
-    const label = rule.curse === 'all' ? 'all curses' : S.curses[rule.curse].label;
-    log(`🎁 <b>${esc(e.user)}</b> sent ${esc(e.gift)} → ${label}`);
-    if (lives) curses.add(rule.curse, e.user);
-  });
-
   // ---------- Settings ----------
+  // Sliders: [key, label, min, max, step, unit]
   const SLIDERS = [
-    ['smileThreshold', 'Smile sensitivity', 0.1, 0.9, 0.05],
-    ['blinkThreshold', 'Blink sensitivity', 0.2, 0.9, 0.05],
-    ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1],
-    ['soundThreshold', 'Sound sensitivity', 0.05, 0.9, 0.05],
-    ['lives', 'Lives', 1, 9, 1],
-    ['maxCurses', 'Curses at once', 1, 5, 1],
-    ['roundSeconds', 'Round length (s)', 30, 600, 30],
+    ['lives', 'Lives', 1, 9, 1, ''],
+    ['roundSeconds', 'Round length', 30, 600, 30, ' s'],
+    ['maxCurses', 'Curses at once', 1, 5, 1, ''],
+    ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
+    ['likesForShield', 'Likes to chain it', 25, 1000, 25, ''],
+    ['smileThreshold', 'Smile sensitivity', 0.1, 0.9, 0.05, ''],
+    ['blinkThreshold', 'Blink sensitivity', 0.2, 0.9, 0.05, ''],
+    ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1, ''],
+    ['soundThreshold', 'Sound sensitivity', 0.05, 0.9, 0.05, ''],
   ];
-  function save() { MC.settings.save(S); curses.s = S; }
-  function renderSettings() {
-    $('sliders').innerHTML = SLIDERS.map(([k, label, min, max, step]) =>
-      `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${S[k]}"><output>${S[k]}</output></label>`).join('');
-    SLIDERS.forEach(([k]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value; if (k === 'lives') { lives = S.lives; renderLives(); } save(); }; });
+  const opts = (sel) => Object.entries(MC.settings.EFFECTS).map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label}</option>`).join('');
 
-    const EFFECT_LABEL = { all: 'All curses', sweep: '🔦 Hunt the streamer', stare: '👁️ Monster stare', shield: '🛡️ Chain the monster', cleanse: '🧹 Remove curses' };
-    const opts = (sel) => ['blink', 'smile', 'move', 'sound', 'all', 'sweep', 'stare', 'shield', 'cleanse'].map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${EFFECT_LABEL[c] || S.curses[c].label}</option>`).join('');
+  function renderSettings() {
+    $('sliders').innerHTML = SLIDERS.map(([k, label, min, max, step, unit]) =>
+      `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${S[k]}"><output>${S[k]}${unit}</output></label>`).join('');
+    SLIDERS.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value + unit; save(); }; });
+
+    ['move', 'smile', 'blink', 'sound'].forEach((k) => {
+      const c = $('r-' + k);
+      c.checked = !!S.lightRules[k];
+      c.onchange = () => { S.lightRules[k] = c.checked; save(); };
+    });
+
+    S.tiers.sort((a, b) => a.min - b.min);
+    $('tierRows').innerHTML = S.tiers.map((t, i) => `<tr>
+      <td><input type="number" id="t-min-${i}" min="1" value="${t.min}" aria-label="From coins" style="width:100px"></td>
+      <td><select id="t-curse-${i}" aria-label="Effect">${opts(t.curse)}</select></td>
+      <td><button data-deltier="${i}" aria-label="Remove">✕</button></td></tr>`).join('');
+    S.tiers.forEach((t, i) => {
+      $('t-min-' + i).onchange = (e) => { t.min = Math.max(1, Math.round(+e.target.value) || 1); save(); renderSettings(); };
+      $('t-curse-' + i).onchange = (e) => { t.curse = e.target.value; save(); };
+    });
+    $('tierRows').querySelectorAll('[data-deltier]').forEach((b) => b.onclick = () => { S.tiers.splice(+b.dataset.deltier, 1); save(); renderSettings(); });
+
     $('giftRows').innerHTML = S.gifts.map((g, i) => `<tr>
       <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
       <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>
       <td><input type="number" id="g-every-${i}" min="1" value="${g.every}" aria-label="Every N gifts" style="width:64px"></td>
       <td><button data-del="${i}" aria-label="Remove">✕</button></td></tr>`).join('');
     S.gifts.forEach((g, i) => {
-      $('g-name-' + i).onchange = (e) => { g.gift = e.target.value.trim(); save(); renderGiftButtons(); };
+      $('g-name-' + i).onchange = (e) => { g.gift = e.target.value.trim(); save(); };
       $('g-curse-' + i).onchange = (e) => { g.curse = e.target.value; save(); };
       $('g-every-' + i).onchange = (e) => { g.every = Math.max(1, +e.target.value || 1); save(); };
     });
-    $('giftRows').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); renderGiftButtons(); });
-
+    $('giftRows').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); });
     $('curseTimes').innerHTML = `<p class="hint" style="margin:0 0 4px">Per gift = time each gift adds. Max = most time that can be on the clock at once.${'<br>'}Keep “Don't blink” short: holding the eyes open for long gets uncomfortable fast.</p>` + Object.entries(S.curses).map(([k, c]) =>
       `<label class="field"><span>${c.icon} ${c.label} · per gift</span><input type="range" id="c-${k}" min="1" max="30" step="1" value="${c.seconds}"><output>${c.seconds} s</output></label>
        <label class="field"><span>${c.icon} ${c.label} · max</span><input type="range" id="cm-${k}" min="3" max="${k === 'blink' ? 20 : 60}" step="1" value="${c.maxSeconds}"><output>${c.maxSeconds} s</output></label>`).join('');
@@ -427,13 +338,12 @@
     $('winDares').onchange = () => { S.winDares = $('winDares').value.split('\n').map((x) => x.trim()).filter(Boolean); save(); };
   }
   renderDares();
-  $('addGift').onclick = () => { S.gifts.push({ gift: 'New gift', curse: 'blink', every: 1 }); save(); renderSettings(); renderGiftButtons(); };
-  $('defaults').onclick = () => { S = MC.settings.defaults(); save(); lives = S.lives; renderSettings(); renderDares(); renderGiftButtons(); renderLives(); log('Settings restored to defaults.'); };
+  $('addGift').onclick = () => { S.gifts.push({ gift: 'New gift', curse: 'blink', every: 1 }); save(); renderSettings(); };
+  $('addTier').onclick = () => { const top = S.tiers.length ? S.tiers[S.tiers.length - 1].min * 10 : 1; S.tiers.push({ min: top, curse: 'sweep' }); save(); renderSettings(); };
+  $('defaults').onclick = () => { S = MC.settings.defaults(); save(); renderSettings(); renderDares(); log('All settings restored to defaults.'); };
 
   renderSettings();
-  renderGiftButtons();
-  renderLives();
-  log('Ready. Start the camera, or open “No camera?” to test with sliders.');
+  log('Start the camera to test detection, or use the sliders without one.');
 </script>
 </body>
 </html>

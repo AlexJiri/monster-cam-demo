@@ -41,21 +41,25 @@
       move: { label: 'Freeze', icon: '🧊', seconds: 5, maxSeconds: 10 }, // no moving and no sound
       sound: { label: 'Silence', icon: '🤫', seconds: 5, maxSeconds: 15 },
     },
-    // `every`: trigger once per N gifts of that kind (e.g. a curse every 10 roses).
-    // `curse`: blink | smile | move | sound | all (curses), sweep | stare (Lights On flashlight),
-    // shield | cleanse (help the streamer: chain the monster, remove all curses).
-    // Gift names must match TikTok's; rename them in the settings to the gifts you want. "*" = any other gift.
+    // Gifts by price: a gift without its own rule below uses the highest price tier it reaches.
+    // Prices are TikTok coins per gift (they come with every gift). Effects as in `gifts`.
+    tiers: [
+      { min: 1, curse: 'curse' }, // small gifts: a random curse
+      { min: 10, curse: 'sweep' }, // the hunter comes for you
+      { min: 100, curse: 'stare' }, // it looks straight into the camera
+      { min: 1000, curse: 'rampage' }, // breaks the chains and hunts you
+      { min: 20000, curse: 'eat' }, // the monster eats you on the spot
+    ],
+    // Named gifts override the price tiers. `every`: trigger once per N gifts of that kind.
+    // `curse`: blink | smile | move | sound | all | curse (random one) (curses), sweep | stare (flashlight),
+    // rampage (break the chains + hunt), eat (lose a life on the spot), shield | cleanse (help the streamer).
+    // Gift names must match TikTok's exactly; the bridge window prints each gift's name and price.
     gifts: [
-      { gift: 'Rose', curse: 'blink', every: 1 },
-      { gift: 'Ice Cream Cone', curse: 'smile', every: 1 },
-      { gift: 'Finger Heart', curse: 'move', every: 1 },
-      { gift: 'Galaxy', curse: 'all', every: 1 },
-      { gift: 'Doughnut', curse: 'sweep', every: 1 },
-      { gift: 'Lion', curse: 'stare', every: 1 },
-      { gift: 'Microphone', curse: 'sound', every: 1 },
-      { gift: 'Hand Hearts', curse: 'shield', every: 1 },
-      { gift: 'Heart Me', curse: 'cleanse', every: 1 },
-      { gift: '*', curse: 'sweep', every: 3 }, // any other gift: every 3rd one sends the hunter
+      { gift: 'Rose', curse: 'blink', every: 1 }, // 1 coin
+      { gift: 'Finger Heart', curse: 'move', every: 1 }, // 5 coins
+      { gift: 'Heart Me', curse: 'cleanse', every: 1 }, // 1 coin, helper
+      { gift: 'Hand Hearts', curse: 'shield', every: 1 }, // 100 coins, helper
+      { gift: 'Galaxy', curse: 'rampage', every: 1 }, // 1,000 coins
     ],
   };
 
@@ -66,12 +70,10 @@
       const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved) {
         const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules } };
-        // Saves from before Lights On have no gift for the flashlight effects: add the defaults.
-        for (const eff of ['sweep', 'stare', 'sound', 'shield', 'cleanse']) {
-          if (!s.gifts.some((g) => g.curse === eff)) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.curse === eff)));
-        }
-        // Saves from before the "any other gift" rule.
-        if (!s.anyGiftAdded) { if (!s.gifts.some((g) => g.gift === '*')) s.gifts.push(clone(DEFAULTS.gifts.find((g) => g.gift === '*'))); s.anyGiftAdded = true; }
+        // Saves from older versions: add the price tiers and drop the old "*" catch-all.
+        if (!Array.isArray(saved.tiers)) s.tiers = clone(DEFAULTS.tiers);
+        s.gifts = s.gifts.filter((g) => g.gift !== '*');
+        delete s.anyGiftAdded;
         return s;
       }
     } catch (e) {}
@@ -82,5 +84,29 @@
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
   }
 
-  MC.settings = { load, save, defaults: () => clone(DEFAULTS) };
+  // The rule for a gift: its own named rule, else the highest price tier its price reaches.
+  function ruleFor(s, gift, coins) {
+    const named = s.gifts.find((g) => g.gift.toLowerCase() === String(gift).toLowerCase());
+    if (named) return named;
+    const tier = (s.tiers || []).filter((t) => (coins || 0) >= t.min).sort((a, b) => b.min - a.min)[0];
+    return tier ? { gift, curse: tier.curse, every: 1, tier: tier.min } : null;
+  }
+
+  // Every effect a gift can have, in the order the settings list them.
+  const EFFECTS = {
+    curse: '🎲 Random curse',
+    blink: "👁️ Curse: don't blink",
+    smile: "😐 Curse: don't smile",
+    move: '🧊 Curse: freeze',
+    sound: '🤫 Curse: silence',
+    all: '☠️ All curses',
+    sweep: '🔦 Hunter comes for you',
+    stare: '👀 Monster stares at you',
+    rampage: '💥 Break chains + hunt',
+    eat: '🩸 Eaten on the spot',
+    shield: '🛡️ Helper: chain the monster',
+    cleanse: '🧹 Helper: remove curses',
+  };
+
+  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS };
 })(window.MC = window.MC || {});

@@ -40,6 +40,14 @@
   #ttUser { flex: 1; min-width: 0; width: auto; font-size: 17px; padding: 7px 10px; }
   #roundBtn { font-size: 17px; padding: 10px 18px; }
   details > summary { cursor: pointer; font-weight: 700; }
+  /* Two pages: Play (this one, what goes on stream) and Settings & test. */
+  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
+  .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
+  .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
+  header { align-items: center; }
+  .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
+  .notice .x:hover { color: var(--text); }
   details[open] > summary { margin-bottom: 8px; }
   .streamHere { display: none; aspect-ratio: 4 / 3; border: 2px dashed var(--line); border-radius: 12px; place-items: center; text-align: center; color: var(--muted); padding: 16px; }
   .streamed .streamHere { display: grid; }
@@ -103,7 +111,7 @@
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
-    <p>When the light finds you, freeze.</p>
+    <nav class="tabs" aria-label="Pages"><a href="lights-on.html" class="on" aria-current="page">🎮 Play</a><a href="bench.html">⚙️ Settings &amp; test</a></nav>
   </header>
   <div class="layout">
     <div class="stageCol" id="stageCol">
@@ -154,35 +162,24 @@
         <button id="roundBtn" disabled>▶ Start round</button>
         <button id="streamBtn" title="A clean window with only the game, to add in TikTok LIVE Studio">📺 Stream window</button>
       </div>
+      <div class="row">
+        <label class="check" title="Volume">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
+        <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="0.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
+      </div>
       <p class="hint" id="edition"></p>
     </section>
     <section>
       <details>
-        <summary>Rules and sound</summary>
-        <div class="row">
-          <span class="hint" style="margin:0">While lit, don't:</span>
-          <label class="check"><input type="checkbox" id="r-move"> move</label>
-          <label class="check"><input type="checkbox" id="r-smile"> smile</label>
-          <label class="check"><input type="checkbox" id="r-blink"> blink</label>
-          <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
-        </div>
-        <div class="row">
-          <label class="check">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
-          <label class="check">🌑 <input type="range" id="dark" min="0.5" max="0.97" step="0.01" aria-label="Darkness" style="width:110px"></label>
-        </div>
-        <p class="hint">Gifts, timers and dares: <a href="bench.html">all settings</a></p>
-      </details>
-    </section>
-    <section>
-      <details>
         <summary>Test with fake viewers</summary>
-        <p class="hint" style="margin:0 0 8px">Only on this computer, nothing is sent to TikTok.</p>
+        <p class="hint" id="simNote" style="margin:0 0 8px">Only on this computer, nothing is sent to TikTok.</p>
+        <div id="simBox">
         <div class="row">
           <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
           <button data-sim="like">❤️ 25 likes</button>
           <button data-sim="follow">➕ Follow</button>
         </div>
         <div class="row" id="giftBtns"></div>
+        </div>
       </details>
       <div class="log" id="log" aria-live="polite"></div>
     </section>
@@ -190,15 +187,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794336932"></script>
-<script src="src/settings.js?v=1794336932"></script>
-<script src="src/events.js?v=1794336932"></script>
-<script src="src/face.js?v=1794336932"></script>
-<script src="src/curses.js?v=1794336932"></script>
-<script src="src/sfx.js?v=1794336932"></script>
-<script src="src/mic.js?v=1794336932"></script>
-<script src="src/lightson.js?v=1794336932"></script>
-<script src="src/live.js?v=1794336932"></script>
+<script src="src/edition.js?v=1794339606"></script>
+<script src="src/settings.js?v=1794339606"></script>
+<script src="src/events.js?v=1794339606"></script>
+<script src="src/face.js?v=1794339606"></script>
+<script src="src/curses.js?v=1794339606"></script>
+<script src="src/sfx.js?v=1794339606"></script>
+<script src="src/mic.js?v=1794339606"></script>
+<script src="src/lightson.js?v=1794339606"></script>
+<script src="src/live.js?v=1794339606"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -354,6 +351,8 @@
       ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
       : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
+    $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
+    $('noticeX').onclick = hideNotice;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
   $('roundBtn').onclick = () => {
@@ -433,14 +432,10 @@
     else notice('No face seen. Face the camera and try again.');
   };
 
-  // ---------- Settings on this page ----------
-  ['move', 'smile', 'blink', 'sound'].forEach((k) => {
-    const c = $('r-' + k);
-    c.checked = !!S.lightRules[k];
-    c.onchange = () => { S.lightRules[k] = c.checked; save(); };
-  });
-  $('dark').value = S.darkness;
-  $('dark').oninput = () => { S.darkness = +$('dark').value; save(); };
+  // ---------- Volume and brightness (the rest is on the Settings page) ----------
+  // Brightness is the opposite of the stored darkness (0.5–0.97).
+  $('bright').value = (1 - S.darkness).toFixed(2);
+  $('bright').oninput = () => { S.darkness = +(1 - $('bright').value).toFixed(2); save(); };
   $('vol').value = S.volume;
   $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
 
@@ -448,10 +443,22 @@
   const viewer = () => $('viewer').value.trim() || 'viewer';
   document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () =>
     MC.bus.emit(b.dataset.sim === 'like' ? { type: 'like', user: viewer(), count: 25 } : { type: 'follow', user: viewer() }));
-  $('giftBtns').innerHTML = S.gifts.map((g, i) => `<button data-gift="${i}">🎁 ${g.gift === '*' ? 'Any other gift' : esc(g.gift)}</button>`).join('');
-  $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => MC.bus.emit({ type: 'gift', user: viewer(), gift: S.gifts[+b.dataset.gift].gift === '*' ? 'Pink Cowboy' : S.gifts[+b.dataset.gift].gift, count: 1 }));
+  // Named gifts, then one gift per price tier ("1,000-coin gift").
+  const simGifts = [...S.gifts.map((g) => ({ label: g.gift, gift: g.gift, coins: 1 })),
+    ...(S.tiers || []).map((t) => ({ label: `${t.min.toLocaleString('en')}-coin gift`, gift: `${t.min}-coin gift`, coins: t.min }))];
+  $('giftBtns').innerHTML = simGifts.map((g, i) => `<button data-gift="${i}">🎁 ${esc(g.label)}</button>`).join('');
+  $('giftBtns').querySelectorAll('button').forEach((b) => b.onclick = () => {
+    const g = simGifts[+b.dataset.gift];
+    MC.bus.emit({ type: 'gift', user: viewer(), gift: g.gift, count: 1, diamonds: g.coins });
+  });
+  // Fake viewers only while not connected to a real live, so nobody can chain the monster for themselves on stream.
+  function lockSimulator(live) {
+    document.querySelectorAll('#simBox button, #simBox input').forEach((el) => { el.disabled = live; });
+    $('simNote').textContent = live ? 'Off while connected to a live: only real viewers can play.' : 'Only on this computer, nothing is sent to TikTok.';
+  }
 
-  const EFFECT_TEXT = { sweep: 'sent the hunter', stare: 'made it look at you', all: 'cursed you with everything' };
+  const EFFECT_TEXT = { sweep: 'sent the hunter', stare: 'made it look at you', all: 'cursed you with everything', rampage: 'broke the chains and sent the hunter', eat: 'fed you to the monster' };
+  const CURSE_TYPES = ['blink', 'smile', 'move', 'sound'];
   MC.bus.on('*', (e) => {
     if (e.type === 'like') {
       feed(`❤️ ${esc(e.user)} ×${e.count}`);
@@ -470,8 +477,8 @@
     }
     if (e.type === 'follow') { feed(`➕ ${esc(e.user)} followed`); return; }
     if (e.type !== 'gift') return;
-    // A gift without its own rule uses the "*" rule (any other gift), if there is one.
-    const rule = S.gifts.find((g) => g.gift.toLowerCase() === e.gift.toLowerCase()) || S.gifts.find((g) => g.gift === '*');
+    // Its own rule, else the price tier it reaches.
+    const rule = MC.settings.ruleFor(S, e.gift, e.diamonds);
     giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
     if (!rule || giftCount[e.gift] % Math.max(1, rule.every)) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); return; }
     if (!round.running) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); log(`🎁 ${esc(e.gift)} from ${esc(e.user)}: no effect between rounds. Start a round to play.`); return; }
@@ -485,13 +492,31 @@
       log(`🧹 ${esc(e.user)} cleared the curses.`);
       return;
     }
-    if (rule.curse === 'sweep' || rule.curse === 'stare') {
+    if (rule.curse === 'eat') {
+      // The biggest gifts: straight to the jaws, chains or not.
+      feed(`🎁 <b>${esc(e.user)}</b> ${EFFECT_TEXT.eat}`);
+      log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → eaten on the spot`);
+      caught(`fed to the monster by ${esc(e.user)}`, e.user);
+      return;
+    }
+    let picked = null; // the random curse, for "Random curse" gifts
+    if (rule.curse === 'rampage') {
+      // Break the chains, then hunt.
+      game.shieldUntil = 0;
+      curses.immuneUntil = 0;
+      game.gift('sweep', now, e.user);
+      banner(`💥 ${esc(e.user)} broke the chains!`);
+    }
+    else if (rule.curse === 'sweep' || rule.curse === 'stare') {
       game.gift(rule.curse, now, e.user);
       banner(rule.curse === 'sweep' ? `🔦 ${esc(e.user)} sent the hunter after you!` : `👁️ ${esc(e.user)} made it look at you!`);
     }
-    else curses.add(rule.curse, e.user, now);
-    const what = EFFECT_TEXT[rule.curse] || `cursed you: ${S.curses[rule.curse].label}`;
-    if (rule.curse === 'sound' && !face.mic && !face.fake) log('🎤 Silence curse sent, but the microphone is off.');
+    else {
+      picked = rule.curse === 'curse' ? pick(CURSE_TYPES) : rule.curse;
+      curses.add(picked, e.user, now);
+    }
+    const what = EFFECT_TEXT[rule.curse] || `cursed you: ${S.curses[picked].label}`;
+    if (picked === 'sound' && !face.mic && !face.fake) log('🎤 Silence curse sent, but the microphone is off.');
     feed(`🎁 <b>${esc(e.user)}</b> ${what}`);
     log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → ${rule.curse}`);
   });
@@ -517,7 +542,13 @@
   };
   $('ttDisconnect').onclick = () => MC.live.disconnect();
   // Live comments show in the feed like the simulator's events.
-  MC.bus.on('comment', (e) => feed(`💬 ${esc(e.user)}: ${esc(e.text).slice(0, 60)}`));
+  // TikTok's own chat stickers arrive as codes like "[heart]"; show the closest emoji. Unknown codes stay as text.
+  const STICKERS = { heart: '❤️', smile: '🙂', happy: '😊', laugh: '😆', laughwithtears: '😂', cry: '😢', weep: '😭', tears: '😭', angry: '😠', rage: '😡',
+    surprised: '😮', wow: '😮', shock: '😱', scream: '😱', astonish: '😲', cool: '😎', lovely: '🥰', loveface: '😍', cute: '🥺', thinking: '🤔', speechless: '😶',
+    flushed: '😳', embarrassed: '😳', awkward: '😅', proud: '😏', wicked: '😈', evil: '😈', angel: '😇', yummy: '😋', drool: '🤤', nap: '😴', sulk: '😒',
+    facewithrollingeyes: '🙄', excited: '🤩', joyful: '😁', hehe: '😄', funnyface: '🤪', greedy: '🤑', slap: '👋', shout: '😤', disdain: '😒', complacent: '😌' };
+  const stickers = (t) => String(t).replace(/\[([a-z]+)\]/gi, (m, k) => STICKERS[k.toLowerCase()] || m);
+  MC.bus.on('comment', (e) => feed(`💬 ${esc(e.user)}: ${esc(stickers(e.text)).slice(0, 60)}`));
 
   // ---------- Steps: tick each one off as it's done ----------
   const done = (id, on) => $(id).classList.toggle('done', !!on);
@@ -525,6 +556,7 @@
     $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
     if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
     done('step1', st.state === 'connected');
+    lockSimulator(st.state === 'connected' || st.state === 'connecting');
   });
   $('ttUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ttConnect').click(); });
 
