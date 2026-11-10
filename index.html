@@ -96,6 +96,9 @@
   .notice big { display: block; font-family: 'Creepster', cursive; font-weight: 400; font-size: 64px; line-height: 1.05; color: var(--lamp); }
   .notice.win big { color: var(--moss); }
   .notice.lose big { color: var(--blood); }
+  /* Lost: the box sits low so the monster's head (where the streamer's was) stays in view. */
+  .notice.lose { top: auto; bottom: 4%; transform: translateX(-50%); padding: 10px 20px; }
+  .notice.lose big { font-size: 44px; }
   .notice .dare { display: block; margin: 10px 0 12px; font-size: 18px; font-weight: 500; }
   .notice { width: max-content; }
   @media (max-width: 600px) {
@@ -195,15 +198,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794347451"></script>
-<script src="src/settings.js?v=1794347451"></script>
-<script src="src/events.js?v=1794347451"></script>
-<script src="src/face.js?v=1794347451"></script>
-<script src="src/curses.js?v=1794347451"></script>
-<script src="src/sfx.js?v=1794347451"></script>
-<script src="src/mic.js?v=1794347451"></script>
-<script src="src/lightson.js?v=1794347451"></script>
-<script src="src/live.js?v=1794347451"></script>
+<script src="src/edition.js?v=1794347869"></script>
+<script src="src/settings.js?v=1794347869"></script>
+<script src="src/events.js?v=1794347869"></script>
+<script src="src/face.js?v=1794347869"></script>
+<script src="src/curses.js?v=1794347869"></script>
+<script src="src/sfx.js?v=1794347869"></script>
+<script src="src/mic.js?v=1794347869"></script>
+<script src="src/lightson.js?v=1794347869"></script>
+<script src="src/live.js?v=1794347869"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -259,7 +262,7 @@
   const game = new MC.LightsOn($('cv'), S, {
     onCaught: (why, by) => caught(`${why} in the light`, by),
     onPhase: (p) => {
-      if (p === 'warn') feed('👣 Footsteps…');
+      if (p === 'warn') feed(S.monster === 'void' ? '🕳️ Something stirs in the dark…' : '👣 Footsteps…');
       if (p === 'stare') feed('👁️ It is looking at you');
     },
   });
@@ -279,6 +282,7 @@
     lives = Math.max(0, lives - 1);
     renderLives();
     game.eat(now, face.state);
+    game.bite(why); // a lost life leaves a bite on the streamer
     curses.clear();
     catches.push({ by, why });
     banner(by ? `🩸 ${esc(by)} got the streamer!` : '🩸 The hunter got the streamer!');
@@ -373,6 +377,7 @@
   function endRound(won) {
     if (!round.running) return;
     clearRound();
+    if (!won) game.finalHead = true; // eaten: the monster's head takes the streamer's place
     const list = (won ? S.winDares : S.loseDares).filter(Boolean);
     const dare = list.length ? pick(list) : '';
     // Lost: the viewer behind the final catch "ate" the streamer; list everyone who caught them.
@@ -402,6 +407,8 @@
   face.onFrame((st) => {
     const now = performance.now();
     if (round.running && !calibrating) {
+      // Tension: the last minute builds up (monster comes back sooner, heartbeat in the last half minute).
+      game.intensity = Math.max(0, Math.min(1, 1 - (round.ends - now) / 60000));
       game.update(now, st);
       if (game.phase !== 'eaten' && lives) curses.tick(st, now);
       const shieldLeft = game.shieldUntil - now;

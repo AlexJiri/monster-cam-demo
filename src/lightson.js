@@ -31,10 +31,77 @@
     }
 
     // ---------- state ----------
-    start(now) { this.set('idle', now); this.nextAt = now + rand(...this.s.patrolGap) * 1000; }
+    start(now) {
+      this.bites = []; this.finalHead = false; this.voidBeams = []; this.emerges = [];
+      // Void: 4 holes in the room, away from the middle where the streamer sits and from the gift list (top right).
+      const spots = [[0.12, 0.22], [0.1, 0.62], [0.9, 0.62], [0.5, 0.1], [0.28, 0.12], [0.62, 0.1]];
+      this.holes = spots.sort(() => Math.random() - 0.5).slice(0, 4).map(([x, y]) => ({ x, y, open: 0, spin: rand(0, TAU) }));
+      this.set('idle', now); this.nextAt = now + this.gap();
+    }
+
+    isVoid() { return this.s.monster === 'void'; }
+    // Every lantern beam on screen: the hunter's, or one per creature out of a hole.
+    beams() { return [this.beam, ...(this.voidBeams || [])].filter(Boolean); }
+
+    // Void: one or more creatures come out of holes, glare at the streamer with their lanterns and sink back.
+    // Near the end of the round more holes open at once.
+    makeVoidPlan(hunting) {
+      const k = this.intensity || 0;
+      const n = Math.min(this.holes.length, (k > 0.85 ? 3 : k > 0.5 ? 2 : 1) + (hunting ? 1 : 0));
+      const order = this.holes.map((h, i) => i).sort(() => Math.random() - 0.5);
+      return order.slice(0, n).map((hole, i) => ({ hole, t0: i * 700, glare: rand(1500, 2500) + (hunting ? 500 : 0), sounded: false }));
+    }
+    updateVoid(now, face) {
+      const W = this.cv.width, H = this.cv.height, t = now - this.t0;
+      const box = this.screenBox(face);
+      if (box) this.faceX = box.x + box.w / 2;
+      this.holes.forEach((h) => { h.open = 0; h.out = 0; });
+      this.voidBeams = [];
+      for (const e of this.emerges) {
+        const h = this.holes[e.hole], local = t - e.t0, total = e.glare + 1600;
+        if (local < 0 || local > total) continue;
+        // open 0.5 s → come out 0.3 s → glare → go back 0.4 s → close 0.4 s
+        h.open = Math.min(1, local / 500, (total - local) / 400);
+        h.out = Math.max(0, Math.min(1, (local - 500) / 300, (total - 400 - local) / 400));
+        if (h.out > 0 && !e.sounded) { e.sounded = true; MC.sfx.growl(0.5, 0.7); MC.sfx.click(); }
+        const glaring = local > 800 && local < 800 + e.glare;
+        if (!glaring) continue;
+        // The lantern sits at the lip of the hole, towards the streamer.
+        const fx = box ? box.x + box.w / 2 : 0.5, fy = box ? box.y + box.h / 2 : 0.5;
+        const dirA = Math.atan2((fx - h.x) * W, (fy - h.y) * H);
+        const r = 0.07;
+        const ox = h.x + Math.sin(dirA) * r * h.out * (H / W), oy = h.y + Math.cos(dirA) * r * h.out;
+        const target = Math.atan2((fx - ox) * W, (fy - oy) * H);
+        // First it searches, then locks on.
+        const lock = Math.min(1, (local - 800) / 500);
+        const angle = target + (1 - lock) * Math.sin(now / 200 + e.hole) * 0.7;
+        this.voidBeams.push({ ox, oy, angle, half: 0.26 });
+      }
+      if (now >= this.end) {
+        this.voidBeams = []; this.emerges = [];
+        this.set('idle', now);
+        this.nextAt = now + this.gap();
+      }
+    }
+
+    // A lost life leaves a bite on the streamer, matching how they got caught. Stays until the next round.
+    bite(why) {
+      const w = String(why).toLowerCase();
+      const want = /smil/.test(w) ? 'mouth' : /blink/.test(w) ? 'eye' : /sound|silence/.test(w) ? 'ear' : /mov|freeze/.test(w) ? 'shoulder' : null;
+      const parts = ['mouth', 'eye', 'ear', 'shoulder'];
+      const free = (p) => p === 'mouth' ? !this.bites.some((b) => b.part === 'mouth') : this.bites.filter((b) => b.part === p).length < 2;
+      const part = want && free(want) ? want : parts.filter(free)[Math.floor(Math.random() * parts.filter(free).length)] || 'shoulder';
+      // Eyes, ears and shoulders come in pairs: take the side not bitten yet.
+      const side = this.bites.some((b) => b.part === part && b.side === -1) ? 1 : -1;
+      this.bites.push({ part, side, seed: Math.random() * 10 });
+    }
     stop(now) { this.set('off', now); this.lit = false; }
 
+    // Darkness before the next pass. Near the end of the round (`intensity` 0..1, set by the game) it comes back sooner.
+    gap() { return rand(...this.s.patrolGap) * 1000 * (1 - 0.65 * (this.intensity || 0)); }
+
     set(phase, now, extra = {}) {
+      if (phase !== 'sweep') { this.voidBeams = []; (this.holes || []).forEach((h) => { h.open = 0; h.out = 0; }); }
       this.phase = phase;
       this.t0 = now;
       Object.assign(this, extra);
@@ -81,7 +148,8 @@
             const hunting = this.pending.length > 0;
             const by = hunting ? this.pending.shift() : null;
             const dir = Math.random() < 0.5 ? 1 : -1;
-            MC.sfx.approach(s.warnSeconds);
+            if (this.isVoid()) MC.sfx.growl(s.warnSeconds, 0.35); // a low rumble from somewhere in the room
+            else MC.sfx.approach(s.warnSeconds);
             if (hunting) MC.sfx.growl(s.warnSeconds, 0.6);
             this.set('warn', now, { dir, end: now + s.warnSeconds * 1000, swing: rand(0, TAU), by, hunting });
           }
@@ -90,11 +158,17 @@
           this.monster.x = this.dir > 0 ? -0.2 : 1.2;
           { const b = this.screenBox(face); if (b) this.faceX = b.x + b.w / 2; }
           if (now >= this.end) {
-            this.plan = this.makePlan(this.dir, this.hunting);
-            this.set('sweep', now, { end: now + this.plan.reduce((t, g) => t + g.dur, 0) });
+            if (this.isVoid()) {
+              this.emerges = this.makeVoidPlan(this.hunting);
+              this.set('sweep', now, { end: now + Math.max(...this.emerges.map((e) => e.t0 + e.glare + 1600)) });
+            } else {
+              this.plan = this.makePlan(this.dir, this.hunting);
+              this.set('sweep', now, { end: now + this.plan.reduce((t, g) => t + g.dur, 0) });
+            }
           }
           break;
         case 'sweep': {
+          if (this.isVoid()) { this.updateVoid(now, face); break; }
           // Find the segment of the plan we're in.
           let t = now - this.t0, seg = this.plan[this.plan.length - 1], p = 1;
           for (const g of this.plan) { if (t <= g.dur) { seg = g; p = g.dur ? t / g.dur : 1; break; } t -= g.dur; }
@@ -134,7 +208,7 @@
             this.beam = null;
             this.seg = null;
             this.set('idle', now);
-            this.nextAt = now + rand(...s.patrolGap) * 1000;
+            this.nextAt = now + this.gap();
           }
           break;
         }
@@ -143,7 +217,7 @@
           break;
         case 'stare':
           this.beam = null;
-          if (now >= this.end) { this.set('idle', now); this.nextAt = now + rand(...s.patrolGap) * 1000; }
+          if (now >= this.end) { this.set('idle', now); this.nextAt = now + this.gap(); }
           break;
         case 'eaten':
           this.beam = null;
@@ -188,7 +262,7 @@
       const box = this.screenBox(face);
       let lit = false;
       if (this.phase === 'stare') lit = true;
-      else if (this.beam && box) lit = this.inBeam(box);
+      else if (box) lit = this.beams().some((b) => this.inBeam(box, b));
       if (lit && !this.lit) this.litSince = now;
       this.lit = lit;
       if (!lit || now - this.litSince < 350) return; // short reaction time when the light lands
@@ -203,15 +277,16 @@
       if (broke) this.onCaught(broke, this.by);
     }
 
-    inBeam(box) {
+    inBeam(box, beam) {
       const W = this.cv.width, H = this.cv.height;
       const cx = (box.x + box.w / 2) * W, cy = (box.y + box.h / 2) * H;
-      const ox = this.beam.ox * W, oy = this.beam.oy * H;
+      const ox = beam.ox * W, oy = beam.oy * H;
       const dx = cx - ox, dy = cy - oy;
       const dist = Math.hypot(dx, dy);
       const toFace = Math.atan2(dx, dy); // 0 = straight down
       const faceRadius = Math.atan2((box.w * W) / 2, dist) * 0.6;
-      return Math.abs(toFace - this.beam.angle) < this.beam.half + faceRadius;
+      const diff = Math.abs(((toFace - beam.angle + Math.PI) % TAU + TAU) % TAU - Math.PI); // wraps round (beams can point up)
+      return diff < beam.half + faceRadius;
     }
 
     // Face box in canvas coordinates (0..1), mirrored like the video on screen.
@@ -230,13 +305,22 @@
       if (this.phase === 'eaten' && now - this.t0 < 900) ctx.translate(rand(-12, 12), rand(-12, 12));
 
       this.drawCamera(video, face, W, H);
+      this.drawScene(now, W, H);
       // Outside a round the camera is shown normally, so the streamer can see themselves and calibrate.
       if (this.phase !== 'off') this.drawDarkness(now, W, H, face);
+      // The scene's edges (walls, trees, pipes) stay faintly visible through the dark.
+      if (this.phase !== 'off' && this.sceneLayer && this.s.scene && this.s.scene !== 'none') {
+        ctx.save(); ctx.globalAlpha = 0.4; ctx.drawImage(this.sceneLayer.cv, 0, 0); ctx.restore();
+      }
+      this.drawBites(face, W, H);
+      if (this.finalHead) this.drawMonsterHead(now, face, W, H);
       this.drawCurses(now, W, H, face);
-      if (this.phase !== 'stare') this.drawHunter(now, W, H);
+      if (this.isVoid()) { if (this.phase !== 'off') this.drawVoid(now, W, H); }
+      else if (this.phase !== 'stare') this.drawHunter(now, W, H);
       if (this.phase === 'stare' || this.phase === 'stareWarn') this.drawStare(now, W, H);
       if (this.phase === 'eaten') this.drawJaws(now, W, H);
       if (now < this.shieldUntil) this.drawChains(now, W, H);
+      if (this.intensity > 0.5 && this.phase !== 'off') this.drawHeartbeat(now, W, H);
       ctx.restore();
     }
 
@@ -273,6 +357,96 @@
       if (!b) return null;
       const cx = (b.x + b.w / 2) * W;
       return { cx, w: b.w * W, h: b.h * H, eyesY: (b.y + b.h * 0.4) * H, mouthY: (b.y + b.h * 0.78) * H };
+    }
+
+    // A ragged hole: an ellipse whose edge alternates in and out like tooth marks.
+    biteShape(x, y, rx, ry, seed) {
+      const ctx = this.ctx, n = 14;
+      ctx.beginPath();
+      for (let i = 0; i <= n * 2; i++) {
+        const a = (i / (n * 2)) * TAU, k = i % 2 ? 0.82 + 0.06 * Math.sin(seed + i) : 1;
+        const px = x + Math.cos(a) * rx * k, py = y + Math.sin(a) * ry * k;
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+    }
+
+    // Cartoon bites (no gore): dark ragged holes with a dark-red rim, following the face.
+    drawBites(face, W, H) {
+      const bites = this.bites || [];
+      const p = bites.length && this.facePoints(face, W, H);
+      if (!p) return;
+      const ctx = this.ctx;
+      ctx.save();
+      for (const b of bites) {
+        let x = p.cx, y, rx, ry;
+        if (b.part === 'mouth') { y = p.mouthY; rx = p.w * 0.24; ry = p.h * 0.1; }
+        else if (b.part === 'eye') { x = p.cx + b.side * p.w * 0.2; y = p.eyesY; rx = p.w * 0.11; ry = p.h * 0.065; }
+        else if (b.part === 'ear') { x = p.cx + b.side * p.w * 0.52; y = p.eyesY + p.h * 0.06; rx = p.w * 0.13; ry = p.h * 0.13; }
+        else { x = p.cx + b.side * p.w * 0.75; y = p.mouthY + p.h * 0.5; rx = p.w * 0.24; ry = p.h * 0.2; }
+        this.biteShape(x, y, rx, ry, b.seed);
+        ctx.fillStyle = '#07040a';
+        ctx.shadowColor = 'rgba(120, 0, 10, 0.9)'; ctx.shadowBlur = 14;
+        ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(110, 10, 20, 0.95)'; ctx.stroke();
+        if (b.part === 'eye') {
+          // A tiny glint deep inside the empty eye.
+          ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255, 60, 60, 0.7)';
+          ctx.beginPath(); ctx.arc(x, y, rx * 0.12, 0, TAU); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // End of a lost round: the monster's head where the streamer's head was.
+    drawMonsterHead(now, face, W, H) {
+      const p = this.facePoints(face, W, H);
+      const cx = p ? p.cx : W / 2, cy = p ? (p.eyesY + p.mouthY) / 2 : H * 0.45;
+      const s = p ? Math.max(p.w, p.h * 0.8) * 0.75 : H * 0.25; // head radius
+      const ctx = this.ctx, chew = Math.abs(Math.sin(now / 160)) * s * 0.06;
+      ctx.save();
+      ctx.fillStyle = ctx.strokeStyle = '#13101a';
+      ctx.shadowColor = 'rgba(255, 205, 120, 0.45)'; ctx.shadowBlur = 25;
+      // horns
+      ctx.lineWidth = s * 0.16; ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(cx + side * s * 0.45, cy - s * 0.75);
+        ctx.bezierCurveTo(cx + side * s * 1.1, cy - s * 1.6, cx + side * s * 1.75, cy - s * 0.7, cx + side * s * 1.25, cy - s * 0.05);
+        ctx.stroke();
+      }
+      // head
+      ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.95, s * 1.1, 0, 0, TAU); ctx.fill();
+      // eyes
+      ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 30;
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * s * 0.38, cy - s * 0.25, s * 0.17, s * 0.11, side * 0.25, 0, TAU); ctx.fill(); }
+      ctx.shadowBlur = 0; ctx.fillStyle = '#13101a';
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * s * 0.38, cy - s * 0.25, s * 0.03, s * 0.09, 0, 0, TAU); ctx.fill(); }
+      // chewing mouth with teeth
+      const my = cy + s * 0.4;
+      ctx.fillStyle = '#3a0a10';
+      ctx.beginPath(); ctx.ellipse(cx, my, s * 0.55, s * 0.18 + chew, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#efe6d2';
+      for (let i = -4; i <= 4; i++) {
+        const tx = cx + i * s * 0.11;
+        ctx.beginPath(); ctx.moveTo(tx - s * 0.05, my - s * 0.14 - chew); ctx.lineTo(tx + s * 0.05, my - s * 0.14 - chew); ctx.lineTo(tx, my - s * 0.02); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(tx - s * 0.05, my + s * 0.14 + chew); ctx.lineTo(tx + s * 0.05, my + s * 0.14 + chew); ctx.lineTo(tx, my + s * 0.02); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Last half minute: the edges pulse red like a heartbeat, faster as the end gets closer.
+    drawHeartbeat(now, W, H) {
+      const bpm = 70 + 80 * this.intensity;
+      const t = (now / (60000 / bpm)) % 1; // 0..1 within one beat
+      const beat = Math.max(Math.exp(-((t - 0.05) ** 2) / 0.002), 0.6 * Math.exp(-((t - 0.25) ** 2) / 0.002)); // lub-dub
+      if (beat > 0.5 && !this.lastBeat) MC.sfx.heartbeat(0.25 + 0.35 * this.intensity);
+      this.lastBeat = beat > 0.5;
+      const ctx = this.ctx;
+      const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.7);
+      g.addColorStop(0, 'rgba(160, 0, 0, 0)');
+      g.addColorStop(1, `rgba(160, 0, 0, ${(0.15 + 0.35 * this.intensity) * beat})`);
+      ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
     }
 
     // Curses made visible: a red light on the eyes (don't blink) and / or the mouth (don't smile),
@@ -355,8 +529,16 @@
       c.fillRect(0, 0, W, H);
       c.globalCompositeOperation = 'destination-out';
 
-      if (this.beam) {
-        const { ox, oy, angle, half } = this.beam;
+      // The scene's own light (a bulb, the moon, a flickering tube) keeps a patch of the room visible.
+      const sl = this.sceneLight(now);
+      if (sl) {
+        const g = c.createRadialGradient(sl.x * W, sl.y * H, 0, sl.x * W, sl.y * H, sl.r * W);
+        g.addColorStop(0, `rgba(0,0,0,${sl.a})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+      }
+
+      for (const beam of this.beams()) {
+        const { ox, oy, angle, half } = beam;
         const x = ox * W, y = oy * H, len = H * 1.6;
         // Soft-edged cone: a wide faint pass, then the bright core.
         for (const [k, a] of [[1.35, 0.35], [1, 0.75], [0.7, 0.95]]) {
@@ -373,7 +555,7 @@
           c.fill();
         }
       }
-      if (this.phase === 'warn') {
+      if (this.phase === 'warn' && !this.isVoid()) {
         // A faint glow on the side the monster is coming from.
         const pulse = 0.12 + 0.1 * Math.sin(now / 120);
         const gx = this.dir > 0 ? 0 : W;
@@ -400,9 +582,9 @@
       this.ctx.drawImage(d, 0, 0);
 
       // Warm tint where the light falls.
-      if (this.beam) {
+      for (const beam of this.beams()) {
         const ctx = this.ctx;
-        const { ox, oy, angle, half } = this.beam;
+        const { ox, oy, angle, half } = beam;
         const x = ox * W, y = oy * H, len = H * 1.6;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -413,6 +595,140 @@
         ctx.lineTo(x + Math.sin(angle - half) * len, y + Math.cos(angle - half) * len);
         ctx.lineTo(x + Math.sin(angle + half) * len, y + Math.cos(angle + half) * len);
         ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ---------- scenes: an atmosphere over the streamer's own room ----------
+    // Static parts are drawn once into a layer; light and flicker are added per frame.
+    sceneLight(now) {
+      const flick = this.flicker(now);
+      switch (this.s.scene) {
+        case 'basement': return { x: 0.5, y: 0.05, r: 0.45, a: 0.45 * (0.85 + 0.15 * Math.sin(now / 900)) }; // swinging bulb
+        case 'forest': return { x: 0.15, y: -0.05, r: 0.6, a: 0.3 }; // moonlight from the top left
+        case 'hospital': return { x: 0.5, y: 0.0, r: 0.55, a: 0.5 * flick }; // flickering tube
+        default: return null;
+      }
+    }
+    // Hospital tube: mostly on, with short random drop-outs.
+    flicker(now) {
+      if (now > (this.flickUntil || 0)) {
+        this.flickOn = Math.random() < 0.9;
+        this.flickUntil = now + (this.flickOn ? rand(400, 2500) : rand(60, 220));
+      }
+      return this.flickOn === false ? 0.15 : 1;
+    }
+    drawScene(now, W, H) {
+      const scene = this.s.scene;
+      if (!scene || scene === 'none') return;
+      if (!this.sceneLayer || this.sceneLayer.key !== scene + W) this.sceneLayer = this.buildScene(scene, W, H);
+      const ctx = this.ctx;
+      ctx.drawImage(this.sceneLayer.cv, 0, 0);
+      if (scene === 'hospital' && this.flicker(now) < 1) { ctx.fillStyle = 'rgba(0,10,5,0.35)'; ctx.fillRect(0, 0, W, H); }
+      if (scene === 'basement') {
+        // the bulb, swinging a little on its cord
+        const sw = Math.sin(now / 900) * W * 0.02, bx = W / 2 + sw, by = H * 0.09;
+        ctx.save();
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(bx, by); ctx.stroke();
+        ctx.fillStyle = '#ffe2a0'; ctx.shadowColor = '#ffcf70'; ctx.shadowBlur = 30;
+        ctx.beginPath(); ctx.arc(bx, by + 6, 9, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+    }
+    buildScene(scene, W, H) {
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const c = cv.getContext('2d');
+      const vignette = (color) => {
+        const g = c.createRadialGradient(W / 2, H * 0.55, H * 0.3, W / 2, H * 0.55, W * 0.75);
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, color);
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+      };
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280); // same picture every time
+      if (scene === 'basement') {
+        c.fillStyle = 'rgba(60, 35, 15, 0.18)'; c.fillRect(0, 0, W, H); // warm, dusty
+        // brick walls at the sides
+        for (const x0 of [0, W * 0.86]) {
+          for (let y = 0, row = 0; y < H; y += 26, row++) {
+            for (let x = x0 - (row % 2) * 30; x < x0 + W * 0.14; x += 60) {
+              c.fillStyle = `rgba(${90 + rnd() * 40}, ${40 + rnd() * 20}, 25, 0.55)`;
+              c.fillRect(Math.max(x0, x) + 2, y + 2, 56 - Math.max(0, x0 - x), 22);
+            }
+          }
+        }
+        // pipes along the ceiling
+        c.strokeStyle = 'rgba(40, 40, 45, 0.9)'; c.lineCap = 'round';
+        for (const [y, wdt] of [[H * 0.03, 14], [H * 0.07, 9]]) { c.lineWidth = wdt; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+        vignette('rgba(20, 10, 0, 0.75)');
+      } else if (scene === 'forest') {
+        c.fillStyle = 'rgba(10, 40, 50, 0.22)'; c.fillRect(0, 0, W, H); // cold night
+        // tree trunks and branches at the edges
+        c.fillStyle = 'rgba(5, 10, 8, 0.92)'; c.strokeStyle = 'rgba(5, 10, 8, 0.92)'; c.lineCap = 'round';
+        for (const [x, wdt] of [[W * 0.03, W * 0.07], [W * 0.13, W * 0.035], [W * 0.95, W * 0.08], [W * 0.84, W * 0.03]]) {
+          c.fillRect(x - wdt / 2, 0, wdt, H);
+          for (let i = 0; i < 4; i++) {
+            const y = H * (0.08 + rnd() * 0.45), dir = x < W / 2 ? 1 : -1;
+            c.lineWidth = wdt * 0.25; c.beginPath(); c.moveTo(x, y);
+            c.quadraticCurveTo(x + dir * W * 0.08, y - H * 0.05, x + dir * W * (0.12 + rnd() * 0.08), y - H * (0.1 + rnd() * 0.08)); c.stroke();
+          }
+        }
+        // ground fog
+        const g = c.createLinearGradient(0, H * 0.75, 0, H);
+        g.addColorStop(0, 'rgba(180, 200, 210, 0)'); g.addColorStop(1, 'rgba(180, 200, 210, 0.3)');
+        c.fillStyle = g; c.fillRect(0, H * 0.75, W, H * 0.25);
+        vignette('rgba(0, 10, 15, 0.7)');
+      } else if (scene === 'hospital') {
+        c.fillStyle = 'rgba(40, 90, 70, 0.2)'; c.fillRect(0, 0, W, H); // sick green
+        // tiles on the walls at the sides
+        c.strokeStyle = 'rgba(200, 230, 215, 0.18)'; c.lineWidth = 1;
+        for (const x0 of [0, W * 0.85]) {
+          for (let x = x0; x <= x0 + W * 0.15; x += 32) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+          for (let y = 0; y <= H; y += 32) { c.beginPath(); c.moveTo(x0, y); c.lineTo(x0 + W * 0.15, y); c.stroke(); }
+        }
+        // the tube light on the ceiling
+        c.fillStyle = 'rgba(220, 255, 235, 0.85)'; c.fillRect(W * 0.38, H * 0.012, W * 0.24, 8);
+        // a stain
+        c.fillStyle = 'rgba(70, 40, 20, 0.25)'; c.beginPath(); c.ellipse(W * 0.9, H * 0.35, 40, 26, 0.4, 0, TAU); c.fill();
+        vignette('rgba(0, 15, 8, 0.7)');
+      }
+      return { cv, key: scene + W };
+    }
+
+    // Void: dark swirling holes in the room. Before a creature comes out its hole pulses; then it opens wide,
+    // a head with glowing eyes rises to the lip and holds a lantern at the streamer.
+    drawVoid(now, W, H) {
+      const ctx = this.ctx, warn = this.phase === 'warn';
+      for (const h of this.holes || []) {
+        const x = h.x * W, y = h.y * H;
+        const pulse = warn ? 0.15 * (0.5 + 0.5 * Math.sin(now / 90)) : 0;
+        const r = W * 0.075 * (0.35 + pulse + 0.65 * (h.open || 0));
+        ctx.save();
+        // the hole: black core, violet rim
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.35);
+        g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.7, 'rgba(5,0,10,0.97)'); g.addColorStop(0.85, 'rgba(110,40,170,0.55)'); g.addColorStop(1, 'rgba(110,40,170,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.ellipse(x, y, r * 1.35, r * 1.0, 0, 0, TAU); ctx.fill();
+        // swirl
+        ctx.strokeStyle = 'rgba(170, 110, 255, 0.35)'; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const a0 = now / 600 + h.spin + (i * TAU) / 3;
+          ctx.beginPath(); ctx.ellipse(x, y, r * (0.5 + 0.25 * i), r * (0.35 + 0.18 * i), 0, a0, a0 + 1.6); ctx.stroke();
+        }
+        if (h.out > 0) {
+          // the creature: a head rising out of the hole, eyes, a claw holding the lantern
+          const hr = r * 0.55 * h.out;
+          ctx.fillStyle = '#100a16'; ctx.shadowColor = 'rgba(255,205,120,0.5)'; ctx.shadowBlur = 18;
+          ctx.beginPath(); ctx.ellipse(x, y - hr * 0.3, hr, hr * 0.9, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 16;
+          for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + side * hr * 0.38, y - hr * 0.35, hr * 0.16, hr * 0.1, 0, 0, TAU); ctx.fill(); }
+        }
+        ctx.restore();
+      }
+      // lanterns at the start of each beam
+      for (const b of this.voidBeams || []) {
+        ctx.save();
+        ctx.fillStyle = '#fff2c4'; ctx.shadowColor = '#ffd27a'; ctx.shadowBlur = 30;
+        ctx.beginPath(); ctx.arc(b.ox * W, b.oy * H, W * 0.011, 0, TAU); ctx.fill();
         ctx.restore();
       }
     }

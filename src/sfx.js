@@ -51,6 +51,20 @@
     for (let i = 0; i < steps; i++) setTimeout(() => footstep(0.35 + (0.65 * i) / steps), i * 450);
   }
 
+  // One soft heartbeat thump. Deliberately not marked as "busy": it's quiet and very low, and marking it
+  // would deafen the microphone for the whole last half minute. Echo cancellation keeps it out of the mic.
+  function heartbeat(volume = 0.4) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(62, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5 * volume, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.22);
+  }
+
   // Low, rumbling growl.
   function growl(seconds = 1.2, volume = 1) {
     if (!ctx) return;
@@ -108,6 +122,6 @@
 
   function setVolume(v) { if (master) master.gain.value = v; }
 
-  const api = { unlock, footstep, approach, growl, caught, click, setVolume, busyUntil: 0 };
+  const api = { unlock, footstep, approach, growl, heartbeat, caught, click, setVolume, busyUntil: 0 };
   MC.sfx = api;
 })(window.MC = window.MC || {});

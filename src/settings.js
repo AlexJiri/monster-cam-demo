@@ -15,6 +15,8 @@
     roundSeconds: 300, // survive this long to win the round (a duel lasts about 5 minutes)
     volume: 0.8,
     // Lights On: what counts as "moving" while the flashlight is on you.
+    monster: 'hunter', // hunter (walks through the room) | void (comes out of black holes)
+    scene: 'none', // atmosphere over the camera: none | basement | forest | hospital
     lightRules: { move: true, smile: true, blink: false, sound: true },
     showGiftGuide: true, // on stream: which gift curses, hunts, eats or helps
     patrolGap: [4, 9], // seconds of darkness between flashlight sweeps (random in this range)

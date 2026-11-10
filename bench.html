@@ -65,6 +65,10 @@
   .tip b { color: var(--lamp); }
   .tip span { font-size: 14px; }
   @keyframes tipIn { from { opacity: 0; transform: translateY(6px); } }
+  .pick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  .pick label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+  .pick select { font-size: 15px; padding: 6px 8px; color: var(--text); }
+  @media (max-width: 700px) { .pick { grid-template-columns: 1fr; } }
   .goodTitle { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
   /* Advanced: a clear button-like toggle, not a faint link. */
   details.adv > summary { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--night); margin-top: 14px; list-style: none; }
@@ -173,6 +177,22 @@
 
   <section class="panel" id="p-game" hidden>
     <h2>Game</h2>
+    <div class="pick">
+      <label>Monster
+        <select id="monster">
+          <option value="hunter">🔦 Hunter – walks through the room with a lantern</option>
+          <option value="void">🕳️ Void – crawls out of black holes</option>
+        </select>
+      </label>
+      <label>Scene
+        <select id="scene">
+          <option value="none">🎥 Just my room</option>
+          <option value="basement">🧱 Basement</option>
+          <option value="forest">🌲 Forest</option>
+          <option value="hospital">🏥 Hospital</option>
+        </select>
+      </label>
+    </div>
     <div id="gameSliders"></div>
     <div class="row" style="margin-top:6px">
       <span class="hint" style="margin:0">While the light is on you, don't:</span>
@@ -226,10 +246,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794347451"></script>
-<script src="src/events.js?v=1794347451"></script>
-<script src="src/face.js?v=1794347451"></script>
-<script src="src/mic.js?v=1794347451"></script>
+<script src="src/settings.js?v=1794347869"></script>
+<script src="src/events.js?v=1794347869"></script>
+<script src="src/face.js?v=1794347869"></script>
+<script src="src/mic.js?v=1794347869"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -481,6 +501,10 @@
     renderCurseTimes();
     renderRules();
     renderDares();
+    $('monster').value = S.monster || 'hunter';
+    $('monster').onchange = () => { S.monster = $('monster').value; save(); };
+    $('scene').value = S.scene || 'none';
+    $('scene').onchange = () => { S.scene = $('scene').value; save(); };
     $('showGuide').checked = !!S.showGiftGuide;
     $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {
