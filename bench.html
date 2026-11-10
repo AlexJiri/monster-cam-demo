@@ -134,6 +134,7 @@
           <label class="check"><input type="checkbox" id="r-blink"> blink</label>
           <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
         </div>
+        <div class="row"><label class="check"><input type="checkbox" id="showGuide"> Show viewers which gift does what (on stream)</label></div>
         <div id="sliders"></div>
       </section>
 
@@ -162,10 +163,10 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1794340903"></script>
-<script src="src/events.js?v=1794340903"></script>
-<script src="src/face.js?v=1794340903"></script>
-<script src="src/mic.js?v=1794340903"></script>
+<script src="src/settings.js?v=1794341132"></script>
+<script src="src/events.js?v=1794341132"></script>
+<script src="src/face.js?v=1794341132"></script>
+<script src="src/mic.js?v=1794341132"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -289,6 +290,8 @@
       `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${get(k)}"><output>${get(k)}${unit}</output></label>`).join('');
     SLIDERS.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
 
+    $('showGuide').checked = !!S.showGiftGuide;
+    $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {
       const c = $('r-' + k);
       c.checked = !!S.lightRules[k];

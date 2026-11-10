@@ -16,6 +16,7 @@
     volume: 0.8,
     // Lights On: what counts as "moving" while the flashlight is on you.
     lightRules: { move: true, smile: true, blink: false, sound: true },
+    showGiftGuide: true, // on stream: which gift curses, hunts, eats or helps
     patrolGap: [4, 9], // seconds of darkness between flashlight sweeps (random in this range)
     sweepSeconds: 5, // how long one sweep across the room takes
     warnSeconds: 1.5, // footsteps before the light arrives
@@ -100,10 +101,10 @@
 
   // Effects grouped the way the settings page shows them.
   const GROUPS = [
-    { id: 'curses', title: '😈 Curses', hint: 'Cheap gifts: a rule with a timer. Break it and you lose a life.', effects: ['curse', 'blink', 'smile', 'move', 'sound', 'all'] },
-    { id: 'hunter', title: '🔦 Hunter', hint: 'The monster comes looking for you.', effects: ['sweep', 'stare'] },
-    { id: 'big', title: '💥 Big gifts', hint: 'Expensive gifts: break the chains, or straight into the jaws.', effects: ['rampage', 'eat'] },
-    { id: 'helpers', title: '🛡️ Helpers', hint: 'Save the streamer. Keep "every" high so the monster usually wins.', effects: ['shield', 'cleanse'] },
+    { id: 'curses', title: '😈 Curses', viewers: '😈 Curse the streamer', hint: 'Cheap gifts: a rule with a timer. Break it and you lose a life.', effects: ['curse', 'blink', 'smile', 'move', 'sound', 'all'] },
+    { id: 'hunter', title: '🔦 Hunter', viewers: '🔦 Send the hunter', hint: 'The monster comes looking for you.', effects: ['sweep', 'stare'] },
+    { id: 'big', title: '💥 Big gifts', viewers: '💥 Feed them to the monster', hint: 'Expensive gifts: break the chains, or straight into the jaws.', effects: ['rampage', 'eat'] },
+    { id: 'helpers', title: '🛡️ Helpers', viewers: '🛡️ Save the streamer', hint: 'Save the streamer. Keep "every" high so the monster usually wins.', effects: ['shield', 'cleanse'] },
   ];
 
   // Every effect a gift can have, in the order the settings list them.
