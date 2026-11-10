@@ -30,7 +30,7 @@
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   h1 { font-family: 'Creepster', cursive; font-weight: 400; font-size: 42px; margin: 0; color: var(--blood); letter-spacing: 1px; }
   header p { margin: 0; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; }
   @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
   section + section { margin-top: 16px; }
@@ -46,7 +46,6 @@
   .notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); border-radius: 14px; padding: 14px 22px; text-align: center; font-size: 20px; font-weight: 700; display: none; max-width: 85%; }
   .notice.on { display: block; }
   .notice big { display: block; font-size: 56px; color: var(--lamp); line-height: 1.1; }
-  textarea { width: 100%; min-height: 90px; background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; font-size: 13px; color: inherit; resize: vertical; }
 
   .meters { display: grid; gap: 8px; margin-top: 12px; }
   .meter { display: grid; grid-template-columns: 110px 1fr 46px; gap: 8px; align-items: center; font-size: 14px; }
@@ -77,6 +76,12 @@
   h1 { color: var(--lamp); }
   .saved { color: var(--moss); font-size: 13px; }
   section h2 small { font-weight: 400; color: var(--muted); }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .group + .group { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .group p { margin: 0 0 6px; }
+  .group select { min-width: 190px; }
+  .dares { display: grid; gap: 6px; margin-bottom: 6px; }
+  .dares .row input { flex: 1; width: auto; }
 </style>
 </head>
 <body>
@@ -115,19 +120,9 @@
 
     <div>
       <section>
-        <h2>Gifts by price <small>· any gift without its own rule</small></h2>
-        <table>
-          <thead><tr><th>From (coins)</th><th>Effect</th><th></th></tr></thead>
-          <tbody id="tierRows"></tbody>
-        </table>
-        <div class="row" style="margin-top:8px"><button id="addTier">+ Add price tier</button></div>
-        <h2 style="margin-top:14px">Gifts by name <small>· these override the price</small></h2>
-        <table>
-          <thead><tr><th>Gift</th><th>Effect</th><th>Every N</th><th></th></tr></thead>
-          <tbody id="giftRows"></tbody>
-        </table>
-        <p class="hint">Use the exact TikTok gift name; the bridge window shows each gift's name and price as it arrives.</p>
-        <div class="row" style="margin-top:8px"><button id="addGift">+ Add gift</button></div>
+        <h2>Gifts <small>· what each TikTok gift does</small></h2>
+        <div id="giftGroups"></div>
+        <p class="hint">Gift names must match TikTok's exactly: the bridge window shows each gift's name and price as it arrives. Gifts not listed only show on screen.</p>
       </section>
 
       <section>
@@ -148,24 +143,29 @@
       </section>
 
       <section>
-        <h2>Dares</h2>
-        <label for="loseDares" class="hint" style="display:block">If the streamer loses (one per line, keep them harmless)</label>
-        <textarea id="loseDares"></textarea>
-        <label for="winDares" class="hint" style="display:block;margin-top:6px">If the streamer wins: a dare for chat (one per line)</label>
-        <textarea id="winDares"></textarea>
+        <h2>Dares <small>· one is picked at random when the round ends</small></h2>
+        <h3>If the streamer loses</h3>
+        <div id="loseDares" class="dares"></div>
+        <button data-adddare="loseDares">+ Add dare</button>
+        <h3>If the streamer wins (a dare for chat)</h3>
+        <div id="winDares" class="dares"></div>
+        <button data-adddare="winDares">+ Add dare</button>
+        <p class="hint">Keep dares harmless: TikTok ends lives with dangerous challenges.</p>
       </section>
 
-      <section>
+      <section class="row">
+        <button class="primary" id="saveBtn">💾 Save</button>
         <button id="defaults">Restore all defaults</button>
+        <span class="hint" style="margin:0">Changes also save on their own.</span>
       </section>
     </div>
   </div>
 </div>
 
-<script src="src/settings.js?v=1794339914"></script>
-<script src="src/events.js?v=1794339914"></script>
-<script src="src/face.js?v=1794339914"></script>
-<script src="src/mic.js?v=1794339914"></script>
+<script src="src/settings.js?v=1794340903"></script>
+<script src="src/events.js?v=1794340903"></script>
+<script src="src/face.js?v=1794340903"></script>
+<script src="src/mic.js?v=1794340903"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -270,7 +270,7 @@
   const SLIDERS = [
     ['lives', 'Lives', 1, 9, 1, ''],
     ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
-    ['roundSeconds', 'Round length', 30, 600, 30, ' s'],
+    ['roundMinutes', 'Round length', 1, 10, 0.5, ' min'],
     ['maxCurses', 'Curses at once', 1, 5, 1, ''],
     ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
     ['likesForShield', 'Likes to chain it', 25, 1000, 25, ''],
@@ -279,12 +279,15 @@
     ['moveThreshold', 'Movement sensitivity', 0.3, 4, 0.1, ''],
     ['soundThreshold', 'Sound sensitivity', 0.05, 0.9, 0.05, ''],
   ];
+  // The round is stored in seconds and shown in minutes.
+  const get = (k) => (k === 'roundMinutes' ? S.roundSeconds / 60 : S[k]);
+  const set = (k, v) => { if (k === 'roundMinutes') S.roundSeconds = Math.round(v * 60); else S[k] = v; };
   const opts = (sel) => Object.entries(MC.settings.EFFECTS).map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label}</option>`).join('');
 
   function renderSettings() {
     $('sliders').innerHTML = SLIDERS.map(([k, label, min, max, step, unit]) =>
-      `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${S[k]}"><output>${S[k]}${unit}</output></label>`).join('');
-    SLIDERS.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { S[k] = +i.value; i.nextElementSibling.textContent = i.value + unit; save(); }; });
+      `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${get(k)}"><output>${get(k)}${unit}</output></label>`).join('');
+    SLIDERS.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
 
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {
       const c = $('r-' + k);
@@ -292,28 +295,28 @@
       c.onchange = () => { S.lightRules[k] = c.checked; save(); };
     });
 
-    S.tiers.sort((a, b) => a.min - b.min);
-    $('tierRows').innerHTML = S.tiers.map((t, i) => `<tr>
-      <td><input type="number" id="t-min-${i}" min="1" value="${t.min}" aria-label="From coins" style="width:100px"></td>
-      <td><select id="t-curse-${i}" aria-label="Effect">${opts(t.curse)}</select></td>
-      <td><button data-deltier="${i}" aria-label="Remove">✕</button></td></tr>`).join('');
-    S.tiers.forEach((t, i) => {
-      $('t-min-' + i).onchange = (e) => { t.min = Math.max(1, Math.round(+e.target.value) || 1); save(); renderSettings(); };
-      $('t-curse-' + i).onchange = (e) => { t.curse = e.target.value; save(); };
-    });
-    $('tierRows').querySelectorAll('[data-deltier]').forEach((b) => b.onclick = () => { S.tiers.splice(+b.dataset.deltier, 1); save(); renderSettings(); });
-
-    $('giftRows').innerHTML = S.gifts.map((g, i) => `<tr>
-      <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
-      <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>
-      <td><input type="number" id="g-every-${i}" min="1" value="${g.every}" aria-label="Every N gifts" style="width:64px"></td>
-      <td><button data-del="${i}" aria-label="Remove">✕</button></td></tr>`).join('');
+    // Gifts grouped by what they do, cheapest first. Changing a gift's effect moves it to that group.
+    const groupOf = (g) => MC.settings.GROUPS.find((gr) => gr.effects.includes(g.curse)) || MC.settings.GROUPS[0];
+    $('giftGroups').innerHTML = MC.settings.GROUPS.map((gr) => {
+      const rows = S.gifts.map((g, i) => ({ g, i })).filter(({ g }) => groupOf(g) === gr).sort((a, b) => (a.g.coins || 0) - (b.g.coins || 0));
+      return `<div class="group"><h3>${gr.title}</h3><p class="hint">${gr.hint}</p>
+        <table><thead><tr><th>Gift</th><th>Coins</th><th>Effect</th><th>Every</th><th></th></tr></thead><tbody>${rows.map(({ g, i }) => `<tr>
+          <td><input type="text" id="g-name-${i}" value="${esc(g.gift)}" aria-label="Gift name"></td>
+          <td><input type="number" id="g-coins-${i}" min="0" value="${g.coins || 0}" aria-label="Price in coins" style="width:76px"></td>
+          <td><select id="g-curse-${i}" aria-label="Effect">${opts(g.curse)}</select></td>
+          <td><input type="number" id="g-every-${i}" min="1" value="${g.every}" aria-label="Every N gifts" title="Works once per this many gifts" style="width:60px"></td>
+          <td><button data-del="${i}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table>
+        <button data-addgift="${gr.effects[0]}" style="margin-top:6px">+ Add gift</button></div>`;
+    }).join('');
     S.gifts.forEach((g, i) => {
       $('g-name-' + i).onchange = (e) => { g.gift = e.target.value.trim(); save(); };
-      $('g-curse-' + i).onchange = (e) => { g.curse = e.target.value; save(); };
+      $('g-coins-' + i).onchange = (e) => { g.coins = Math.max(0, Math.round(+e.target.value) || 0); save(); renderSettings(); };
+      $('g-curse-' + i).onchange = (e) => { g.curse = e.target.value; save(); renderSettings(); };
       $('g-every-' + i).onchange = (e) => { g.every = Math.max(1, +e.target.value || 1); save(); };
     });
-    $('giftRows').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); });
+    $('giftGroups').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.del, 1); save(); renderSettings(); });
+    $('giftGroups').querySelectorAll('[data-addgift]').forEach((b) => b.onclick = () => { S.gifts.push({ gift: 'New gift', coins: 1, curse: b.dataset.addgift, every: 1 }); save(); renderSettings(); });
+
     $('curseTimes').innerHTML = `<p class="hint" style="margin:0 0 4px">Per gift = time each gift adds. Max = most time that can be on the clock at once.${'<br>'}Keep “Don't blink” short: holding the eyes open for long gets uncomfortable fast.</p>` + Object.entries(S.curses).map(([k, c]) =>
       `<label class="field"><span>${c.icon} ${c.label} · per gift</span><input type="range" id="c-${k}" min="1" max="30" step="1" value="${c.seconds}"><output>${c.seconds} s</output></label>
        <label class="field"><span>${c.icon} ${c.label} · max</span><input type="range" id="cm-${k}" min="3" max="${k === 'blink' ? 20 : 60}" step="1" value="${c.maxSeconds}"><output>${c.maxSeconds} s</output></label>`).join('');
@@ -332,16 +335,23 @@
       max.oninput = sync;
     });
   }
+  // Dares: one text field each, + to add, ✕ to remove.
   function renderDares() {
-    $('loseDares').value = S.loseDares.join('\n');
-    $('winDares').value = S.winDares.join('\n');
-    $('loseDares').onchange = () => { S.loseDares = $('loseDares').value.split('\n').map((x) => x.trim()).filter(Boolean); save(); };
-    $('winDares').onchange = () => { S.winDares = $('winDares').value.split('\n').map((x) => x.trim()).filter(Boolean); save(); };
+    for (const key of ['loseDares', 'winDares']) {
+      $(key).innerHTML = S[key].map((d, i) => `<div class="row"><input type="text" value="${esc(d)}" data-dare="${key}" data-i="${i}" aria-label="Dare"><button data-deldare="${key}" data-i="${i}" aria-label="Remove">✕</button></div>`).join('');
+    }
+    document.querySelectorAll('[data-dare]').forEach((inp) => inp.onchange = () => { S[inp.dataset.dare][+inp.dataset.i] = inp.value.trim(); save(); });
+    document.querySelectorAll('[data-deldare]').forEach((b) => b.onclick = () => { S[b.dataset.deldare].splice(+b.dataset.i, 1); save(); renderDares(); });
   }
+  document.querySelectorAll('[data-adddare]').forEach((b) => b.onclick = () => {
+    S[b.dataset.adddare].push('');
+    renderDares();
+    const inputs = $(b.dataset.adddare).querySelectorAll('input');
+    inputs[inputs.length - 1].focus();
+  });
   renderDares();
-  $('addGift').onclick = () => { S.gifts.push({ gift: 'New gift', curse: 'blink', every: 1 }); save(); renderSettings(); };
-  $('addTier').onclick = () => { const top = S.tiers.length ? S.tiers[S.tiers.length - 1].min * 10 : 1; S.tiers.push({ min: top, curse: 'sweep' }); save(); renderSettings(); };
-  $('defaults').onclick = () => { S = MC.settings.defaults(); save(); renderSettings(); renderDares(); log('All settings restored to defaults.'); };
+  $('saveBtn').onclick = () => { S.loseDares = S.loseDares.filter(Boolean); S.winDares = S.winDares.filter(Boolean); save(); renderDares(); };
+  $('defaults').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderSettings(); renderDares(); log('All settings restored to defaults.'); };
 
   renderSettings();
   log('Start the camera to test detection, or use the sliders without one.');
