@@ -85,23 +85,23 @@
   // The rule for a gift, by its TikTok name.
   const ruleFor = (s, gift) => s.gifts.find((g) => g.gift.toLowerCase() === String(gift).toLowerCase()) || null;
 
-  // TikTok gifts the settings offer in a list (others can be typed in). Coins = price, only to sort; icons are ours.
+  // TikTok gifts the settings offer in a list (others can be typed in). Coins = price, only to sort; icons are ours (emoji that Windows 10 can show).
   // Prices: ttcalculator.net LIVE gift chart (2026) and gifts seen on lives.
   const CATALOG = [
     { name: 'Rose', coins: 1, icon: '🌹' },
     { name: 'TikTok', coins: 1, icon: '🎵' },
     { name: 'Heart Me', coins: 1, icon: '💗' },
     { name: 'Blow a kiss', coins: 1, icon: '😘' },
-    { name: 'Finger Heart', coins: 5, icon: '🫰' },
+    { name: 'Finger Heart', coins: 5, icon: '💞' },
     { name: 'Panda', coins: 5, icon: '🐼' },
     { name: 'Doughnut', coins: 30, icon: '🍩' },
-    { name: 'Hand Hearts', coins: 100, icon: '🫶' },
+    { name: 'Hand Hearts', coins: 100, icon: '🤲' },
     { name: 'Confetti', coins: 100, icon: '🎊' },
     { name: 'Sunglasses', coins: 199, icon: '🕶️' },
     { name: 'Corgi', coins: 299, icon: '🐕' },
     { name: 'Perfume', coins: 300, icon: '🧴' },
     { name: 'Pink Cowboy', coins: 450, icon: '🤠' },
-    { name: 'Coral', coins: 499, icon: '🪸' },
+    { name: 'Coral', coins: 499, icon: '🐚' },
     { name: 'Galaxy', coins: 1000, icon: '🌌' },
     { name: 'Drama Queen', coins: 5000, icon: '👑' },
     { name: 'Rocket', coins: 20000, icon: '🚀' },
