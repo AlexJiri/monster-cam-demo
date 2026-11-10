@@ -48,7 +48,7 @@
   .banner.on { display: block; animation: pop 0.25s ease-out; }
   @keyframes pop { from { transform: translate(-50%, -8px) scale(0.9); opacity: 0; } }
   .notice .catches { display: block; font-size: 14px; font-weight: 400; color: var(--muted); margin-top: 4px; }
-  .lit { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(242, 193, 78, 0.92); color: #1b1400; font-weight: 700; border-radius: 999px; padding: 4px 16px; font-size: 18px; display: none; pointer-events: none; }
+  .lit { position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); background: rgba(242, 193, 78, 0.92); color: #1b1400; font-weight: 700; border-radius: 999px; padding: 4px 16px; font-size: 18px; display: none; pointer-events: none; }
   .lit.on { display: block; }
   .curses { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 6px; width: min(240px, 60%); pointer-events: none; }
   .curse { background: rgba(0, 0, 0, 0.65); border-radius: 8px; padding: 4px 8px; font-size: 14px; }
@@ -68,7 +68,7 @@
     .notice { font-size: 15px; padding: 10px 14px; }
     .notice big { font-size: 40px; }
     .notice .dare { font-size: 15px; }
-    .lit { font-size: 14px; bottom: 8px; }
+    .lit { font-size: 14px; bottom: 44px; }
     .lives { font-size: 18px; }
   }
 
@@ -82,6 +82,7 @@
   input[type=text] { background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; width: 120px; }
   .log { height: 120px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .hint a, .notice a { color: var(--lamp); }
   #fakeSliders label { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; font-size: 13px; }
   @media (prefers-reduced-motion: reduce) { .feed div { animation: none; } }
 </style>
@@ -120,6 +121,7 @@
         <button id="calBtn" disabled>Calibrate</button>
         <button id="roundBtn" disabled>▶ Start round</button>
       </div>
+      <p class="hint" id="edition"></p>
       <div class="row">
         <span class="hint" style="margin:0">While lit, don't:</span>
         <label class="check"><input type="checkbox" id="r-move"> move</label>
@@ -151,14 +153,15 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1794305520"></script>
-<script src="src/events.js?v=1794305520"></script>
-<script src="src/face.js?v=1794305520"></script>
-<script src="src/curses.js?v=1794305520"></script>
-<script src="src/sfx.js?v=1794305520"></script>
-<script src="src/mic.js?v=1794305520"></script>
-<script src="src/lightson.js?v=1794305520"></script>
-<script src="src/live.js?v=1794305520"></script>
+<script src="src/edition.js?v=1794314472"></script>
+<script src="src/settings.js?v=1794314472"></script>
+<script src="src/events.js?v=1794314472"></script>
+<script src="src/face.js?v=1794314472"></script>
+<script src="src/curses.js?v=1794314472"></script>
+<script src="src/sfx.js?v=1794314472"></script>
+<script src="src/mic.js?v=1794314472"></script>
+<script src="src/lightson.js?v=1794314472"></script>
+<script src="src/live.js?v=1794314472"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -173,6 +176,7 @@
   let lives = S.lives, calibrating = false;
   const round = { running: false, ends: 0 };
   const giftCount = {};
+  const ctx2d = $('cv').getContext('2d');
 
   function log(html) { $('log').insertAdjacentHTML('afterbegin', `<div>${new Date().toLocaleTimeString()} · ${html}</div>`); }
   function feed(html) {
@@ -235,7 +239,43 @@
 
   // ---------- Round ----------
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
+  // ---------- Edition: free rounds and required updates ----------
+  const ED = MC.edition;
+  let update = null; // result of the version check
+  // "14:40", or "tomorrow 14:40" / "Wed 14:40" when it's not today.
+  function when(ms) {
+    const d = new Date(ms), t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
+    return days === 0 ? t : days === 1 ? `tomorrow ${t}` : `${d.toLocaleDateString([], { weekday: 'short' })} ${t}`;
+  }
+  function renderEdition() {
+    const v = `v${ED.VERSION}`;
+    if (update && update.required) { $('edition').innerHTML = `⛔ ${v} is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a>`; return; }
+    const upd = update && update.available ? ` · <a href="${esc(update.download)}" target="_blank" rel="noopener">v${esc(update.latest)} available</a>` : '';
+    if (ED.PAID) { $('edition').innerHTML = `Full version ${v}${upd}`; return; }
+    const left = ED.rounds.left();
+    const next = ED.rounds.nextAt();
+    $('edition').innerHTML = `Free version ${v}: ${left}/${ED.FREE_ROUNDS} rounds left` +
+      (next ? ` · next free round ${when(next)}` : '') + upd;
+  }
+  ED.checkVersion().then((r) => { update = r; renderEdition(); });
+  setInterval(renderEdition, 30000); // the cooldown runs out while the page is open
+  renderEdition();
+  // Returns true when a round may start; otherwise explains why on the stage.
+  function canStartRound() {
+    if (update && update.required) {
+      notice(`Update required<br><small>This version is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a></small>`);
+      return false;
+    }
+    if (ED.rounds.left() > 0) return true;
+    notice(`No free rounds left<br><small>Next free round ${when(ED.rounds.nextAt())}. The full version has unlimited rounds and no watermark.</small>`);
+    return false;
+  }
+
   function startRound() {
+    if (!canStartRound()) return;
+    ED.rounds.use();
+    renderEdition();
     MC.sfx.unlock();
     lives = S.lives; renderLives();
     catches = [];
@@ -298,6 +338,7 @@
       if (left <= 0 && lives) endRound(true);
     }
     game.draw(now, video, st);
+    ED.watermark(ctx2d);
     $('lit').classList.toggle('on', round.running && game.lit && game.phase !== 'eaten');
     if (!calibrating) $('status').textContent = ({ loading: 'Loading face model…', ready: st.face ? 'Face found' : 'No face in view', fake: 'Manual sliders' }[st.status] || 'Camera off') + (face.mic || face.fake ? (st.sound > S.soundThreshold ? ' · 🔊' : ' · 🎤') : '');
     $('curses').innerHTML = curses.active.map((c) => {
@@ -420,7 +461,7 @@
   renderLives();
   // ---------- TikTok LIVE (through the bridge) ----------
   const TT_TEXT = {
-    nobridge: '⚪ Bridge not running. In the bridge folder run: npm start',
+    nobridge: '⚪ Bridge not running. Double-click bridge/start-bridge.bat',
     bridge: '🟡 Bridge running. Type a username and press Connect.',
     idle: '🟡 Bridge running, not connected to a live.',
     connecting: '🟡 ',
