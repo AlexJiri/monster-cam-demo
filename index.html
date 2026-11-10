@@ -195,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794343756"></script>
-<script src="src/settings.js?v=1794343756"></script>
-<script src="src/events.js?v=1794343756"></script>
-<script src="src/face.js?v=1794343756"></script>
-<script src="src/curses.js?v=1794343756"></script>
-<script src="src/sfx.js?v=1794343756"></script>
-<script src="src/mic.js?v=1794343756"></script>
-<script src="src/lightson.js?v=1794343756"></script>
-<script src="src/live.js?v=1794343756"></script>
+<script src="src/edition.js?v=1794343876"></script>
+<script src="src/settings.js?v=1794343876"></script>
+<script src="src/events.js?v=1794343876"></script>
+<script src="src/face.js?v=1794343876"></script>
+<script src="src/curses.js?v=1794343876"></script>
+<script src="src/sfx.js?v=1794343876"></script>
+<script src="src/mic.js?v=1794343876"></script>
+<script src="src/lightson.js?v=1794343876"></script>
+<script src="src/live.js?v=1794343876"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -486,7 +486,7 @@
   MC.bus.on('*', (e) => {
     if (e.type === 'like') {
       feed(`❤️ ${esc(e.user)} ×${e.count}`);
-      if (!round.running) return;
+      if (!round.running || !(S.likesForShield > 0)) return; // taps off: likes only show
       likes += e.count || 1;
       likers[e.user] = (likers[e.user] || 0) + (e.count || 1);
       // When the bar is full, the top 3 likers of this bar get the credit.
@@ -548,7 +548,7 @@
     log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → ${rule.curse}`);
   });
 
-  function renderLikes() { $('likeBar').textContent = `❤️ ${Math.min(likes, S.likesForShield)}/${S.likesForShield} likes to chain it`; }
+  function renderLikes() { $('likeBar').hidden = !(S.likesForShield > 0); $('likeBar').textContent = `❤️ ${Math.min(likes, S.likesForShield)}/${S.likesForShield} likes to chain it`; }
   renderLikes();
   renderLives();
   // ---------- TikTok LIVE (through the bridge) ----------
@@ -623,7 +623,7 @@
   const guideCards = () => {
     const lines = [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).map((g) =>
       `<span>${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${esc(g.gift)} <small>→ ${esc(effectShort(g.curse))}</small></span>`);
-    lines.push(`<span>❤️ ${S.likesForShield} taps <small>→ chain the monster</small></span>`);
+    if (S.likesForShield > 0) lines.push(`<span>❤️ ${S.likesForShield} taps <small>→ chain the monster</small></span>`);
     const cards = [];
     for (let i = 0; i < lines.length; i += 8) cards.push('<b>🎁 Gifts</b>' + lines.slice(i, i + 8).join(''));
     return cards;

@@ -58,6 +58,7 @@
   .rule { display: grid; grid-template-columns: 64px 18px minmax(0, 1fr) 18px minmax(0, 1.2fr) 36px; gap: 6px; align-items: center; margin: 6px 0; }
   .rule .x, .rule .arrow { color: var(--muted); text-align: center; }
   .rule .other { grid-column: 3 / 4; }
+  .rule[hidden] { display: none; }
   .rule select, .rule input { width: 100%; }
   .dares { display: grid; gap: 6px; margin-bottom: 6px; }
   .dares .row input { flex: 1; width: auto; }
@@ -145,13 +146,15 @@
   <section class="panel" id="p-gifts" hidden>
     <h2>Gifts <small>· keep it short: viewers have to remember it</small></h2>
     <div id="rules"></div>
-    <div class="rule">
+    <div class="rule" id="tapsRule">
       <input type="number" id="likesForShield" min="10" step="10" aria-label="Taps needed">
       <span class="x">×</span><span>❤️ taps (likes)</span>
-      <span class="arrow">→</span><span>🛡️ Chain the monster (helps)</span><span></span>
+      <span class="arrow">→</span><span>🛡️ Chain the monster (helps)</span>
+      <button id="delTaps" aria-label="Remove">✕</button>
     </div>
     <div class="row" style="margin-top:10px">
       <button id="addRule">+ Add gift</button>
+      <button id="addTaps">+ Add ❤️ taps</button>
       <button id="defaultGifts">Default gifts</button>
     </div>
     <p><label class="check"><input type="checkbox" id="showGuide"> Show this list to viewers on stream</label></p>
@@ -208,10 +211,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794343756"></script>
-<script src="src/events.js?v=1794343756"></script>
-<script src="src/face.js?v=1794343756"></script>
-<script src="src/mic.js?v=1794343756"></script>
+<script src="src/settings.js?v=1794343876"></script>
+<script src="src/events.js?v=1794343876"></script>
+<script src="src/face.js?v=1794343876"></script>
+<script src="src/mic.js?v=1794343876"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -427,8 +430,13 @@
     renderCurseTimes();
     renderRules();
     renderDares();
+    // Taps (likes) chaining the monster: 0 = off.
+    $('tapsRule').hidden = !(S.likesForShield > 0);
+    $('addTaps').hidden = S.likesForShield > 0;
     $('likesForShield').value = S.likesForShield;
     $('likesForShield').onchange = (e) => { S.likesForShield = Math.max(10, Math.round(+e.target.value) || 10); save(); };
+    $('delTaps').onclick = () => { S.likesForShield = 0; save(); renderAll(); };
+    $('addTaps').onclick = () => { S.likesForShield = MC.settings.defaults().likesForShield; save(); renderAll(); };
     $('showGuide').checked = !!S.showGiftGuide;
     $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {
