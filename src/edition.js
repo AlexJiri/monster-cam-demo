@@ -4,6 +4,9 @@
 (function (MC) {
   const VERSION = '0.3.2';
   const PAID = false;
+  // Developer copy (game served by `npm start` / start-bridge.bat from the source folder): unlimited rounds.
+  // The bridge switches this on; the desktop app never does.
+  const DEV = false;
   const FREE_ROUNDS = 3;
   const COOLDOWN_HOURS = 24;
   // Public file with { "latest": "x.y.z", "minimum": "x.y.z", "download": "url" }. Older than `minimum` = must update.
@@ -27,14 +30,14 @@
       const since = Date.now() - COOLDOWN_HOURS * 3600e3;
       try { return (JSON.parse(localStorage.getItem(KEY)) || []).filter((t) => t > since); } catch (e) { return []; }
     },
-    left() { return PAID ? Infinity : Math.max(0, FREE_ROUNDS - this.list().length); },
+    left() { return PAID || DEV ? Infinity : Math.max(0, FREE_ROUNDS - this.list().length); },
     // When the next free round becomes available (ms timestamp), or 0 if one is available now.
     nextAt() {
       if (this.left() > 0) return 0;
       return Math.min(...this.list()) + COOLDOWN_HOURS * 3600e3;
     },
     use() {
-      if (PAID) return;
+      if (PAID || DEV) return;
       const l = this.list(); l.push(Date.now());
       try { localStorage.setItem(KEY, JSON.stringify(l)); } catch (e) {}
     },
@@ -66,5 +69,5 @@
     ctx.restore();
   }
 
-  MC.edition = { VERSION, PAID, FREE_ROUNDS, COOLDOWN_HOURS, rounds, checkVersion, watermark };
+  MC.edition = { VERSION, PAID, DEV, FREE_ROUNDS, COOLDOWN_HOURS, rounds, checkVersion, watermark };
 })(window.MC = window.MC || {});

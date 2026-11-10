@@ -195,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794343876"></script>
-<script src="src/settings.js?v=1794343876"></script>
-<script src="src/events.js?v=1794343876"></script>
-<script src="src/face.js?v=1794343876"></script>
-<script src="src/curses.js?v=1794343876"></script>
-<script src="src/sfx.js?v=1794343876"></script>
-<script src="src/mic.js?v=1794343876"></script>
-<script src="src/lightson.js?v=1794343876"></script>
-<script src="src/live.js?v=1794343876"></script>
+<script src="src/edition.js?v=1794344546"></script>
+<script src="src/settings.js?v=1794344546"></script>
+<script src="src/events.js?v=1794344546"></script>
+<script src="src/face.js?v=1794344546"></script>
+<script src="src/curses.js?v=1794344546"></script>
+<script src="src/sfx.js?v=1794344546"></script>
+<script src="src/mic.js?v=1794344546"></script>
+<script src="src/lightson.js?v=1794344546"></script>
+<script src="src/live.js?v=1794344546"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -304,6 +304,7 @@
     if (update && update.required) { $('edition').innerHTML = `⛔ ${v} is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a>`; return; }
     const upd = update && update.available ? ` · <a href="${esc(update.download)}" target="_blank" rel="noopener">v${esc(update.latest)} available</a>` : '';
     if (ED.PAID) { $('edition').innerHTML = `Full version ${v}${upd}`; return; }
+    if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FREE_ROUNDS})`; return; }
     const left = ED.rounds.left();
     const next = ED.rounds.nextAt();
     $('edition').innerHTML = `Free version ${v}: ${left}/${ED.FREE_ROUNDS} rounds left` +
