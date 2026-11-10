@@ -58,7 +58,12 @@
   .rule { display: grid; grid-template-columns: 64px 18px minmax(0, 1fr) 18px minmax(0, 1.2fr) 36px; gap: 6px; align-items: center; margin: 6px 0; }
   .rule .x, .rule .arrow { color: var(--muted); text-align: center; }
   .rule .other { grid-column: 3 / 4; }
-  .rule[hidden] { display: none; }
+  .goodTitle { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
+  /* Advanced: a clear button-like toggle, not a faint link. */
+  details.adv > summary { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--night); margin-top: 14px; list-style: none; }
+  details.adv > summary::-webkit-details-marker { display: none; }
+  details.adv > summary::after { content: '▸'; color: var(--lamp); }
+  details.adv[open] > summary::after { content: '▾'; }
   .rule select, .rule input { width: 100%; }
   .dares { display: grid; gap: 6px; margin-bottom: 6px; }
   .dares .row input { flex: 1; width: auto; }
@@ -145,20 +150,17 @@
 
   <section class="panel" id="p-gifts" hidden>
     <h2>Gifts <small>· keep it short: viewers have to remember it</small></h2>
-    <div id="rules"></div>
-    <div class="rule" id="tapsRule">
-      <input type="number" id="likesForShield" min="10" step="10" aria-label="Taps needed">
-      <span class="x">×</span><span>❤️ taps (likes)</span>
-      <span class="arrow">→</span><span>🛡️ Chain the monster (helps)</span>
-      <button id="delTaps" aria-label="Remove">✕</button>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button id="addRule">+ Add gift</button>
-      <button id="addTaps">+ Add ❤️ taps</button>
+    <h3>😈 Against the streamer <small class="hint">· curses, the hunter, big gifts</small></h3>
+    <div id="rulesBad"></div>
+    <button data-addrule="bad">+ Add gift</button>
+    <h3 class="goodTitle">🛡️ Help the streamer <small class="hint">· chain the monster, remove curses</small></h3>
+    <div id="rulesGood"></div>
+    <button data-addrule="good">+ Add gift</button>
+    <div class="row" style="margin-top:14px">
       <button id="defaultGifts">Default gifts</button>
     </div>
     <p><label class="check"><input type="checkbox" id="showGuide"> Show this list to viewers on stream</label></p>
-    <p class="hint">“Other gift”: type the name exactly as TikTok shows it; the bridge window prints each gift's name as it arrives.</p>
+    <p class="hint">Each gift (and taps) can be used once. “Other gift”: type the name exactly as TikTok shows it; the bridge window prints each gift's name as it arrives.</p>
     <div class="next"><button data-go="camera">← Back</button><button class="primary" data-go="game">Next: Game →</button></div>
   </section>
 
@@ -172,8 +174,8 @@
       <label class="check"><input type="checkbox" id="r-blink"> blink</label>
       <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
     </div>
-    <details>
-      <summary>Advanced</summary>
+    <details class="adv">
+      <summary>⚙️ Advanced</summary>
       <div id="advSliders"></div>
       <h3>Curse timers</h3>
       <div id="curseTimes"></div>
@@ -211,10 +213,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794344546"></script>
-<script src="src/events.js?v=1794344546"></script>
-<script src="src/face.js?v=1794344546"></script>
-<script src="src/mic.js?v=1794344546"></script>
+<script src="src/settings.js?v=1794344856"></script>
+<script src="src/events.js?v=1794344856"></script>
+<script src="src/face.js?v=1794344856"></script>
+<script src="src/mic.js?v=1794344856"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -349,44 +351,68 @@
     list.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
   }
 
-  // ---------- Gifts: [count] × [gift] → [effect] ----------
+  // ---------- Gifts: [count] × [gift] → [effect], in two lists: against / help ----------
   const CAT = [...MC.settings.CATALOG].sort((a, b) => a.coins - b.coins);
+  const TAPS = MC.settings.TAPS;
   const OTHER = '__other__';
-  const effectOpts = (sel) => Object.entries(MC.settings.EFFECTS).map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label}</option>`).join('');
-  const giftOpts = (name) => {
-    const known = CAT.some((g) => g.name.toLowerCase() === name.toLowerCase());
-    return CAT.map((g) => `<option value="${esc(g.name)}" ${g.name.toLowerCase() === name.toLowerCase() ? 'selected' : ''}>${g.icon} ${esc(g.name)} · ${g.coins.toLocaleString('en')}</option>`).join('') +
+  const HELP = ['shield', 'cleanse'];
+  const isHelp = (g) => HELP.includes(g.curse);
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+  // Effects offered in each list.
+  const effectOpts = (sel, help) => Object.entries(MC.settings.EFFECTS).filter(([k]) => HELP.includes(k) === help)
+    .map(([k, label]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${label.replace(' (helps)', '')}</option>`).join('');
+  // Gifts already used by another rule are greyed out: a gift can't both curse and help.
+  const giftOpts = (name, i) => {
+    const used = (n) => S.gifts.some((g, j) => j !== i && same(g.gift, n));
+    const known = name === TAPS || CAT.some((g) => same(g.name, name));
+    return `<option value="${TAPS}" ${name === TAPS ? 'selected' : ''} ${used(TAPS) ? 'disabled' : ''}>❤️ Taps (likes)</option>` +
+      CAT.map((g) => `<option value="${esc(g.name)}" ${same(g.name, name) ? 'selected' : ''} ${used(g.name) ? 'disabled' : ''}>${g.icon} ${esc(g.name)} · ${g.coins.toLocaleString('en')}${used(g.name) ? ' (used)' : ''}</option>`).join('') +
       `<option value="${OTHER}" ${known ? '' : 'selected'}>✏️ Other gift…</option>`;
   };
+  function ruleRow(g, i) {
+    const known = g.gift === TAPS || CAT.some((c) => same(c.name, g.gift));
+    return `<div class="rule">
+      <input type="number" min="1" value="${g.every}" id="r-every-${i}" aria-label="How many" title="How many it takes">
+      <span class="x">×</span>
+      <select id="r-gift-${i}" aria-label="Gift">${giftOpts(g.gift, i)}</select>
+      <span class="arrow">→</span>
+      <select id="r-eff-${i}" aria-label="Effect">${effectOpts(g.curse, isHelp(g))}</select>
+      <button data-delrule="${i}" aria-label="Remove">✕</button>
+      ${known ? '' : `<span></span><span></span><input type="text" class="other" id="r-name-${i}" value="${esc(g.gift)}" placeholder="Exact TikTok gift name" aria-label="Gift name">`}
+    </div>`;
+  }
   function renderRules() {
-    $('rules').innerHTML = S.gifts.map((g, i) => {
-      const known = CAT.some((c) => c.name.toLowerCase() === g.gift.toLowerCase());
-      return `<div class="rule">
-        <input type="number" min="1" value="${g.every}" id="r-every-${i}" aria-label="How many gifts" title="How many of this gift it takes">
-        <span class="x">×</span>
-        <select id="r-gift-${i}" aria-label="Gift">${giftOpts(g.gift)}</select>
-        <span class="arrow">→</span>
-        <select id="r-eff-${i}" aria-label="Effect">${effectOpts(g.curse)}</select>
-        <button data-delrule="${i}" aria-label="Remove">✕</button>
-        ${known ? '' : `<span></span><span></span><input type="text" class="other" id="r-name-${i}" value="${esc(g.gift)}" placeholder="Exact TikTok gift name" aria-label="Gift name">`}
-      </div>`;
-    }).join('');
+    const rows = S.gifts.map((g, i) => ({ g, i }));
+    $('rulesBad').innerHTML = rows.filter(({ g }) => !isHelp(g)).map(({ g, i }) => ruleRow(g, i)).join('') || '<p class="hint">None.</p>';
+    $('rulesGood').innerHTML = rows.filter(({ g }) => isHelp(g)).map(({ g, i }) => ruleRow(g, i)).join('') || '<p class="hint">None: nothing can save the streamer.</p>';
     S.gifts.forEach((g, i) => {
       $('r-every-' + i).onchange = (e) => { g.every = Math.max(1, Math.round(+e.target.value) || 1); save(); };
       $('r-eff-' + i).onchange = (e) => { g.curse = e.target.value; save(); };
-      $('r-gift-' + i).onchange = (e) => { g.gift = e.target.value === OTHER ? '' : e.target.value; save(); renderRules(); if (e.target.value === OTHER) $('r-name-' + i).focus(); };
+      $('r-gift-' + i).onchange = (e) => {
+        const v = e.target.value;
+        g.gift = v === OTHER ? '' : v;
+        if (v === TAPS && g.every < 10) g.every = 100; // taps come in hundreds
+        save(); renderRules();
+        if (v === OTHER) $('r-name-' + i).focus();
+      };
       const n = $('r-name-' + i);
-      if (n) n.onchange = () => { g.gift = n.value.trim(); save(); };
+      if (n) n.onchange = () => {
+        const v = n.value.trim();
+        // A typed name that's already used elsewhere is refused.
+        if (S.gifts.some((x, j) => j !== i && same(x.gift, v))) { n.value = g.gift; alertUsed(v); return; }
+        g.gift = v; save();
+      };
     });
     document.querySelectorAll('[data-delrule]').forEach((b) => b.onclick = () => { S.gifts.splice(+b.dataset.delrule, 1); save(); renderRules(); });
   }
-  $('addRule').onclick = () => {
+  const alertUsed = (v) => log(`⚠️ “${esc(v)}” is already used by another rule. Each gift can do one thing.`);
+  document.querySelectorAll('[data-addrule]').forEach((b) => b.onclick = () => {
     // Offer the cheapest gift not used yet.
-    const free = CAT.find((c) => !S.gifts.some((g) => g.gift.toLowerCase() === c.name.toLowerCase()));
-    S.gifts.push({ gift: free ? free.name : '', every: 1, curse: 'curse' });
+    const free = CAT.find((c) => !S.gifts.some((g) => same(g.gift, c.name)));
+    S.gifts.push({ gift: free ? free.name : '', every: 1, curse: b.dataset.addrule === 'good' ? 'shield' : 'curse' });
     save(); renderRules();
-  };
-  $('defaultGifts').onclick = () => { const d = MC.settings.defaults(); S.gifts = d.gifts; S.likesForShield = d.likesForShield; save(); renderAll(); };
+  });
+  $('defaultGifts').onclick = () => { S.gifts = MC.settings.defaults().gifts; save(); renderAll(); };
 
   // ---------- Dares ----------
   function renderDares() {
@@ -430,13 +456,6 @@
     renderCurseTimes();
     renderRules();
     renderDares();
-    // Taps (likes) chaining the monster: 0 = off.
-    $('tapsRule').hidden = !(S.likesForShield > 0);
-    $('addTaps').hidden = S.likesForShield > 0;
-    $('likesForShield').value = S.likesForShield;
-    $('likesForShield').onchange = (e) => { S.likesForShield = Math.max(10, Math.round(+e.target.value) || 10); save(); };
-    $('delTaps').onclick = () => { S.likesForShield = 0; save(); renderAll(); };
-    $('addTaps').onclick = () => { S.likesForShield = MC.settings.defaults().likesForShield; save(); renderAll(); };
     $('showGuide').checked = !!S.showGiftGuide;
     $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {

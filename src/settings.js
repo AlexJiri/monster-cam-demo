@@ -23,7 +23,7 @@
     darkness: 0.85, // 0 = no darkness, 1 = pitch black between sweeps
     stareSeconds: 3, // big gift: the monster looks straight into the camera
     shieldSeconds: 6, // helper gift: the monster is chained and can't catch the streamer
-    likesForShield: 200, // chat fills a bar with likes (taps); when full, the monster is chained
+    likesForShield: 200, // old saves only: now a gift rule on TAPS (see gifts)
     // Dares are written by the streamer: keep them harmless (TikTok removes lives with dangerous challenges).
     loseDares: [
       'Talk like a pirate for 1 minute',
@@ -52,8 +52,10 @@
       { gift: 'Doughnut', every: 1, curse: 'sweep' },
       { gift: 'Galaxy', every: 1, curse: 'rampage' },
       { gift: 'Lion', every: 1, curse: 'eat' },
+      { gift: '__taps__', every: 200, curse: 'shield' }, // likes (taps): every 200 chain the monster
     ],
     giftsVersion: 3,
+    tapsRule: true, // taps are a rule in `gifts` (older saves get converted once)
   };
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -69,6 +71,11 @@
           s.giftsVersion = DEFAULTS.giftsVersion;
           s.roundSeconds = DEFAULTS.roundSeconds;
           s.likesForShield = DEFAULTS.likesForShield;
+        }
+        // Taps used to be a separate setting; now they're a rule like the gifts (once).
+        if (!saved.tapsRule) {
+          if (s.likesForShield > 0 && !s.gifts.some((g) => g.gift === TAPS)) s.gifts.push({ gift: TAPS, every: s.likesForShield, curse: 'shield' });
+          s.tapsRule = true;
         }
         delete s.tiers;
         delete s.anyGiftAdded;
@@ -108,7 +115,10 @@
     { name: 'Lion', coins: 29999, icon: '🦁' },
     { name: 'Universe', coins: 34999, icon: '🪐' },
   ];
-  const giftInfo = (name) => CATALOG.find((g) => g.name.toLowerCase() === String(name).toLowerCase()) || { name, coins: 0, icon: '🎁' };
+  // Likes (taps) work like a gift: `every` taps fill the bar and trigger the effect.
+  const TAPS = '__taps__';
+  const giftInfo = (name) => (name === TAPS ? { name, label: 'taps', coins: 0, icon: '❤️' }
+    : CATALOG.find((g) => g.name.toLowerCase() === String(name).toLowerCase()) || { name, coins: 0, icon: '🎁' });
 
   // Effects grouped (helpers last).
   const GROUPS = [
@@ -134,5 +144,5 @@
     cleanse: '🧹 Remove all curses (helps)',
   };
 
-  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo };
+  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo, TAPS };
 })(window.MC = window.MC || {});
