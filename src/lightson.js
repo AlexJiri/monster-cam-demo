@@ -1,5 +1,7 @@
-// Lights On: a hunter walks along the top of the room with a flashlight.
-// Dark → footsteps (warning) → the beam sweeps the room → dark again.
+// Lights On: a tall hunter walks through the room with a lantern.
+// Dark → footsteps (warning) → a pass through the room → dark again (a breather for the streamer).
+// Each pass is a random trick: walk across swinging the light, stop with its back turned and then spin round
+// and shine the lantern in the streamer's eyes, or peek in from the edge and glare.
 // While the beam is on the streamer's face, the light rules apply (don't move / smile / blink).
 // A big gift makes the monster stare straight into the camera: the whole frame is lit.
 (function (MC) {
@@ -22,7 +24,9 @@
       this.lit = false;
       this.litSince = 0;
       this.beam = null;
-      this.monster = { x: -0.2, y: 0, side: 1 };
+      this.monster = { x: -0.2, facing: 1, back: false, moving: false };
+      this.plan = []; // the current pass: segments { dur, x0, x1, beam: 'swing' | 'face' | 'off', back, facing }
+      this.stepAt = 0; // next footstep sound
     }
 
     // ---------- state ----------
@@ -82,25 +86,51 @@
           break;
         case 'warn':
           this.monster.x = this.dir > 0 ? -0.2 : 1.2;
-          if (now >= this.end) { MC.sfx.click(); this.set('sweep', now, { end: now + s.sweepSeconds * 1000 }); }
+          { const b = this.screenBox(face); if (b) this.faceX = b.x + b.w / 2; }
+          if (now >= this.end) {
+            this.plan = this.makePlan(this.dir, this.hunting);
+            this.set('sweep', now, { end: now + this.plan.reduce((t, g) => t + g.dur, 0) });
+          }
           break;
         case 'sweep': {
-          const p = Math.min(1, (now - this.t0) / (this.end - this.t0));
-          this.monster.x = this.dir > 0 ? lerp(-0.15, 1.15, p) : lerp(1.15, -0.15, p);
-          // The beam swings left and right while the monster walks.
-          let angle = Math.sin(p * TAU * 1.3 + this.swing) * 0.55;
-          const ox = this.monster.x + 0.05 * this.dir, oy = 0.17;
-          const box = this.hunting && this.screenBox(face);
-          if (box) {
-            // Hunt: in the middle of the pass the beam locks onto the face.
-            const W = this.cv.width, H = this.cv.height;
-            const target = Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H);
-            const lock = Math.sin(p * Math.PI) ** 0.6; // 0 at the edges, 1 in the middle
-            angle = lerp(angle, target, lock);
+          // Find the segment of the plan we're in.
+          let t = now - this.t0, seg = this.plan[this.plan.length - 1], p = 1;
+          for (const g of this.plan) { if (t <= g.dur) { seg = g; p = g.dur ? t / g.dur : 1; break; } t -= g.dur; }
+          if (seg !== this.seg) {
+            // Entering a new segment: the spin round is loud.
+            if (seg.beam === 'face' && this.seg && this.seg.back) { MC.sfx.growl(0.6, 0.9); MC.sfx.click(); }
+            else if (seg.beam !== 'off' && (!this.seg || this.seg.beam === 'off')) MC.sfx.click();
+            this.seg = seg;
           }
-          this.beam = { ox, oy, angle, half: this.hunting ? 0.24 : 0.2 };
+          const m = this.monster;
+          m.x = lerp(seg.x0, seg.x1, p);
+          m.facing = seg.facing;
+          m.back = seg.back;
+          m.moving = seg.x0 !== seg.x1;
+          if (m.moving && now >= this.stepAt) { MC.sfx.footstep(0.45); this.stepAt = now + 420; }
+          const ox = m.x + 0.075 * m.facing, oy = 0.42;
+          const box = this.screenBox(face);
+          if (box) this.faceX = box.x + box.w / 2;
+          const W = this.cv.width, H = this.cv.height;
+          // Default aim: across the room, towards its middle.
+          const centre = Math.atan2((0.5 - ox) * W, (0.5 - oy) * H);
+          if (seg.beam === 'off') this.beam = null;
+          else if (seg.beam === 'face') {
+            // Straight into the streamer's eyes (or the middle of the room if there's no face).
+            const target = box ? Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H) : centre;
+            this.beam = { ox, oy, angle: target, half: 0.3 };
+          } else {
+            let angle = centre + Math.sin((now - this.t0) / 650 + this.swing) * 0.6;
+            if (this.hunting && box) {
+              // Hunt: in the middle of the walk the beam locks onto the face.
+              const target = Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H);
+              angle = lerp(angle, target, Math.sin(p * Math.PI) ** 0.6);
+            }
+            this.beam = { ox, oy, angle, half: this.hunting ? 0.24 : 0.2 };
+          }
           if (now >= this.end) {
             this.beam = null;
+            this.seg = null;
             this.set('idle', now);
             this.nextAt = now + rand(...s.patrolGap) * 1000;
           }
@@ -119,6 +149,36 @@
           break;
       }
       this.checkLight(now, face);
+    }
+
+    // One pass through the room, picked at random. Times in ms, x in frame widths (−0.2 and 1.2 are off screen).
+    makePlan(dir, hunting) {
+      const s = this.s, from = dir > 0 ? -0.2 : 1.2, to = dir > 0 ? 1.2 : -0.2, f = dir;
+      const walk = s.sweepSeconds * 1000;
+      const trick = hunting ? (Math.random() < 0.6 ? 'turn' : 'walk') : ['walk', 'walk', 'turn', 'peek'][Math.floor(Math.random() * 4)];
+      if (trick === 'turn') {
+        // Walks in, stops with its back to the streamer, then spins round and shines the lantern in their eyes.
+        // Stops on the far side from the streamer, so it doesn't stand in front of their face.
+        const fx = this.faceX == null ? 0.5 : this.faceX;
+        const stop = fx < 0.5 ? rand(0.66, 0.82) : rand(0.18, 0.34);
+        const inFrac = Math.abs(stop - from) / 1.4;
+        return [
+          { dur: walk * inFrac, x0: from, x1: stop, beam: 'swing', back: false, facing: f },
+          { dur: rand(1000, 3000), x0: stop, x1: stop, beam: 'off', back: true, facing: -f },
+          { dur: rand(1200, 2000), x0: stop, x1: stop, beam: 'face', back: false, facing: f },
+          { dur: walk * (1 - inFrac), x0: stop, x1: to, beam: 'swing', back: false, facing: f },
+        ];
+      }
+      if (trick === 'peek') {
+        // Leans in from the edge, glares, and leaves the way it came.
+        const edge = dir > 0 ? 0.08 : 0.92;
+        return [
+          { dur: 700, x0: from, x1: edge, beam: 'off', back: false, facing: f },
+          { dur: rand(1200, 2200), x0: edge, x1: edge, beam: 'face', back: false, facing: f },
+          { dur: 700, x0: edge, x1: from, beam: 'off', back: false, facing: -f },
+        ];
+      }
+      return [{ dur: walk, x0: from, x1: to, beam: 'swing', back: false, facing: f }];
     }
 
     // Is the face inside the beam (or is the monster staring)? If so, the light rules apply.
@@ -265,38 +325,74 @@
       }
     }
 
-    // The hunter looms along the top edge: shoulders, head with glowing eyes, arm holding the lantern.
+    // The hunter: a tall, thin creature walking through the room on long legs, lantern in one hand.
+    // Seen from behind (`back`) it has no eyes and the lantern is hidden.
     drawHunter(now, W, H) {
       if (this.phase !== 'sweep') return;
-      const ctx = this.ctx;
-      const x = this.monster.x * W, bob = Math.sin(now / 140) * H * 0.008;
-      const dir = this.dir;
+      const ctx = this.ctx, m = this.monster;
+      const x = m.x * W, f = m.facing;
+      const walkT = now / 260;
+      const stride = m.moving ? Math.sin(walkT) : 0;
+      const bob = m.moving ? Math.abs(Math.cos(walkT)) * H * 0.012 : Math.sin(now / 500) * H * 0.004; // breathing when still
+      const hipY = H * 0.62 - bob, shoulderY = H * 0.27 - bob, headY = H * 0.17 - bob;
       ctx.save();
-      // Dark body with a warm rim from the lantern, so it reads against the dark room.
-      ctx.fillStyle = '#171a23';
-      ctx.shadowColor = 'rgba(255, 205, 120, 0.55)';
-      ctx.shadowBlur = 22;
-      // shoulders and head
-      ctx.beginPath(); ctx.ellipse(x, -H * 0.02 + bob, W * 0.14, H * 0.13, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x, H * 0.06 + bob, W * 0.055, H * 0.085, 0, 0, TAU); ctx.fill();
-      // horns
+      ctx.fillStyle = ctx.strokeStyle = '#11131b';
+      ctx.shadowColor = 'rgba(255, 205, 120, 0.5)';
+      ctx.shadowBlur = m.back ? 10 : 22;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // legs: thigh + shin with a backwards knee, swinging when walking
+      for (const side of [-1, 1]) {
+        const sw = stride * side;
+        const hip = x + side * W * 0.022;
+        const knee = { x: hip + sw * W * 0.05 + f * W * 0.012, y: H * 0.8 };
+        const foot = { x: hip + sw * W * 0.09, y: H * 1.0 };
+        ctx.lineWidth = W * 0.022;
+        ctx.beginPath(); ctx.moveTo(hip, hipY); ctx.lineTo(knee.x, knee.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
+      }
+      // body: hunched, thin torso
       ctx.beginPath();
-      ctx.moveTo(x - W * 0.035, H * 0.0 + bob); ctx.quadraticCurveTo(x - W * 0.08, -H * 0.05, x - W * 0.06, -H * 0.09); ctx.lineTo(x - W * 0.02, H * 0.0 + bob);
-      ctx.moveTo(x + W * 0.035, H * 0.0 + bob); ctx.quadraticCurveTo(x + W * 0.08, -H * 0.05, x + W * 0.06, -H * 0.09); ctx.lineTo(x + W * 0.02, H * 0.0 + bob);
-      ctx.fill();
-      // arm towards the lantern
-      const lx = (this.monster.x + 0.05 * dir) * W, ly = 0.17 * H;
-      ctx.strokeStyle = '#171a23'; ctx.lineWidth = W * 0.018; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x + W * 0.06 * dir, H * 0.06 + bob); ctx.quadraticCurveTo(x + W * 0.07 * dir, H * 0.15, lx, ly); ctx.stroke();
-      // glowing eyes
-      ctx.fillStyle = '#ffe36b';
-      ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 18;
-      ctx.beginPath(); ctx.ellipse(x - W * 0.02, H * 0.06 + bob, W * 0.009, H * 0.008, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x + W * 0.02, H * 0.06 + bob, W * 0.009, H * 0.008, 0, 0, TAU); ctx.fill();
-      // lantern
-      ctx.shadowBlur = 30;
-      ctx.fillStyle = '#fff2c4';
-      ctx.beginPath(); ctx.arc(lx, ly, W * 0.012, 0, TAU); ctx.fill();
+      ctx.moveTo(x - W * 0.05, shoulderY);
+      ctx.quadraticCurveTo(x - W * 0.065, H * 0.42, x - W * 0.03, hipY);
+      ctx.lineTo(x + W * 0.03, hipY);
+      ctx.quadraticCurveTo(x + W * 0.065, H * 0.42, x + W * 0.05, shoulderY);
+      ctx.closePath(); ctx.fill();
+      // head, pushed forward, with horns
+      const hx = x + f * W * 0.015;
+      ctx.beginPath(); ctx.ellipse(hx, headY, W * 0.04, H * 0.065, 0, 0, TAU); ctx.fill();
+      // horns: curling out and down like a ram's, thick at the root
+      ctx.lineWidth = W * 0.012;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(hx + side * W * 0.02, headY - H * 0.05);
+        ctx.bezierCurveTo(hx + side * W * 0.06, headY - H * 0.12, hx + side * W * 0.11, headY - H * 0.06, hx + side * W * 0.085, headY + H * 0.01);
+        ctx.stroke();
+      }
+      // arms: long, the lantern arm reaching forward, the other hanging (swinging when walking)
+      // jaw: a pale grin under the eyes when facing the streamer
+      if (!m.back) {
+        ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(230, 220, 200, 0.75)';
+        for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(hx + i * W * 0.008 - W * 0.003, headY + H * 0.03); ctx.lineTo(hx + i * W * 0.008 + W * 0.003, headY + H * 0.03); ctx.lineTo(hx + i * W * 0.008, headY + H * 0.045); ctx.fill(); }
+        ctx.restore();
+      }
+      ctx.lineWidth = W * 0.014;
+      const lx = (m.x + 0.075 * f) * W, ly = H * 0.42;
+      if (!m.back) {
+        ctx.beginPath(); ctx.moveTo(x + f * W * 0.045, shoulderY + H * 0.02); ctx.quadraticCurveTo(x + f * W * 0.08, H * 0.3, lx, ly); ctx.stroke();
+      }
+      const hang = x - f * W * 0.045;
+      ctx.beginPath(); ctx.moveTo(hang, shoulderY + H * 0.02); ctx.quadraticCurveTo(hang - f * W * 0.02, H * 0.4, hang - stride * W * 0.03, H * 0.62); ctx.stroke();
+      if (!m.back) {
+        // glowing eyes and the lantern
+        ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 18;
+        for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * W * 0.015 + f * W * 0.006, headY, W * 0.008, H * 0.007, 0, 0, TAU); ctx.fill(); }
+        ctx.shadowBlur = 30; ctx.fillStyle = '#fff2c4';
+        ctx.beginPath(); ctx.arc(lx, ly, W * 0.012, 0, TAU); ctx.fill();
+      } else {
+        // Back turned: just a faint glow of the hidden lantern on the far side.
+        const g = ctx.createRadialGradient(x - f * W * 0.06, H * 0.42, 0, x - f * W * 0.06, H * 0.42, W * 0.05);
+        g.addColorStop(0, 'rgba(255,214,140,0.35)'); g.addColorStop(1, 'rgba(255,214,140,0)');
+        ctx.shadowBlur = 0; ctx.fillStyle = g; ctx.fillRect(x - W * 0.2, H * 0.3, W * 0.4, H * 0.25);
+      }
       ctx.restore();
     }
 

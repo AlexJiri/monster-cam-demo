@@ -52,6 +52,11 @@
   .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
   .guide span { display: block; color: var(--text); }
   .guide small { color: var(--muted); }
+  /* Test round inside Settings & Test: no header, no TikTok step, a narrower panel. */
+  .embed header, .embed #step1 { display: none; }
+  .embed .layout { grid-template-columns: minmax(0, 1fr) 320px; }
+  .embed .stageCol .stage { width: min(100%, calc((100vh - 24px) * 4 / 3)); }
+  .embed .panel { max-height: calc(100vh - 24px); }
   .backBtn { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 500; }
   .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
   .notice .x:hover { color: var(--text); }
@@ -117,7 +122,7 @@
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
-    <nav class="tabs" aria-label="Pages"><a href="index.html" class="on" aria-current="page">🎮 Play</a><a href="bench.html">⚙️ Settings &amp; Test</a></nav>
+    <nav class="tabs" aria-label="Pages"><a href="index.html" class="on" aria-current="page">▶ Play</a><a href="bench.html">⚙️ Settings &amp; Test</a></nav>
   </header>
   <div class="layout">
     <div class="stageCol" id="stageCol">
@@ -190,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794342120"></script>
-<script src="src/settings.js?v=1794342120"></script>
-<script src="src/events.js?v=1794342120"></script>
-<script src="src/face.js?v=1794342120"></script>
-<script src="src/curses.js?v=1794342120"></script>
-<script src="src/sfx.js?v=1794342120"></script>
-<script src="src/mic.js?v=1794342120"></script>
-<script src="src/lightson.js?v=1794342120"></script>
-<script src="src/live.js?v=1794342120"></script>
+<script src="src/edition.js?v=1794342844"></script>
+<script src="src/settings.js?v=1794342844"></script>
+<script src="src/events.js?v=1794342844"></script>
+<script src="src/face.js?v=1794342844"></script>
+<script src="src/curses.js?v=1794342844"></script>
+<script src="src/sfx.js?v=1794342844"></script>
+<script src="src/mic.js?v=1794342844"></script>
+<script src="src/lightson.js?v=1794342844"></script>
+<script src="src/live.js?v=1794342844"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -319,7 +324,10 @@
   }
 
   // Test (from Settings & Test): a 60 s round with fake viewers, TikTok off, not counted as a free round.
-  const PREVIEW = location.hash === '#preview';
+  const PREVIEW = location.hash.startsWith('#preview');
+  // Inside the Settings & Test page: no header, the page around it has one.
+  const EMBED = location.hash.startsWith('#preview-embed');
+  if (EMBED) document.body.classList.add('embed');
   const PREVIEW_SECONDS = 60;
   function startRound() {
     if (!PREVIEW) {
@@ -379,7 +387,7 @@
       ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
       : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
-    if (PREVIEW) $('againBtn').insertAdjacentHTML('afterend', ' <a href="bench.html" class="backBtn">← Back to Settings</a>');
+    if (PREVIEW && !EMBED) $('againBtn').insertAdjacentHTML('afterend', ' <a href="bench.html" class="backBtn">← Back to Settings</a>');
     $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
     $('noticeX').onclick = hideNotice;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);

@@ -30,12 +30,15 @@
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   h1 { font-family: 'Creepster', cursive; font-weight: 400; font-size: 42px; margin: 0; color: var(--blood); letter-spacing: 1px; }
   header p { margin: 0; color: var(--muted); }
-  .wrap { max-width: 1000px; }
+  .wrap { max-width: 1200px; }
   label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
   .tabs { display: flex; gap: 6px; margin-left: auto; }
   .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
   .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
+  .tabs a.play:not(.on) { background: var(--blood); border-color: var(--blood); color: #fff; font-weight: 700; padding: 6px 20px; box-shadow: 0 0 18px rgba(224, 57, 62, 0.55); }
+  .tabs a.play:not(.on):hover { filter: brightness(1.12); color: #fff; }
+  .testFrame { width: 100%; height: 760px; border: 1px solid var(--line); border-radius: 12px; background: #000; display: block; margin-top: 12px; }
   header { align-items: center; }
   h1 { color: var(--lamp); }
   .saved { color: var(--moss); font-size: 13px; }
@@ -101,7 +104,7 @@
   <header>
     <h1>Settings</h1>
     <span class="saved" id="saved"></span>
-    <nav class="tabs" aria-label="Pages"><a href="index.html">🎮 Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
+    <nav class="tabs" aria-label="Pages"><a href="index.html" class="play">▶ Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
   </header>
 
   <nav class="steps" aria-label="Steps">
@@ -189,13 +192,14 @@
 
   <section class="panel" id="p-test" hidden>
     <h2>Test <small>· play one round with your settings</small></h2>
-    <p>A 60-second round with fake viewers sending your gifts and taps. TikTok stays off and it doesn't count as a free round. You can also send gifts yourself from the test buttons.</p>
+    <p>A 60-second round with fake viewers sending your gifts and taps, right here. TikTok stays off and it doesn't count as a free round. You can also send gifts yourself from the test buttons.</p>
     <div class="row">
-      <a class="primary bigBtn" id="testBtn" href="index.html#preview" style="text-decoration:none;border-radius:8px;background:var(--blood);color:#fff;font-weight:700">🧪 Start test round</a>
+      <button class="primary bigBtn" id="testBtn">🧪 Start test round</button>
       <button id="restoreAll">Restore all defaults</button>
+      <span class="hint" style="margin:0">Everything is saved as you go.</span>
     </div>
-    <p class="hint">Everything is saved as you go.</p>
-    <div class="next"><button data-go="dares">← Back</button><a href="index.html" style="align-self:center">Done: go to Play →</a></div>
+    <iframe class="testFrame" id="testFrame" title="Test round" allow="camera; microphone; autoplay" hidden></iframe>
+    <div class="next"><button data-go="dares">← Back</button></div>
   </section>
 
   <section style="margin-top:16px">
@@ -204,10 +208,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794342120"></script>
-<script src="src/events.js?v=1794342120"></script>
-<script src="src/face.js?v=1794342120"></script>
-<script src="src/mic.js?v=1794342120"></script>
+<script src="src/settings.js?v=1794342844"></script>
+<script src="src/events.js?v=1794342844"></script>
+<script src="src/face.js?v=1794342844"></script>
+<script src="src/mic.js?v=1794342844"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -330,7 +334,7 @@
     ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
   ];
   const ADV = [
-    ['maxCurses', 'Curses at once', 1, 5, 1, ''],
+    ['maxCurses', 'Curses at once (there are 4)', 1, 4, 1, ''],
     ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
   ];
   // The round is stored in seconds and shown in minutes.
@@ -435,7 +439,14 @@
   }
   // Empty gift names and dares are dropped before testing or playing.
   const tidy = () => { S.gifts = S.gifts.filter((g) => g.gift); S.loseDares = S.loseDares.filter(Boolean); S.winDares = S.winDares.filter(Boolean); save(); };
-  $('testBtn').onclick = tidy;
+  // The test round runs inside this tab (the Play page in test mode), with the settings just saved.
+  $('testBtn').onclick = () => {
+    tidy();
+    $('testFrame').hidden = false;
+    $('testFrame').src = 'index.html#preview-embed&' + Date.now();
+    $('testBtn').textContent = '🔁 Restart test round';
+    $('testFrame').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   window.addEventListener('pagehide', tidy);
   $('restoreAll').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderAll(); log('All settings restored to defaults.'); };
   renderAll();
