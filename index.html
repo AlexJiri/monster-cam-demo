@@ -187,15 +187,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794339606"></script>
-<script src="src/settings.js?v=1794339606"></script>
-<script src="src/events.js?v=1794339606"></script>
-<script src="src/face.js?v=1794339606"></script>
-<script src="src/curses.js?v=1794339606"></script>
-<script src="src/sfx.js?v=1794339606"></script>
-<script src="src/mic.js?v=1794339606"></script>
-<script src="src/lightson.js?v=1794339606"></script>
-<script src="src/live.js?v=1794339606"></script>
+<script src="src/edition.js?v=1794339914"></script>
+<script src="src/settings.js?v=1794339914"></script>
+<script src="src/events.js?v=1794339914"></script>
+<script src="src/face.js?v=1794339914"></script>
+<script src="src/curses.js?v=1794339914"></script>
+<script src="src/sfx.js?v=1794339914"></script>
+<script src="src/mic.js?v=1794339914"></script>
+<script src="src/lightson.js?v=1794339914"></script>
+<script src="src/live.js?v=1794339914"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -260,9 +260,14 @@
     onChange() {},
   });
 
+  // After each lost life the streamer gets a few safe seconds (revive), so back-to-back big gifts can't wipe all lives at once.
+  let reviveUntil = 0;
   function caught(why, by = null) {
-    if (!round.running || game.phase === 'eaten') return;
+    if (!round.running) return false;
     const now = performance.now();
+    if (now < reviveUntil || game.phase === 'eaten') return false; // still reviving: nothing can catch the streamer
+    reviveUntil = now + S.reviveSeconds * 1000;
+    curses.immuneUntil = Math.max(curses.immuneUntil, reviveUntil);
     lives = Math.max(0, lives - 1);
     renderLives();
     game.eat(now, face.state);
@@ -271,6 +276,8 @@
     banner(by ? `🩸 ${esc(by)} got the streamer!` : '🩸 The hunter got the streamer!');
     log(`🩸 Caught: ${why}${by ? ` (thanks to ${esc(by)})` : ''}. Lives left: ${lives}`);
     if (!lives) setTimeout(() => endRound(false), 1600);
+    else if (S.reviveSeconds > 0) setTimeout(() => banner(`💫 Revived! Safe for ${S.reviveSeconds} s`, true), 1400);
+    return true;
   }
 
   // ---------- Round ----------
@@ -322,6 +329,7 @@
     renderLikes();
     curses.clear();
     round.running = true;
+    reviveUntil = 0;
     round.ends = performance.now() + S.roundSeconds * 1000;
     game.start(performance.now());
     $('timer').hidden = false;
@@ -494,9 +502,13 @@
     }
     if (rule.curse === 'eat') {
       // The biggest gifts: straight to the jaws, chains or not.
-      feed(`🎁 <b>${esc(e.user)}</b> ${EFFECT_TEXT.eat}`);
-      log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → eaten on the spot`);
-      caught(`fed to the monster by ${esc(e.user)}`, e.user);
+      if (caught(`fed to the monster by ${esc(e.user)}`, e.user)) {
+        feed(`🎁 <b>${esc(e.user)}</b> ${EFFECT_TEXT.eat}`);
+        log(`🎁 ${esc(e.user)} sent ${esc(e.gift)} → eaten on the spot`);
+      } else {
+        feed(`🎁 <b>${esc(e.user)}</b>'s ${esc(e.gift)} missed: the streamer is reviving 💫`);
+        log(`💫 ${esc(e.user)}'s ${esc(e.gift)} came during the revive: no life lost.`);
+      }
       return;
     }
     let picked = null; // the random curse, for "Random curse" gifts

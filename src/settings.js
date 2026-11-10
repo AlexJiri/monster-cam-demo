@@ -9,6 +9,7 @@
     moveThreshold: 1.5, // head movement speed
     soundThreshold: 0.3, // 0..1 above the room's background noise
     lives: 3,
+    reviveSeconds: 3, // after losing a life nothing can catch the streamer for this long
     maxCurses: 3, // active at once, the rest wait in a queue
     graceMs: 1200, // warning time before a new curse starts counting
     roundSeconds: 180, // survive this long to win the round

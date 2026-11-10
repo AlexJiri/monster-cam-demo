@@ -162,10 +162,10 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1794339606"></script>
-<script src="src/events.js?v=1794339606"></script>
-<script src="src/face.js?v=1794339606"></script>
-<script src="src/mic.js?v=1794339606"></script>
+<script src="src/settings.js?v=1794339914"></script>
+<script src="src/events.js?v=1794339914"></script>
+<script src="src/face.js?v=1794339914"></script>
+<script src="src/mic.js?v=1794339914"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -269,6 +269,7 @@
   // Sliders: [key, label, min, max, step, unit]
   const SLIDERS = [
     ['lives', 'Lives', 1, 9, 1, ''],
+    ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
     ['roundSeconds', 'Round length', 30, 600, 30, ' s'],
     ['maxCurses', 'Curses at once', 1, 5, 1, ''],
     ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
