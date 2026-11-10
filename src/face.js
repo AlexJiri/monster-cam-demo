@@ -81,8 +81,19 @@
     loop() {
       if (this.looping) return;
       this.looping = true;
-      let lastTime = -1;
-      const tick = () => {
+      let lastTime = -1, gen = 0, lastTick = performance.now();
+      // Frames are timed by the window that shows the stage (`frameWindow`, the stream window when it's open).
+      // A browser stops frame callbacks in a window that is covered, so a maximised stream window over the
+      // main window would otherwise freeze the camera and the monster.
+      const win = () => (this.frameWindow && !this.frameWindow.closed ? this.frameWindow : window);
+      const schedule = () => { const g = gen; win().requestAnimationFrame(() => tick(g)); };
+      this.restartLoop = () => { gen++; schedule(); };
+      // A callback queued in a window that then closes never runs: restart the loop if it went quiet.
+      setInterval(() => { if (performance.now() - lastTick > 1000) this.restartLoop(); }, 1000);
+      const tick = (g) => {
+        if (g !== gen) return; // an older loop, replaced by restartLoop()
+        lastTick = performance.now();
+        if (this.video && this.video.paused && this.video.srcObject) this.video.play().catch(() => {});
         if (this.fake) {
           Object.assign(this.state, { face: true, raw: { smile: this.fake.smile, blink: this.fake.blink } });
           this.state.smile = this.fake.smile;
@@ -97,9 +108,9 @@
         }
         if (this.mic && !this.fake) { this.state.sound = this.mic.read(); this.mic.sample(); }
         this.listeners.forEach((fn) => fn(this.state));
-        requestAnimationFrame(tick);
+        schedule();
       };
-      requestAnimationFrame(tick);
+      schedule();
     }
 
     read(res) {

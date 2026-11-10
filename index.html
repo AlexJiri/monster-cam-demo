@@ -174,7 +174,7 @@
       </div>
       <div class="row">
         <label class="check" title="Volume">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
-        <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="0.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
+        <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="1.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
       </div>
       <p class="hint" id="edition"></p>
     </section>
@@ -195,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794345847"></script>
-<script src="src/settings.js?v=1794345847"></script>
-<script src="src/events.js?v=1794345847"></script>
-<script src="src/face.js?v=1794345847"></script>
-<script src="src/curses.js?v=1794345847"></script>
-<script src="src/sfx.js?v=1794345847"></script>
-<script src="src/mic.js?v=1794345847"></script>
-<script src="src/lightson.js?v=1794345847"></script>
-<script src="src/live.js?v=1794345847"></script>
+<script src="src/edition.js?v=1794347451"></script>
+<script src="src/settings.js?v=1794347451"></script>
+<script src="src/events.js?v=1794347451"></script>
+<script src="src/face.js?v=1794347451"></script>
+<script src="src/curses.js?v=1794347451"></script>
+<script src="src/sfx.js?v=1794347451"></script>
+<script src="src/mic.js?v=1794347451"></script>
+<script src="src/lightson.js?v=1794347451"></script>
+<script src="src/live.js?v=1794347451"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -463,9 +463,14 @@
   };
 
   // ---------- Volume and brightness (the rest is on the Settings page) ----------
-  // Brightness is the opposite of the stored darkness (0.5–0.97).
-  $('bright').value = (1 - S.darkness).toFixed(2);
-  $('bright').oninput = () => { S.darkness = +(1 - $('bright').value).toFixed(2); save(); };
+  // Up to 1: less darkness between sweeps (1 = none). Above 1: also brightens the camera (up to 1.5×).
+  $('bright').value = (S.camBoost > 1 ? S.camBoost : 1 - S.darkness).toFixed(2);
+  $('bright').oninput = () => {
+    const v = +$('bright').value;
+    S.darkness = +Math.max(0, 1 - v).toFixed(2);
+    S.camBoost = +Math.max(1, v).toFixed(2);
+    save();
+  };
   $('vol').value = S.volume;
   $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
 
@@ -612,6 +617,7 @@
     $('stageCol').prepend(document.adoptNode(stage));
     $('stageCol').classList.remove('streamed');
     streamWin = null;
+    face.frameWindow = null; if (face.restartLoop) face.restartLoop();
     $('streamBtn').textContent = '📺 Stream window';
   }
   $('streamBtn').onclick = () => {
@@ -627,6 +633,8 @@
     fit.textContent = 'html,body{margin:0;height:100%;background:#000;overflow:hidden}body{display:grid;place-items:center}.stage{width:min(100vw,calc(100vh*4/3));border-radius:0}';
     d.head.appendChild(fit);
     d.body.appendChild(d.adoptNode(stage));
+    // Time the frames by the window that shows the game, so covering the main window doesn't freeze it.
+    face.frameWindow = w; if (face.restartLoop) face.restartLoop();
     $('stageCol').classList.add('streamed');
     $('streamBtn').textContent = '📺 Show stream window';
     w.addEventListener('pagehide', bringStageBack);

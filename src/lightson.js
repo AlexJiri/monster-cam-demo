@@ -249,6 +249,7 @@
         if (vr > cr) { sw = sh * cr; sx = (video.videoWidth - sw) / 2; } else { sh = sw / cr; sy = (video.videoHeight - sh) / 2; }
         ctx.save();
         ctx.translate(W, 0); ctx.scale(-1, 1);
+        if (this.s.camBoost > 1) ctx.filter = `brightness(${this.s.camBoost}) contrast(1.05)`;
         ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
         ctx.restore();
       } else {

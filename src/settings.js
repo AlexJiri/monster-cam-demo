@@ -21,6 +21,7 @@
     sweepSeconds: 5, // how long one sweep across the room takes
     warnSeconds: 1.5, // footsteps before the light arrives
     darkness: 0.85, // 0 = no darkness, 1 = pitch black between sweeps
+    camBoost: 1, // camera brightness, 1 = as is, up to 1.5
     stareSeconds: 3, // big gift: the monster looks straight into the camera
     shieldSeconds: 6, // helper gift: the monster is chained and can't catch the streamer
     likesForShield: 200, // old saves only: now a gift rule on TAPS (see gifts)
