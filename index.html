@@ -28,7 +28,21 @@
   button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
   button.primary { background: var(--blood); border-color: var(--blood); color: #fff; font-weight: 700; }
   a { color: var(--lamp); }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); }
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 10px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left)); }
+  /* Stage on the left sized to fit the window height; the streamer's panel on the right, no page scroll. */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
+  .stageCol .stage { width: min(100%, calc((100vh - 84px) * 4 / 3)); margin: 0 auto; }
+  .panel { display: grid; gap: 10px; max-height: calc(100vh - 84px); overflow: auto; padding-right: 2px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .panel { max-height: none; } }
+  .step h2 { display: flex; align-items: center; gap: 8px; }
+  .step h2 b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--lamp); color: #1b1400; font-size: 13px; }
+  .step.done h2 b { background: var(--moss); }
+  #ttUser { flex: 1; min-width: 0; width: auto; font-size: 17px; padding: 7px 10px; }
+  #roundBtn { font-size: 17px; padding: 10px 18px; }
+  details > summary { cursor: pointer; font-weight: 700; }
+  details[open] > summary { margin-bottom: 8px; }
+  .streamHere { display: none; aspect-ratio: 4 / 3; border: 2px dashed var(--line); border-radius: 12px; place-items: center; text-align: center; color: var(--muted); padding: 16px; }
+  .streamed .streamHere { display: grid; }
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
   h1 { font-family: 'Creepster', cursive; font-weight: 400; font-size: 40px; margin: 0; color: var(--lamp); letter-spacing: 1px; }
   header p { margin: 0; color: var(--muted); }
@@ -72,15 +86,13 @@
     .lives { font-size: 18px; }
   }
 
-  .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
-  @media (max-width: 760px) { .controls { grid-template-columns: 1fr; } }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
   h2 { margin: 0 0 8px; font-size: 15px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .row + .row { margin-top: 8px; }
   label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
   input[type=text] { background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; width: 120px; }
-  .log { height: 120px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
+  .log { height: 110px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   .hint a, .notice a { color: var(--lamp); }
   #fakeSliders label { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; font-size: 13px; }
@@ -91,9 +103,10 @@
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
-    <p>When the light finds you, freeze. <a href="bench.html">Settings and test bench</a></p>
+    <p>When the light finds you, freeze.</p>
   </header>
-
+  <div class="layout">
+    <div class="stageCol" id="stageCol">
   <div class="stage">
     <canvas id="cv" width="960" height="720" aria-label="Game view"></canvas>
     <div class="hud">
@@ -109,61 +122,87 @@
     <div class="curses" id="curses"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
     <div class="lit" id="lit">🔦 The light is on you. Freeze!</div>
-    <div class="notice on" id="notice">Start the camera, calibrate, then start a round.<br><small style="font-weight:400;color:var(--muted)">Everything runs on this computer; no video is sent anywhere.</small></div>
+    <div class="notice on" id="notice">Connect your live, start the camera, calibrate, then start a round.<br><small style="font-weight:400;color:var(--muted)">Everything runs on this computer; no video is sent anywhere.</small></div>
   </div>
 
-  <div class="controls">
-    <section>
-      <h2>Game</h2>
+      <div class="streamHere" id="streamHere"><div>📺 The game is in the stream window.<br><small>Add that window in TikTok LIVE Studio (Window capture). Close it to bring the game back here.</small></div></div>
+    </div>
+  <div class="panel">
+    <section class="step" id="step1">
+      <h2><b>1</b> Your TikTok LIVE</h2>
       <div class="row">
-        <button class="primary" id="startBtn">Start camera</button>
-        <button id="fakeBtn">No camera: use sliders</button>
-        <button id="calBtn" disabled>Calibrate</button>
-        <button id="roundBtn" disabled>▶ Start round</button>
+        <input type="text" id="ttUser" placeholder="@your_username" aria-label="Your TikTok username">
+        <button class="primary" id="ttConnect">Connect</button>
       </div>
-      <p class="hint" id="edition"></p>
       <div class="row">
-        <span class="hint" style="margin:0">While lit, don't:</span>
-        <label class="check"><input type="checkbox" id="r-move"> move</label>
-        <label class="check"><input type="checkbox" id="r-smile"> smile</label>
-        <label class="check"><input type="checkbox" id="r-blink"> blink</label>
-        <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
-        <label class="check">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:90px"></label>
-        <label class="check">🌑 <input type="range" id="dark" min="0.5" max="0.97" step="0.01" aria-label="Darkness" style="width:90px"></label>
-      </div>
-      <div id="fakeSliders"></div>
-      <h2 style="margin-top:12px">TikTok LIVE</h2>
-      <div class="row">
-        <input type="text" id="ttUser" placeholder="@username" aria-label="TikTok username">
-        <button id="ttConnect">Connect</button>
+        <p class="hint" id="ttStatus" style="margin:0;flex:1">Looking for the bridge…</p>
         <button id="ttDisconnect">Disconnect</button>
       </div>
-      <p class="hint" id="ttStatus">Looking for the bridge…</p>
+    </section>
+    <section class="step" id="step2">
+      <h2><b>2</b> Camera</h2>
+      <div class="row">
+        <button class="primary" id="startBtn">Start camera</button>
+        <button id="calBtn" disabled>Calibrate</button>
+        <button id="fakeBtn" title="Test without a camera">No camera</button>
+      </div>
+      <div id="fakeSliders"></div>
+    </section>
+    <section class="step" id="step3">
+      <h2><b>3</b> Play</h2>
+      <div class="row">
+        <button id="roundBtn" disabled>▶ Start round</button>
+        <button id="streamBtn" title="A clean window with only the game, to add in TikTok LIVE Studio">📺 Stream window</button>
+      </div>
+      <p class="hint" id="edition"></p>
     </section>
     <section>
-      <h2>Simulator</h2>
-      <div class="row">
-        <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
-        <button data-sim="like">❤️ 25 likes</button>
-        <button data-sim="follow">➕ Follow</button>
-      </div>
-      <div class="row" id="giftBtns"></div>
+      <details>
+        <summary>Rules and sound</summary>
+        <div class="row">
+          <span class="hint" style="margin:0">While lit, don't:</span>
+          <label class="check"><input type="checkbox" id="r-move"> move</label>
+          <label class="check"><input type="checkbox" id="r-smile"> smile</label>
+          <label class="check"><input type="checkbox" id="r-blink"> blink</label>
+          <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
+        </div>
+        <div class="row">
+          <label class="check">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
+          <label class="check">🌑 <input type="range" id="dark" min="0.5" max="0.97" step="0.01" aria-label="Darkness" style="width:110px"></label>
+        </div>
+        <p class="hint">Gifts, timers and dares: <a href="bench.html">all settings</a></p>
+      </details>
+    </section>
+    <section>
+      <details>
+        <summary>Test with fake viewers</summary>
+        <p class="hint" style="margin:0 0 8px">Only on this computer, nothing is sent to TikTok.</p>
+        <div class="row">
+          <input type="text" id="viewer" value="Ion" aria-label="Viewer name">
+          <button data-sim="like">❤️ 25 likes</button>
+          <button data-sim="follow">➕ Follow</button>
+        </div>
+        <div class="row" id="giftBtns"></div>
+      </details>
       <div class="log" id="log" aria-live="polite"></div>
     </section>
   </div>
+  </div>
 </div>
 
-<script src="src/edition.js?v=1794314472"></script>
-<script src="src/settings.js?v=1794314472"></script>
-<script src="src/events.js?v=1794314472"></script>
-<script src="src/face.js?v=1794314472"></script>
-<script src="src/curses.js?v=1794314472"></script>
-<script src="src/sfx.js?v=1794314472"></script>
-<script src="src/mic.js?v=1794314472"></script>
-<script src="src/lightson.js?v=1794314472"></script>
-<script src="src/live.js?v=1794314472"></script>
+<script src="src/edition.js?v=1794336549"></script>
+<script src="src/settings.js?v=1794336549"></script>
+<script src="src/events.js?v=1794336549"></script>
+<script src="src/face.js?v=1794336549"></script>
+<script src="src/curses.js?v=1794336549"></script>
+<script src="src/sfx.js?v=1794336549"></script>
+<script src="src/mic.js?v=1794336549"></script>
+<script src="src/lightson.js?v=1794336549"></script>
+<script src="src/live.js?v=1794336549"></script>
 <script>
-  const $ = (id) => document.getElementById(id);
+  // The stage can move into the stream window, so look for its elements there too.
+  const STAGE = document.querySelector('.stage');
+  const $ = (id) => document.getElementById(id) || STAGE.querySelector('#' + id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const S = MC.settings.load();
   const save = () => MC.settings.save(S);
@@ -390,7 +429,7 @@
     const r = await face.calibrate(3000);
     clearInterval(t); calibrating = false; $('calBtn').disabled = false;
     if (r.rejected) notice(r.rejected === 'smile' ? 'You were smiling 😏<br><small>Relax and calibrate again.</small>' : 'Eyes looked half closed<br><small>Calibrate again.</small>');
-    else if (r.samples) { notice('Calibrated ✓<br><small>Start a round when ready.</small>'); setTimeout(() => { if (!round.running) hideNotice(); }, 1500); }
+    else if (r.samples) { $('step2').classList.add('done'); notice('Calibrated ✓<br><small>Start a round when ready.</small>'); setTimeout(() => { if (!round.running) hideNotice(); }, 1500); }
     else notice('No face seen. Face the camera and try again.');
   };
 
@@ -461,7 +500,7 @@
   renderLives();
   // ---------- TikTok LIVE (through the bridge) ----------
   const TT_TEXT = {
-    nobridge: '⚪ Bridge not running. Double-click bridge/start-bridge.bat',
+    nobridge: '⚪ Bridge not running. Restart the app (or double-click bridge/start-bridge.bat).',
     bridge: '🟡 Bridge running. Type a username and press Connect.',
     idle: '🟡 Bridge running, not connected to a live.',
     connecting: '🟡 ',
@@ -470,10 +509,6 @@
     error: '🔴 ',
   };
   try { $('ttUser').value = localStorage.getItem('monstercam-tt-user') || ''; } catch (e) {}
-  MC.live.start((st) => {
-    $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
-    if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
-  });
   $('ttConnect').onclick = () => {
     const u = $('ttUser').value.trim();
     try { localStorage.setItem('monstercam-tt-user', u); } catch (e) {}
@@ -482,6 +517,46 @@
   $('ttDisconnect').onclick = () => MC.live.disconnect();
   // Live comments show in the feed like the simulator's events.
   MC.bus.on('comment', (e) => feed(`💬 ${esc(e.user)}: ${esc(e.text).slice(0, 60)}`));
+
+  // ---------- Steps: tick each one off as it's done ----------
+  const done = (id, on) => $(id).classList.toggle('done', !!on);
+  MC.live.start((st) => {
+    $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
+    if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
+    done('step1', st.state === 'connected');
+  });
+  $('ttUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ttConnect').click(); });
+
+  // ---------- Stream window: only the game, for TikTok LIVE Studio's Window capture ----------
+  // The stage element itself moves into the new window and keeps running from here; closing it brings it back.
+  let streamWin = null;
+  const stage = STAGE;
+  function bringStageBack() {
+    if (!streamWin) return;
+    $('stageCol').prepend(document.adoptNode(stage));
+    $('stageCol').classList.remove('streamed');
+    streamWin = null;
+    $('streamBtn').textContent = '📺 Stream window';
+  }
+  $('streamBtn').onclick = () => {
+    if (streamWin && !streamWin.closed) { streamWin.focus(); return; }
+    const w = window.open('', 'monstercam-stream', 'width=960,height=720');
+    if (!w) { log('⚠️ The stream window was blocked. Allow pop-ups for this page.'); return; }
+    streamWin = w;
+    const d = w.document;
+    d.title = 'Monster Cam – Stream';
+    document.querySelectorAll('style, link[rel=stylesheet]').forEach((n) => d.head.appendChild(d.importNode(n, true)));
+    const fit = d.createElement('style');
+    // Fill the window with the 4:3 stage, black around it.
+    fit.textContent = 'html,body{margin:0;height:100%;background:#000;overflow:hidden}body{display:grid;place-items:center}.stage{width:min(100vw,calc(100vh*4/3));border-radius:0}';
+    d.head.appendChild(fit);
+    d.body.appendChild(d.adoptNode(stage));
+    $('stageCol').classList.add('streamed');
+    $('streamBtn').textContent = '📺 Show stream window';
+    w.addEventListener('pagehide', bringStageBack);
+    log('📺 Stream window open: in TikTok LIVE Studio add a Window capture of "Monster Cam – Stream".');
+  };
+  window.addEventListener('beforeunload', () => { if (streamWin) streamWin.close(); });
 
   face.loop(); // draw the stage even before the camera starts
 </script>
