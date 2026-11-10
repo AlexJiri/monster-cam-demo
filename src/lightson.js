@@ -27,6 +27,7 @@
       this.monster = { x: -0.2, facing: 1, back: false, moving: false };
       this.plan = []; // the current pass: segments { dur, x0, x1, beam: 'swing' | 'face' | 'off', back, facing }
       this.stepAt = 0; // next footstep sound
+      this.curses = []; // active curses, set by the game each frame: { type, on } (on = past the warning)
     }
 
     // ---------- state ----------
@@ -71,6 +72,7 @@
 
     update(now, face) {
       const s = this.s;
+      this.lastSound = face.sound || 0;
       switch (this.phase) {
         case 'idle':
           this.beam = null;
@@ -229,7 +231,8 @@
 
       this.drawCamera(video, face, W, H);
       // Outside a round the camera is shown normally, so the streamer can see themselves and calibrate.
-      if (this.phase !== 'off') this.drawDarkness(now, W, H);
+      if (this.phase !== 'off') this.drawDarkness(now, W, H, face);
+      this.drawCurses(now, W, H, face);
       if (this.phase !== 'stare') this.drawHunter(now, W, H);
       if (this.phase === 'stare' || this.phase === 'stareWarn') this.drawStare(now, W, H);
       if (this.phase === 'eaten') this.drawJaws(now, W, H);
@@ -263,7 +266,84 @@
       }
     }
 
-    drawDarkness(now, W, H) {
+    // Where the eyes and the mouth are, in canvas pixels (from the face box; good enough for a spotlight).
+    facePoints(face, W, H) {
+      const b = this.screenBox(face);
+      if (!b) return null;
+      const cx = (b.x + b.w / 2) * W;
+      return { cx, w: b.w * W, h: b.h * H, eyesY: (b.y + b.h * 0.4) * H, mouthY: (b.y + b.h * 0.78) * H };
+    }
+
+    // Curses made visible: a red light on the eyes (don't blink) and / or the mouth (don't smile),
+    // the monster's ears at the edges (silence; they grow with noise), frost around the frame (freeze).
+    drawCurses(now, W, H, face) {
+      if (!this.curses.length) return;
+      const ctx = this.ctx, has = (t) => this.curses.find((c) => c.type === t);
+      const pulse = 0.6 + 0.4 * Math.sin(now / 180);
+      const p = this.facePoints(face, W, H);
+      ctx.save();
+      for (const [type, y, rx, ry] of p ? [['blink', p.eyesY, p.w * 0.42, p.h * 0.12], ['smile', p.mouthY, p.w * 0.28, p.h * 0.1]] : []) {
+        const c = has(type);
+        if (!c) continue;
+        // Warning period: dashed and faint; active: solid and pulsing.
+        ctx.strokeStyle = `rgba(255, 60, 60, ${c.on ? 0.55 + 0.4 * pulse : 0.45})`;
+        ctx.lineWidth = c.on ? 4 : 2;
+        ctx.setLineDash(c.on ? [] : [8, 8]);
+        ctx.shadowColor = '#ff3030'; ctx.shadowBlur = c.on ? 24 * pulse : 6;
+        ctx.beginPath(); ctx.ellipse(p.cx, y, rx, ry, 0, 0, TAU); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      const quiet = has('sound') || has('move');
+      if (quiet) {
+        // Big monster ears at both edges, cupped towards the streamer: it's listening. Louder = bigger.
+        const loud = Math.min(1, (this.lastSound || 0) / Math.max(0.05, this.s.soundThreshold));
+        const k = (quiet.on ? 1 : 0.7) * (1 + 0.35 * loud + 0.04 * Math.sin(now / 300));
+        for (const side of [-1, 1]) this.drawEar(side < 0 ? 0 : W, H * 0.5, H * 0.22 * k, side, loud);
+      }
+      const frost = has('move');
+      if (frost) {
+        // Frost creeping in from the edges.
+        const a = frost.on ? 0.55 : 0.3;
+        const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, W * 0.68);
+        g.addColorStop(0, 'rgba(170, 220, 255, 0)'); g.addColorStop(1, `rgba(170, 220, 255, ${a})`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = `rgba(220, 245, 255, ${a})`; ctx.lineWidth = 2; ctx.shadowBlur = 0;
+        for (let i = 0; i < 14; i++) {
+          // Fixed crystals along the edges (seeded by index so they don't jump around).
+          const t = i / 14, ex = i % 2 ? t * W : (i % 4 < 2 ? 12 : W - 12), ey = i % 2 ? (i % 4 < 2 ? 12 : H - 12) : t * H;
+          for (let r = 0; r < 3; r++) { const ang = (r * Math.PI) / 3; ctx.beginPath(); ctx.moveTo(ex - Math.cos(ang) * 14, ey - Math.sin(ang) * 14); ctx.lineTo(ex + Math.cos(ang) * 14, ey + Math.sin(ang) * 14); ctx.stroke(); }
+        }
+      }
+      ctx.restore();
+    }
+
+    // One pointed monster ear at the edge of the frame, opening towards the middle.
+    drawEar(x, y, size, side, loud) {
+      const ctx = this.ctx, d = -side; // points inwards
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(d, 1);
+      ctx.fillStyle = '#1a1420';
+      ctx.shadowColor = loud > 0.6 ? 'rgba(255, 60, 60, 0.9)' : 'rgba(255, 205, 120, 0.5)';
+      ctx.shadowBlur = 20 + 30 * loud;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.1, -size * 0.9);
+      ctx.quadraticCurveTo(size * 0.95, -size * 1.2, size * 0.75, -size * 0.1);
+      ctx.quadraticCurveTo(size * 0.6, size * 0.6, size * 0.15, size * 0.95);
+      ctx.lineTo(-size * 0.1, size * 0.9);
+      ctx.closePath(); ctx.fill();
+      // inner ear
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = loud > 0.6 ? 'rgba(200, 40, 50, 0.85)' : 'rgba(120, 50, 70, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(size * 0.02, -size * 0.6);
+      ctx.quadraticCurveTo(size * 0.65, -size * 0.8, size * 0.5, -size * 0.1);
+      ctx.quadraticCurveTo(size * 0.4, size * 0.4, size * 0.1, size * 0.6);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    drawDarkness(now, W, H, face) {
       const d = this.dark;
       if (d.width !== W) { d.width = W; d.height = H; }
       const c = d.getContext('2d');
@@ -299,6 +379,17 @@
         const g = c.createRadialGradient(gx, H * 0.2, 0, gx, H * 0.2, W * 0.35);
         g.addColorStop(0, `rgba(0,0,0,${pulse})`); g.addColorStop(1, 'rgba(0,0,0,0)');
         c.fillStyle = g; c.fillRect(0, 0, W, H);
+      }
+      // Cursed eyes / mouth stay lit, so viewers can see them.
+      const pts = this.facePoints(face, W, H);
+      if (pts) {
+        for (const [type, y, rx, ry] of [['blink', pts.eyesY, pts.w * 0.42, pts.h * 0.12], ['smile', pts.mouthY, pts.w * 0.28, pts.h * 0.1]]) {
+          if (!this.curses.some((x) => x.type === type)) continue;
+          const g = c.createRadialGradient(pts.cx, y, 0, pts.cx, y, rx * 1.2);
+          g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(0.7, 'rgba(0,0,0,0.8)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+          c.fillStyle = g;
+          c.beginPath(); c.ellipse(pts.cx, y, rx * 1.2, ry * 1.6, 0, 0, TAU); c.fill();
+        }
       }
       if (this.phase === 'stare') {
         const g = c.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, W * 0.7);

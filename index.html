@@ -195,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794342844"></script>
-<script src="src/settings.js?v=1794342844"></script>
-<script src="src/events.js?v=1794342844"></script>
-<script src="src/face.js?v=1794342844"></script>
-<script src="src/curses.js?v=1794342844"></script>
-<script src="src/sfx.js?v=1794342844"></script>
-<script src="src/mic.js?v=1794342844"></script>
-<script src="src/lightson.js?v=1794342844"></script>
-<script src="src/live.js?v=1794342844"></script>
+<script src="src/edition.js?v=1794343377"></script>
+<script src="src/settings.js?v=1794343377"></script>
+<script src="src/events.js?v=1794343377"></script>
+<script src="src/face.js?v=1794343377"></script>
+<script src="src/curses.js?v=1794343377"></script>
+<script src="src/sfx.js?v=1794343377"></script>
+<script src="src/mic.js?v=1794343377"></script>
+<script src="src/lightson.js?v=1794343377"></script>
+<script src="src/live.js?v=1794343377"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -412,6 +412,8 @@
       $('timer').classList.toggle('low', left < 10000);
       if (left <= 0 && lives) endRound(true);
     }
+    // The game draws the active curses on the streamer: light on the eyes / mouth, the monster's ears, frost.
+    game.curses = round.running ? curses.active.map((c) => ({ type: c.type, on: now >= c.starts })) : [];
     game.draw(now, video, st);
     ED.watermark(ctx2d);
     $('lit').classList.toggle('on', round.running && game.lit && game.phase !== 'eaten');
