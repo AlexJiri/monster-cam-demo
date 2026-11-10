@@ -16,6 +16,11 @@
     return false;
   };
 
+  // Test site only (the public demo): add #reset-rounds to the link to get the free rounds back.
+  if (location.hostname === 'alexjiri.github.io' && location.hash === '#reset-rounds') {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+  }
+
   const rounds = {
     // Start times of the rounds played in the last COOLDOWN_HOURS.
     list() {
