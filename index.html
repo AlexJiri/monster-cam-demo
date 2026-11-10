@@ -130,6 +130,13 @@
         <label class="check">🌑 <input type="range" id="dark" min="0.5" max="0.97" step="0.01" aria-label="Darkness" style="width:90px"></label>
       </div>
       <div id="fakeSliders"></div>
+      <h2 style="margin-top:12px">TikTok LIVE</h2>
+      <div class="row">
+        <input type="text" id="ttUser" placeholder="@username" aria-label="TikTok username">
+        <button id="ttConnect">Connect</button>
+        <button id="ttDisconnect">Disconnect</button>
+      </div>
+      <p class="hint" id="ttStatus">Looking for the bridge…</p>
     </section>
     <section>
       <h2>Simulator</h2>
@@ -144,13 +151,14 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1793962431"></script>
-<script src="src/events.js?v=1793962431"></script>
-<script src="src/face.js?v=1793962431"></script>
-<script src="src/curses.js?v=1793962431"></script>
-<script src="src/sfx.js?v=1793962431"></script>
-<script src="src/mic.js?v=1793962431"></script>
-<script src="src/lightson.js?v=1793962431"></script>
+<script src="src/settings.js?v=1794305520"></script>
+<script src="src/events.js?v=1794305520"></script>
+<script src="src/face.js?v=1794305520"></script>
+<script src="src/curses.js?v=1794305520"></script>
+<script src="src/sfx.js?v=1794305520"></script>
+<script src="src/mic.js?v=1794305520"></script>
+<script src="src/lightson.js?v=1794305520"></script>
+<script src="src/live.js?v=1794305520"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -410,6 +418,30 @@
   function renderLikes() { $('likeBar').textContent = `❤️ ${Math.min(likes, S.likesForShield)}/${S.likesForShield} likes to chain it`; }
   renderLikes();
   renderLives();
+  // ---------- TikTok LIVE (through the bridge) ----------
+  const TT_TEXT = {
+    nobridge: '⚪ Bridge not running. In the bridge folder run: npm start',
+    bridge: '🟡 Bridge running. Type a username and press Connect.',
+    idle: '🟡 Bridge running, not connected to a live.',
+    connecting: '🟡 ',
+    connected: '🟢 ',
+    offline: '🔴 ',
+    error: '🔴 ',
+  };
+  try { $('ttUser').value = localStorage.getItem('monstercam-tt-user') || ''; } catch (e) {}
+  MC.live.start((st) => {
+    $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
+    if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
+  });
+  $('ttConnect').onclick = () => {
+    const u = $('ttUser').value.trim();
+    try { localStorage.setItem('monstercam-tt-user', u); } catch (e) {}
+    if (!MC.live.connect(u)) $('ttStatus').textContent = TT_TEXT.nobridge;
+  };
+  $('ttDisconnect').onclick = () => MC.live.disconnect();
+  // Live comments show in the feed like the simulator's events.
+  MC.bus.on('comment', (e) => feed(`💬 ${esc(e.user)}: ${esc(e.text).slice(0, 60)}`));
+
   face.loop(); // draw the stage even before the camera starts
 </script>
 </body>
