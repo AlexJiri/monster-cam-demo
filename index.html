@@ -198,15 +198,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794347869"></script>
-<script src="src/settings.js?v=1794347869"></script>
-<script src="src/events.js?v=1794347869"></script>
-<script src="src/face.js?v=1794347869"></script>
-<script src="src/curses.js?v=1794347869"></script>
-<script src="src/sfx.js?v=1794347869"></script>
-<script src="src/mic.js?v=1794347869"></script>
-<script src="src/lightson.js?v=1794347869"></script>
-<script src="src/live.js?v=1794347869"></script>
+<script src="src/edition.js?v=1794353595"></script>
+<script src="src/settings.js?v=1794353595"></script>
+<script src="src/events.js?v=1794353595"></script>
+<script src="src/face.js?v=1794353595"></script>
+<script src="src/curses.js?v=1794353595"></script>
+<script src="src/sfx.js?v=1794353595"></script>
+<script src="src/mic.js?v=1794353595"></script>
+<script src="src/lightson.js?v=1794353595"></script>
+<script src="src/live.js?v=1794353595"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -334,7 +334,9 @@
   const EMBED = location.hash.startsWith('#preview-embed');
   if (EMBED) document.body.classList.add('embed');
   const PREVIEW_SECONDS = 60;
+  let calWasOn = false;
   function startRound() {
+    if (calibrating) return; // finish calibrating first
     if (!PREVIEW) {
       if (!canStartRound()) return;
       ED.rounds.use();
@@ -350,6 +352,8 @@
     renderLikes();
     curses.clear();
     round.running = true;
+    // No calibrating mid-round: it would cover the game with its messages.
+    calWasOn = !$('calBtn').disabled; $('calBtn').disabled = true;
     reviveUntil = 0;
     round.ends = performance.now() + (PREVIEW ? PREVIEW_SECONDS : S.roundSeconds) * 1000;
     game.start(performance.now());
@@ -361,6 +365,7 @@
   // Round over (won, lost or stopped): clear everything that was active on screen.
   function clearRound() {
     round.running = false;
+    if (calWasOn) { $('calBtn').disabled = false; calWasOn = false; }
     game.stop(performance.now());
     game.shieldUntil = 0;
     curses.clear();
@@ -395,7 +400,8 @@
     $('againBtn').onclick = startRound;
     if (PREVIEW && !EMBED) $('againBtn').insertAdjacentHTML('afterend', ' <a href="bench.html" class="backBtn">← Back to Settings</a>');
     $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
-    $('noticeX').onclick = hideNotice;
+    // Closing the result also gives the streamer their face back (no monster head, no bites).
+    $('noticeX').onclick = () => { hideNotice(); game.finalHead = false; game.bites = []; };
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
   $('roundBtn').onclick = () => {
@@ -458,6 +464,7 @@
     }
   };
   $('calBtn').onclick = async () => {
+    if (round.running) return;
     calibrating = true; $('calBtn').disabled = true;
     let n = 3;
     notice(`Relaxed face, stay quiet<big>${n}</big>`);
@@ -465,7 +472,7 @@
     const r = await face.calibrate(3000);
     clearInterval(t); calibrating = false; $('calBtn').disabled = false;
     if (r.rejected) notice(r.rejected === 'smile' ? 'You were smiling 😏<br><small>Relax and calibrate again.</small>' : 'Eyes looked half closed<br><small>Calibrate again.</small>');
-    else if (r.samples) { $('step2').classList.add('done'); notice('Calibrated ✓<br><small>Start a round when ready.</small>'); setTimeout(() => { if (!round.running) hideNotice(); }, 1500); }
+    else if (r.samples) { $('step2').classList.add('done'); if (!round.running) notice('Calibrated ✓<br><small>Start a round when ready.</small>'); setTimeout(() => { if (!round.running) hideNotice(); }, 1500); }
     else notice('No face seen. Face the camera and try again.');
   };
 

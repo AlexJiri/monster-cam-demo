@@ -102,6 +102,7 @@
           this.state.sound = this.fake.sound;
           // A pretend face in the middle of the frame; `x` (0..1, as seen on screen) slides it sideways.
           this.state.box = { x: 1 - this.fake.x - 0.14, y: 0.3, w: 0.28, h: 0.4 };
+          this.state.parts = null; // bites fall back to the face box
         } else if (this.landmarker && this.video.currentTime !== lastTime) {
           lastTime = this.video.currentTime;
           this.read(this.landmarker.detectForVideo(this.video, performance.now()));
@@ -136,6 +137,16 @@
       let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
       for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
       s.box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      // Face parts for the bites, from the face mesh (video coordinates, not mirrored).
+      const mid = (a, b) => ({ x: (pts[a].x + pts[b].x) / 2, y: (pts[a].y + pts[b].y) / 2 });
+      const iris = pts.length >= 478; // the model also gives the iris centres
+      s.parts = {
+        eyes: [iris ? pts[468] : mid(33, 133), iris ? pts[473] : mid(362, 263)],
+        eyeW: Math.hypot(pts[33].x - pts[133].x, pts[33].y - pts[133].y),
+        mouthCorners: [pts[61], pts[291]],
+        mouth: mid(13, 14),
+        ears: [pts[234], pts[454]], // the face's outer edge at ear height
+      };
     }
 
     // Record the neutral face for `ms` and measure smile/blink relative to it.

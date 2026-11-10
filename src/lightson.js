@@ -93,7 +93,7 @@
       const part = want && free(want) ? want : parts.filter(free)[Math.floor(Math.random() * parts.filter(free).length)] || 'shoulder';
       // Eyes, ears and shoulders come in pairs: take the side not bitten yet.
       const side = this.bites.some((b) => b.part === part && b.side === -1) ? 1 : -1;
-      this.bites.push({ part, side, seed: Math.random() * 10 });
+      this.bites.push({ part, side, seed: Math.random() * 10, t: performance.now() });
     }
     stop(now) { this.set('off', now); this.lit = false; }
 
@@ -292,8 +292,14 @@
     // Face box in canvas coordinates (0..1), mirrored like the video on screen.
     screenBox(face) {
       if (!face.face || !face.box) return null;
-      const b = face.box;
-      return { x: 1 - b.x - b.w, y: b.y, w: b.w, h: b.h };
+      const b = face.box, c = this.crop || { sx: 0, sy: 0, sw: 1, sh: 1 };
+      // The camera is cover-fitted (a 16:9 webcam loses its sides on the 4:3 stage) and mirrored.
+      return { x: 1 - (b.x + b.w - c.sx) / c.sw, y: (b.y - c.sy) / c.sh, w: b.w / c.sw, h: b.h / c.sh };
+    }
+    // A face point (video coordinates) in canvas pixels.
+    toCanvas(pt, W, H) {
+      const c = this.crop || { sx: 0, sy: 0, sw: 1, sh: 1 };
+      return { x: (1 - (pt.x - c.sx) / c.sw) * W, y: ((pt.y - c.sy) / c.sh) * H };
     }
 
     // ---------- drawing ----------
@@ -312,7 +318,7 @@
       if (this.phase !== 'off' && this.sceneLayer && this.s.scene && this.s.scene !== 'none') {
         ctx.save(); ctx.globalAlpha = 0.4; ctx.drawImage(this.sceneLayer.cv, 0, 0); ctx.restore();
       }
-      this.drawBites(face, W, H);
+      this.drawBites(now, face, W, H);
       if (this.finalHead) this.drawMonsterHead(now, face, W, H);
       this.drawCurses(now, W, H, face);
       if (this.isVoid()) { if (this.phase !== 'off') this.drawVoid(now, W, H); }
@@ -331,12 +337,15 @@
         const vr = video.videoWidth / video.videoHeight, cr = W / H;
         let sw = video.videoWidth, sh = video.videoHeight, sx = 0, sy = 0;
         if (vr > cr) { sw = sh * cr; sx = (video.videoWidth - sw) / 2; } else { sh = sw / cr; sy = (video.videoHeight - sh) / 2; }
+        // Remember the crop, so face points (in video coordinates) land on the right spot of the canvas.
+        this.crop = { sx: sx / video.videoWidth, sy: sy / video.videoHeight, sw: sw / video.videoWidth, sh: sh / video.videoHeight };
         ctx.save();
         ctx.translate(W, 0); ctx.scale(-1, 1);
         if (this.s.camBoost > 1) ctx.filter = `brightness(${this.s.camBoost}) contrast(1.05)`;
         ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
         ctx.restore();
       } else {
+        this.crop = null;
         // Manual mode: a stand-in room and person.
         const g = ctx.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, '#5a4a3c'); g.addColorStop(1, '#2c241e');
@@ -355,47 +364,141 @@
     facePoints(face, W, H) {
       const b = this.screenBox(face);
       if (!b) return null;
-      const cx = (b.x + b.w / 2) * W;
-      return { cx, w: b.w * W, h: b.h * H, eyesY: (b.y + b.h * 0.4) * H, mouthY: (b.y + b.h * 0.78) * H };
+      const out = { cx: (b.x + b.w / 2) * W, w: b.w * W, h: b.h * H, eyesY: (b.y + b.h * 0.4) * H, mouthY: (b.y + b.h * 0.78) * H };
+      // With the face mesh, use the real eyes and mouth instead of fixed proportions of the box.
+      if (face.parts) {
+        const [e1, e2] = face.parts.eyes.map((pt) => this.toCanvas(pt, W, H));
+        out.cx = (e1.x + e2.x) / 2; out.eyesY = (e1.y + e2.y) / 2;
+        out.mouthY = this.toCanvas(face.parts.mouth, W, H).y;
+      }
+      return out;
     }
 
-    // A ragged hole: an ellipse whose edge alternates in and out like tooth marks.
-    biteShape(x, y, rx, ry, seed) {
-      const ctx = this.ctx, n = 14;
+    // A bite mark: a round hole whose edge is a row of tooth scallops (sharp points inward, like a bitten cookie),
+    // slightly uneven so no two bites look the same.
+    biteShape(x, y, r, seed, squash = 0.85) {
+      const ctx = this.ctx, teeth = 13, n = 160;
       ctx.beginPath();
-      for (let i = 0; i <= n * 2; i++) {
-        const a = (i / (n * 2)) * TAU, k = i % 2 ? 0.82 + 0.06 * Math.sin(seed + i) : 1;
-        const px = x + Math.cos(a) * rx * k, py = y + Math.sin(a) * ry * k;
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * TAU;
+        const k = 0.92 + 0.08 * Math.abs(Math.sin((teeth * a) / 2 + seed)) + 0.06 * Math.sin(2 * a + seed * 2) + 0.03 * Math.sin(5 * a + seed);
+        const px = x + Math.cos(a) * r * k, py = y + Math.sin(a) * r * k * squash;
         i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       }
       ctx.closePath();
     }
 
-    // Cartoon bites (no gore): dark ragged holes with a dark-red rim, following the face.
-    drawBites(face, W, H) {
+    // Where a bite sits on the face, in canvas pixels: on the real eye / mouth corner / ear when the face mesh
+    // gives them, otherwise estimated from the face box (manual mode).
+    bitePlace(b, face, W, H) {
+      const p = this.facePoints(face, W, H);
+      if (!p) return null;
+      const parts = face.parts;
+      const bySide = (two) => { const [a, c] = two.map((pt) => this.toCanvas(pt, W, H)); return (a.x < c.x) === (b.side < 0) ? a : c; };
+      if (parts && b.part === 'eye') { const e = bySide(parts.eyes); return { x: e.x, y: e.y, r: Math.max(parts.eyeW / this.cropW() * W * 0.62, p.w * 0.07) }; }
+      if (parts && b.part === 'mouth') {
+        // A bite out of one corner: half the mouth stays visible, so viewers can still see a smile.
+        const c = bySide(parts.mouthCorners), m = this.toCanvas(parts.mouth, W, H);
+        return { x: c.x + (c.x - m.x) * 0.15, y: c.y, r: p.w * 0.17 };
+      }
+      if (parts && b.part === 'ear') { const e = bySide(parts.ears); return { x: e.x + b.side * p.w * 0.04, y: e.y, r: p.w * 0.13 }; }
+      if (b.part === 'mouth') return { x: p.cx + b.side * p.w * 0.14, y: p.mouthY, r: p.w * 0.17 };
+      if (b.part === 'eye') return { x: p.cx + b.side * p.w * 0.2, y: p.eyesY - p.h * 0.03, r: p.w * 0.1 };
+      if (b.part === 'ear') return { x: p.cx + b.side * p.w * 0.5, y: p.eyesY + p.h * 0.08, r: p.w * 0.13 };
+      return { x: p.cx + b.side * p.w * 0.75, y: p.mouthY + p.h * 0.5, r: p.w * 0.24 }; // shoulder
+    }
+    cropW() { return this.crop ? this.crop.sw : 1; }
+
+    // Cartoon bites (no blood): a dark hole with depth and a faint bitten rim, following the face.
+    // A new bite arrives with a quick chomp: two rows of teeth snap shut on the spot, then the hole pops in.
+    drawBites(now, face, W, H) {
       const bites = this.bites || [];
-      const p = bites.length && this.facePoints(face, W, H);
-      if (!p) return;
+      if (!bites.length) return;
       const ctx = this.ctx;
-      ctx.save();
       for (const b of bites) {
-        let x = p.cx, y, rx, ry;
-        if (b.part === 'mouth') { y = p.mouthY; rx = p.w * 0.24; ry = p.h * 0.1; }
-        else if (b.part === 'eye') { x = p.cx + b.side * p.w * 0.2; y = p.eyesY; rx = p.w * 0.11; ry = p.h * 0.065; }
-        else if (b.part === 'ear') { x = p.cx + b.side * p.w * 0.52; y = p.eyesY + p.h * 0.06; rx = p.w * 0.13; ry = p.h * 0.13; }
-        else { x = p.cx + b.side * p.w * 0.75; y = p.mouthY + p.h * 0.5; rx = p.w * 0.24; ry = p.h * 0.2; }
-        this.biteShape(x, y, rx, ry, b.seed);
-        ctx.fillStyle = '#07040a';
-        ctx.shadowColor = 'rgba(120, 0, 10, 0.9)'; ctx.shadowBlur = 14;
-        ctx.fill();
-        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(110, 10, 20, 0.95)'; ctx.stroke();
+        const pl = this.bitePlace(b, face, W, H);
+        if (!pl) continue;
+        const { x, y, r } = pl, age = now - b.t;
+        ctx.save();
+        if (age < 260) { this.drawChomp(x, y, r, age / 260); ctx.restore(); continue; }
+        // Pop in with a small overshoot.
+        const t = Math.min(1, (age - 260) / 220), pop = t < 1 ? 1 + 0.25 * Math.sin(t * Math.PI) : 1;
+        const rr = r * pop;
+        // Soft shadow around the hole.
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = rr * 0.35;
+        this.biteShape(x, y, rr, b.seed);
+        const g = ctx.createRadialGradient(x, y - rr * 0.2, 0, x, y, rr);
+        g.addColorStop(0, '#020104'); g.addColorStop(0.65, '#0b0610'); g.addColorStop(1, '#2a1424');
+        ctx.fillStyle = g; ctx.fill();
+        // Bitten rim: a thin pale edge, lit from above.
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = Math.max(1.5, rr * 0.06);
+        const rim = ctx.createLinearGradient(x, y - rr, x, y + rr);
+        rim.addColorStop(0, 'rgba(240, 200, 180, 0.35)'); rim.addColorStop(1, 'rgba(60, 25, 35, 0.5)');
+        ctx.strokeStyle = rim; ctx.stroke();
+        // A few seconds later the wound gets patched up: an eye patch on an eye, crossed plasters elsewhere.
+        if (age > 2500) { this.drawBandage(b, x, y, r, Math.min(1, (age - 2500) / 180), face, W, H); ctx.restore(); continue; }
         if (b.part === 'eye') {
-          // A tiny glint deep inside the empty eye.
-          ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255, 60, 60, 0.7)';
-          ctx.beginPath(); ctx.arc(x, y, rx * 0.12, 0, TAU); ctx.fill();
+          // Something looks back from inside the empty eye.
+          ctx.fillStyle = 'rgba(255, 70, 70, 0.8)'; ctx.shadowColor = '#ff3030'; ctx.shadowBlur = rr * 0.4;
+          ctx.beginPath(); ctx.arc(x, y, rr * 0.11, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    // `k` 0..1: the bandage slaps on (comes in big, settles to size).
+    drawBandage(b, x, y, r, k, face, W, H) {
+      const ctx = this.ctx, sc = 1 + 0.4 * (1 - k);
+      ctx.save();
+      ctx.globalAlpha = k;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'; ctx.shadowBlur = r * 0.25; ctx.shadowOffsetY = r * 0.08;
+      if (b.part === 'eye') {
+        // Pirate eye patch with its strap across the head.
+        const p = this.facePoints(face, W, H), tilt = b.side * -0.35;
+        if (p) {
+          ctx.strokeStyle = '#141018'; ctx.lineWidth = Math.max(2, r * 0.14); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(x - b.side * p.w * 0.42, y - p.h * 0.3); ctx.lineTo(x + b.side * p.w * 0.42, y + p.h * 0.04); ctx.stroke();
+        }
+        ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(sc, sc);
+        ctx.fillStyle = '#1a1520';
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 1.05, r * 0.85, 0, 0, TAU); ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'; ctx.lineWidth = r * 0.08;
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.85, r * 0.67, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
+      } else {
+        // Two plasters in an X over the hole.
+        ctx.translate(x, y); ctx.scale(sc, sc);
+        const L = r * 2.4, T = r * 0.7;
+        for (const a of [0.6 + b.seed * 0.05, -0.75 + b.seed * 0.04]) {
+          ctx.save(); ctx.rotate(a);
+          ctx.fillStyle = '#e9b98f';
+          ctx.beginPath(); ctx.roundRect(-L / 2, -T / 2, L, T, T / 2); ctx.fill();
+          ctx.shadowColor = 'transparent';
+          ctx.fillStyle = '#f6e3cf'; ctx.fillRect(-T * 0.6, -T * 0.32, T * 1.2, T * 0.64); // pad in the middle
+          ctx.fillStyle = 'rgba(120, 80, 60, 0.35)'; // little air holes on the ends
+          for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) {
+            ctx.beginPath(); ctx.arc(sx * (L * 0.3 + i * T * 0.22), (i % 2 ? 0.15 : -0.15) * T, T * 0.05, 0, TAU); ctx.fill();
+          }
+          ctx.restore();
         }
       }
       ctx.restore();
+    }
+
+    // Two rows of teeth closing on (x, y); `k` 0..1 is how far the jaws have closed.
+    drawChomp(x, y, r, k) {
+      const ctx = this.ctx, gap = r * 1.3 * (1 - k * k), n = 6, tw = (r * 2.2) / n;
+      ctx.fillStyle = '#f2ead8'; ctx.strokeStyle = 'rgba(40, 20, 20, 0.7)'; ctx.lineWidth = 1.5;
+      for (const dir of [-1, 1]) {
+        const base = y + dir * (gap + r * 0.55);
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const tx = x - r * 1.1 + i * tw;
+          ctx.moveTo(tx, base); ctx.lineTo(tx + tw / 2, base - dir * r * 0.55); ctx.lineTo(tx + tw, base);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
     }
 
     // End of a lost round: the monster's head where the streamer's head was.

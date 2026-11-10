@@ -1,8 +1,9 @@
 // Microphone loudness, 0..1 above the room's background noise. Runs locally; audio is never recorded or sent.
 // The game's own sounds come out of the speakers and would reach the microphone, so the level is ignored
-// while the game is making noise (MC.sfx.busyUntil) and the browser's echo cancellation is requested.
+// while the game is making noise (MC.sfx.busyUntil) only a louder sound counts, and the browser's echo cancellation is requested.
 (function (MC) {
   const MIN_DB = -65, MAX_DB = -15; // map this range to 0..1
+  const BUSY_MARGIN = 0.2; // extra loudness needed while the game's own sounds play (about 10 dB)
 
   class Mic {
     constructor() {
@@ -33,7 +34,11 @@
       const db = 20 * Math.log10(Math.sqrt(sum / this.buf.length) + 1e-9);
       this.raw = Math.max(0, Math.min(1, (db - MIN_DB) / (MAX_DB - MIN_DB)));
       const busy = MC.sfx && now < (MC.sfx.busyUntil || 0) + 250;
-      const above = busy ? 0 : Math.max(0, (this.raw - this.floor) / (1 - this.floor));
+      // While the game makes noise, only a clearly louder sound counts (a voice, not the speakers' footsteps).
+      // Muting the mic completely here made the streamer impossible to catch while the hunter walked:
+      // its footsteps play every 0.4 s, exactly while the light sweeps the room.
+      const floor = busy ? Math.min(0.85, this.floor + BUSY_MARGIN) : this.floor;
+      const above = Math.max(0, (this.raw - floor) / (1 - floor));
       // Rise fast, fall slower, so a short word still registers.
       this.level = above > this.level ? above : this.level * 0.85 + above * 0.15;
       return this.level;
