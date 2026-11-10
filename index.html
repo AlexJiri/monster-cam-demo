@@ -52,6 +52,7 @@
   .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
   .guide span { display: block; color: var(--text); }
   .guide small { color: var(--muted); }
+  .backBtn { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 500; }
   .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
   .notice .x:hover { color: var(--text); }
   details[open] > summary { margin-bottom: 8px; }
@@ -117,7 +118,7 @@
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
-    <nav class="tabs" aria-label="Pages"><a href="index.html" class="on" aria-current="page">🎮 Play</a><a href="bench.html">⚙️ Settings &amp; test</a></nav>
+    <nav class="tabs" aria-label="Pages"><a href="index.html" class="on" aria-current="page">🎮 Play</a><a href="bench.html">⚙️ Settings &amp; Test</a></nav>
   </header>
   <div class="layout">
     <div class="stageCol" id="stageCol">
@@ -194,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794341132"></script>
-<script src="src/settings.js?v=1794341132"></script>
-<script src="src/events.js?v=1794341132"></script>
-<script src="src/face.js?v=1794341132"></script>
-<script src="src/curses.js?v=1794341132"></script>
-<script src="src/sfx.js?v=1794341132"></script>
-<script src="src/mic.js?v=1794341132"></script>
-<script src="src/lightson.js?v=1794341132"></script>
-<script src="src/live.js?v=1794341132"></script>
+<script src="src/edition.js?v=1794341420"></script>
+<script src="src/settings.js?v=1794341420"></script>
+<script src="src/events.js?v=1794341420"></script>
+<script src="src/face.js?v=1794341420"></script>
+<script src="src/curses.js?v=1794341420"></script>
+<script src="src/sfx.js?v=1794341420"></script>
+<script src="src/mic.js?v=1794341420"></script>
+<script src="src/lightson.js?v=1794341420"></script>
+<script src="src/live.js?v=1794341420"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -322,10 +323,15 @@
     return false;
   }
 
+  // Preview (from the Settings page): a 60 s round with fake viewers, TikTok off, not counted as a free round.
+  const PREVIEW = location.hash === '#preview';
+  const PREVIEW_SECONDS = 60;
   function startRound() {
-    if (!canStartRound()) return;
-    ED.rounds.use();
-    renderEdition();
+    if (!PREVIEW) {
+      if (!canStartRound()) return;
+      ED.rounds.use();
+      renderEdition();
+    }
     MC.sfx.unlock();
     lives = S.lives; renderLives();
     catches = [];
@@ -337,12 +343,12 @@
     curses.clear();
     round.running = true;
     reviveUntil = 0;
-    round.ends = performance.now() + S.roundSeconds * 1000;
+    round.ends = performance.now() + (PREVIEW ? PREVIEW_SECONDS : S.roundSeconds) * 1000;
     game.start(performance.now());
     $('timer').hidden = false;
     $('roundBtn').textContent = '■ Stop round';
     hideNotice();
-    log(`▶ Round started: survive ${S.roundSeconds} s.`);
+    log(PREVIEW ? `👁️ Preview: ${PREVIEW_SECONDS} s with fake viewers. Not counted as a round.` : `▶ Round started: survive ${S.roundSeconds} s.`);
   }
   // Round over (won, lost or stopped): clear everything that was active on screen.
   function clearRound() {
@@ -378,6 +384,7 @@
       ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
       : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
+    if (PREVIEW) $('againBtn').insertAdjacentHTML('afterend', ' <a href="bench.html" class="backBtn">← Back to Settings</a>');
     $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
     $('noticeX').onclick = hideNotice;
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
@@ -581,7 +588,7 @@
 
   // ---------- Steps: tick each one off as it's done ----------
   const done = (id, on) => $(id).classList.toggle('done', !!on);
-  MC.live.start((st) => {
+  if (!PREVIEW) MC.live.start((st) => {
     $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
     if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
     done('step1', st.state === 'connected');
@@ -642,6 +649,36 @@
   }
   showGuide();
   setInterval(showGuide, 6000);
+
+  // ---------- Preview run ----------
+  if (PREVIEW) {
+    document.title = 'Monster Cam – Preview';
+    document.querySelector('h1').textContent = 'Preview';
+    $('ttConnect').disabled = $('ttDisconnect').disabled = $('ttUser').disabled = true;
+    $('ttStatus').textContent = '👁️ Preview: TikTok is off, fake viewers are playing.';
+    lockSimulator(true);
+    $('simNote').textContent = 'Preview: the fake viewers play on their own.';
+    const names = ['Ion', 'Maria', 'Ana', 'Vlad', 'Elena', 'userx', 'Radu'];
+    const pickW = () => {
+      // Cheap gifts come often, big ones rarely, like on a real live.
+      const w = S.gifts.map((g) => 1 / (1 + Math.log10(1 + (g.coins || 1))) ** 3);
+      let r = Math.random() * w.reduce((a, b) => a + b, 0);
+      return S.gifts.find((g, i) => (r -= w[i]) <= 0) || S.gifts[0];
+    };
+    setInterval(() => {
+      if (!round.running) return;
+      const user = pick(names), r = Math.random();
+      if (r < 0.45 && S.gifts.length) { const g = pickW(); MC.bus.emit({ type: 'gift', user, gift: g.gift, count: 1, diamonds: g.coins || 1 }); }
+      else if (r < 0.75) MC.bus.emit({ type: 'like', user, count: 10 + Math.floor(Math.random() * 15) });
+      else MC.bus.emit({ type: 'comment', user, text: pick(['run!', 'behind you [cry]', 'feed him [heart]', 'monster', '😂']) });
+    }, 2200);
+    // Use the camera if it's allowed, otherwise the stand-in figure.
+    (async () => {
+      await $('startBtn').onclick();
+      if (face.state.status !== 'ready') $('fakeBtn').onclick();
+      setTimeout(startRound, 800);
+    })();
+  }
 
   face.loop(); // draw the stage even before the camera starts
 </script>

@@ -68,7 +68,9 @@
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
-  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tabs { display: flex; gap: 6px; }
+  .previewBtn { margin-left: auto; text-decoration: none; background: var(--blood); color: #fff; font-weight: 700; border-radius: 8px; padding: 6px 14px; }
+  .previewBtn:hover { filter: brightness(1.1); }
   .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
   .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
@@ -89,7 +91,8 @@
   <header>
     <h1>Settings</h1>
     <p>Everything is set here and saved on this computer. <span class="saved" id="saved"></span></p>
-    <nav class="tabs" aria-label="Pages"><a href="index.html">🎮 Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; test</a></nav>
+    <a class="previewBtn" href="index.html#preview" title="See the game with your settings: 60 s, fake viewers, not counted">👁️ Preview</a>
+    <nav class="tabs" aria-label="Pages"><a href="index.html">🎮 Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
   </header>
 
   <div class="grid">
@@ -156,6 +159,7 @@
 
       <section class="row">
         <button class="primary" id="saveBtn">💾 Save</button>
+        <a class="previewBtn" style="margin-left:0" href="index.html#preview">👁️ Preview</a>
         <button id="defaults">Restore all defaults</button>
         <span class="hint" style="margin:0">Changes also save on their own.</span>
       </section>
@@ -163,10 +167,10 @@
   </div>
 </div>
 
-<script src="src/settings.js?v=1794341132"></script>
-<script src="src/events.js?v=1794341132"></script>
-<script src="src/face.js?v=1794341132"></script>
-<script src="src/mic.js?v=1794341132"></script>
+<script src="src/settings.js?v=1794341420"></script>
+<script src="src/events.js?v=1794341420"></script>
+<script src="src/face.js?v=1794341420"></script>
+<script src="src/mic.js?v=1794341420"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
