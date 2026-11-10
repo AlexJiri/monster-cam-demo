@@ -195,15 +195,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794344856"></script>
-<script src="src/settings.js?v=1794344856"></script>
-<script src="src/events.js?v=1794344856"></script>
-<script src="src/face.js?v=1794344856"></script>
-<script src="src/curses.js?v=1794344856"></script>
-<script src="src/sfx.js?v=1794344856"></script>
-<script src="src/mic.js?v=1794344856"></script>
-<script src="src/lightson.js?v=1794344856"></script>
-<script src="src/live.js?v=1794344856"></script>
+<script src="src/edition.js?v=1794345847"></script>
+<script src="src/settings.js?v=1794345847"></script>
+<script src="src/events.js?v=1794345847"></script>
+<script src="src/face.js?v=1794345847"></script>
+<script src="src/curses.js?v=1794345847"></script>
+<script src="src/sfx.js?v=1794345847"></script>
+<script src="src/mic.js?v=1794345847"></script>
+<script src="src/lightson.js?v=1794345847"></script>
+<script src="src/live.js?v=1794345847"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -447,7 +447,7 @@
     }
     catch (e) {
       $('startBtn').disabled = false;
-      notice(e && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser and try again.' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
+      notice(e && e.name === 'NotAllowedError' ? 'The camera is blocked for this page.<br><small>Click the icon left of the address bar, set Camera and Microphone to Allow, then reload (F5).</small>' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
     }
   };
   $('calBtn').onclick = async () => {

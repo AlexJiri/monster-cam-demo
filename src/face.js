@@ -7,6 +7,27 @@
   const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
   const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
+  // Camera and microphone, asked for once per page and shared: the test round inside Settings & Test
+  // uses the streams the Settings page already has, so Chrome doesn't ask again (asking again and again
+  // gets the permission blocked automatically).
+  const CONSTRAINTS = {
+    video: { video: { width: 640, height: 480, facingMode: 'user' }, audio: false },
+    audio: { audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false }, video: false },
+  };
+  MC.media = {
+    async get(kind) {
+      const owners = [window];
+      try { if (window.top !== window && window.top.MC) owners.unshift(window.top); } catch (e) {} // other site: no sharing
+      for (const w of owners) {
+        const s = w.__mcStreams && w.__mcStreams[kind];
+        if (s && s.getTracks().some((t) => t.readyState === 'live')) return s;
+      }
+      const s = await navigator.mediaDevices.getUserMedia(CONSTRAINTS[kind]);
+      (window.__mcStreams = window.__mcStreams || {})[kind] = s;
+      return s;
+    },
+  };
+
   const clamp = (v) => Math.max(0, Math.min(1, v));
   // Highest smile / eye-closure a relaxed face can have during calibration.
   const MAX_NEUTRAL_SMILE = 0.3;
@@ -28,7 +49,7 @@
     async start(video) {
       this.video = video;
       this.state.status = 'camera';
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+      const stream = await MC.media.get('video');
       video.srcObject = stream;
       await video.play();
 

@@ -225,10 +225,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794345644"></script>
-<script src="src/events.js?v=1794345644"></script>
-<script src="src/face.js?v=1794345644"></script>
-<script src="src/mic.js?v=1794345644"></script>
+<script src="src/settings.js?v=1794345847"></script>
+<script src="src/events.js?v=1794345847"></script>
+<script src="src/face.js?v=1794345847"></script>
+<script src="src/mic.js?v=1794345847"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -491,8 +491,16 @@
   // Empty gift names and dares are dropped before testing or playing.
   const tidy = () => { S.gifts = S.gifts.filter((g) => g.gift); S.loseDares = S.loseDares.filter(Boolean); S.winDares = S.winDares.filter(Boolean); save(); };
   // The test round runs inside this tab (the Play page in test mode), with the settings just saved.
-  $('testBtn').onclick = () => {
+  $('testBtn').onclick = async () => {
     tidy();
+    // Ask for the camera and microphone here, once; the test round reuses them.
+    try { await MC.media.get('video'); }
+    catch (e) {
+      log(`⚠️ ${e && e.name === 'NotAllowedError' ? 'The camera is blocked for this page. Click the icon left of the address bar, set Camera and Microphone to Allow, then reload.' : 'The camera could not start: ' + esc(e && e.message || e)}`);
+      $('testFrame').hidden = true;
+      return;
+    }
+    try { await MC.media.get('audio'); } catch (e) {} // the microphone is optional
     $('testFrame').hidden = false;
     $('testFrame').src = 'index.html?t=' + Date.now() + '#preview-embed'; // ?t: always the latest page, never a cached one
     $('testBtn').textContent = '🔁 Restart test round';

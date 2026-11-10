@@ -13,10 +13,7 @@
     }
 
     async start() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
-        video: false,
-      });
+      const stream = await MC.media.get('audio'); // shared with the page around a test round (see face.js)
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       const src = this.ctx.createMediaStreamSource(stream);
       this.an = this.ctx.createAnalyser();
