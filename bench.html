@@ -58,6 +58,13 @@
   .rule { display: grid; grid-template-columns: 64px 18px minmax(0, 1fr) 18px minmax(0, 1.2fr) 36px; gap: 6px; align-items: center; margin: 6px 0; }
   .rule .x, .rule .arrow { color: var(--muted); text-align: center; }
   .rule .other { grid-column: 3 / 4; }
+  /* One-time tip pointing at Advanced. */
+  .tip { position: relative; margin-top: 14px; background: #2a2414; border: 1px solid var(--lamp); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; max-width: 520px; animation: tipIn 0.3s ease-out; }
+  .tip[hidden] { display: none; }
+  .tip::after { content: ''; position: absolute; left: 28px; bottom: -8px; width: 14px; height: 14px; background: #2a2414; border-right: 1px solid var(--lamp); border-bottom: 1px solid var(--lamp); transform: rotate(45deg); }
+  .tip b { color: var(--lamp); }
+  .tip span { font-size: 14px; }
+  @keyframes tipIn { from { opacity: 0; transform: translateY(6px); } }
   .goodTitle { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
   /* Advanced: a clear button-like toggle, not a faint link. */
   details.adv > summary { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--night); margin-top: 14px; list-style: none; }
@@ -174,7 +181,12 @@
       <label class="check"><input type="checkbox" id="r-blink"> blink</label>
       <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
     </div>
-    <details class="adv">
+    <div class="tip" id="advTip" hidden role="note">
+      <b>⚙️ Worth a look: Advanced</b>
+      <span>How long each curse lasts and the most time it can stack to, how many curses can run at once, and how long a chain holds the monster. These decide how hard the game is.</span>
+      <div class="row"><button id="advOpen">Show me</button><button id="advGotIt">Got it</button></div>
+    </div>
+    <details class="adv" id="adv">
       <summary>⚙️ Advanced</summary>
       <div id="advSliders"></div>
       <h3>Curse timers</h3>
@@ -213,10 +225,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794344856"></script>
-<script src="src/events.js?v=1794344856"></script>
-<script src="src/face.js?v=1794344856"></script>
-<script src="src/mic.js?v=1794344856"></script>
+<script src="src/settings.js?v=1794345644"></script>
+<script src="src/events.js?v=1794345644"></script>
+<script src="src/face.js?v=1794345644"></script>
+<script src="src/mic.js?v=1794345644"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -241,7 +253,19 @@
     for (const k of STEPS.slice(0, STEPS.indexOf(step))) $('step-' + k).classList.add('done');
     try { localStorage.setItem('monstercam-settings-step', step); } catch (e) {}
     window.scrollTo(0, 0);
+    if (step === 'game') showAdvTip();
   }
+  // The Advanced tip shows on the Game step until the streamer dismisses it (or opens Advanced).
+  const TIP_KEY = 'monstercam-tip-advanced';
+  function showAdvTip() {
+    let seen = false;
+    try { seen = localStorage.getItem(TIP_KEY) === '1'; } catch (e) {}
+    $('advTip').hidden = seen;
+  }
+  const hideAdvTip = () => { $('advTip').hidden = true; try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} };
+  $('advGotIt').onclick = hideAdvTip;
+  $('advOpen').onclick = () => { hideAdvTip(); $('adv').open = true; $('adv').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  $('adv').addEventListener('toggle', () => { if ($('adv').open) hideAdvTip(); });
   document.querySelectorAll('[data-step]').forEach((b) => b.onclick = () => go(b.dataset.step));
   document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => go(b.dataset.go));
   let lastStep = 'camera';
