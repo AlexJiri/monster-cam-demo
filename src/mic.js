@@ -13,14 +13,27 @@
       this.ready = false;
     }
 
+    // Create the audio context right inside a tap handler (before any await), the only moment phones allow it to run.
+    prime() {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    }
+
+    get running() { return !!this.ctx && this.ctx.state === 'running'; }
+
     async start() {
+      this.prime();
       const stream = await MC.media.get('audio'); // shared with the page around a test round (see face.js)
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       const src = this.ctx.createMediaStreamSource(stream);
       this.an = this.ctx.createAnalyser();
       this.an.fftSize = 1024;
       src.connect(this.an);
       this.buf = new Float32Array(this.an.fftSize);
+      // Phones (iOS Safari above all) start the audio context suspended and only let a tap or key press wake it,
+      // so resuming from the frame loop alone left the mic deaf until something else woke it.
+      const wake = () => { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); };
+      for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) addEventListener(ev, wake, { capture: true, passive: true });
+      wake();
       this.ready = true;
     }
 

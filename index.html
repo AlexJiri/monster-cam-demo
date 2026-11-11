@@ -54,6 +54,8 @@
     .helpers .pill { font-size: 11px; }
   }
   .guide.fade { opacity: 0; }
+  .tapHint { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(242, 193, 78, 0.95); color: #1b1400; font-weight: 700; border-radius: 12px; padding: 10px 16px; text-align: center; max-width: 80%; }
+  .tapHint[hidden] { display: none; }
   .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
   .guide span { display: block; color: var(--text); }
   .guide small { color: var(--muted); }
@@ -150,6 +152,7 @@
     </div>
     <div class="feed" id="feed"></div>
     <div class="guide" id="guide" aria-live="off"></div>
+    <div class="tapHint" id="tapHint" hidden>👆 Tap here to turn on sound and the microphone</div>
     <div class="curses" id="curses"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
     <div class="lit" id="lit">🔦 The light is on you. Freeze!</div>
@@ -206,15 +209,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794383465"></script>
-<script src="src/settings.js?v=1794383465"></script>
-<script src="src/events.js?v=1794383465"></script>
-<script src="src/face.js?v=1794383465"></script>
-<script src="src/curses.js?v=1794383465"></script>
-<script src="src/sfx.js?v=1794383465"></script>
-<script src="src/mic.js?v=1794383465"></script>
-<script src="src/lightson.js?v=1794383465"></script>
-<script src="src/live.js?v=1794383465"></script>
+<script src="src/edition.js?v=1794384064"></script>
+<script src="src/settings.js?v=1794384064"></script>
+<script src="src/events.js?v=1794384064"></script>
+<script src="src/face.js?v=1794384064"></script>
+<script src="src/curses.js?v=1794384064"></script>
+<script src="src/sfx.js?v=1794384064"></script>
+<script src="src/mic.js?v=1794384064"></script>
+<script src="src/lightson.js?v=1794384064"></script>
+<script src="src/live.js?v=1794384064"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -456,6 +459,7 @@
   }
   $('startBtn').onclick = async () => {
     MC.sfx.unlock(); MC.sfx.setVolume(S.volume);
+    const mic = new MC.Mic(); mic.prime(); // before any await, while the tap still counts (phones)
     $('startBtn').disabled = true;
     notice('Loading camera and face model…');
     try {
@@ -463,7 +467,7 @@
       ready();
       log('📷 Camera ready.');
       // Microphone is optional: without it the sound rules simply never trigger.
-      try { const mic = new MC.Mic(); await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); }
+      try { await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); setTimeout(checkAudio, 400); }
       catch (err) { log('🎤 No microphone access: the "silence" rules are off. Allow the microphone and reload to use them.'); }
     }
     catch (e) {
@@ -471,6 +475,17 @@
       notice(e && e.name === 'NotAllowedError' ? 'The camera is blocked for this page.<br><small>Click the icon left of the address bar, set Camera and Microphone to Allow, then reload (F5).</small>' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
     }
   };
+  // Phones keep sound and the microphone off until a tap on this page. The test round inside Settings starts
+  // without one (the tap was on the page around it), so ask for a tap on the stage when they are still off.
+  function checkAudio() {
+    const off = face.mic && !face.mic.running;
+    $('tapHint').hidden = !off;
+    if (off) log('👆 Tap the game once to turn on sound and the microphone.');
+  }
+  for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => {
+    MC.sfx.unlock(); // the microphone wakes itself on the same tap (mic.js)
+    if (!$('tapHint').hidden) setTimeout(checkAudio, 300);
+  }, { capture: true, passive: true });
   $('calBtn').onclick = async () => {
     if (round.running) return;
     calibrating = true; $('calBtn').disabled = true;
