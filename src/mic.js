@@ -19,17 +19,25 @@
       if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
     }
 
-    get running() { return !!this.ctx && this.ctx.state === 'running'; }
+    // Is the microphone really delivering sound? Judged by the samples, not by ctx.state: iPhones can report
+    // 'suspended' or their own 'interrupted' state, or 'running' while handing over only zeros.
+    get running() { return performance.now() - (this.heardAt || -1e9) < 1000; }
 
     async start() {
       this.prime();
       this.stream = await MC.media.get('audio'); // shared with the page around a test round (see face.js)
       this.connect();
-      // Phones (iOS Safari above all) start the audio context suspended and only let a tap or key press wake it,
-      // so resuming from the frame loop alone left the mic deaf until something else woke it.
-      const wake = () => { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); };
+      // Phones (iOS Safari above all) only let a tap or key press start audio. On a tap: resume the context,
+      // and if the microphone still isn't heard, build a fresh context right inside the tap (that one runs).
+      let lastFresh = 0;
+      const wake = () => {
+        if (!this.ready || this.running) return;
+        if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+        const now = performance.now();
+        if (now - lastFresh > 1000 && now - (this.startedAt || 0) > 1500) { lastFresh = now; this.revive(); }
+      };
       for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) addEventListener(ev, wake, { capture: true, passive: true });
-      wake();
+      this.startedAt = performance.now();
       this.ready = true;
     }
 
@@ -57,10 +65,11 @@
     // Current loudness above the floor (0..1). Call once per frame.
     read(now = performance.now()) {
       if (!this.ready) return 0;
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
       this.an.getFloatTimeDomainData(this.buf);
       let sum = 0;
       for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
+      if (sum > 0) this.heardAt = now;
       if (sum === 0 && this.ctx.state === 'running' && this.stream.getAudioTracks().some((t) => t.readyState === 'live')) {
         if (++this.silent > 60 && (this.revives || 0) < 5) this.revive();
       } else this.silent = 0;

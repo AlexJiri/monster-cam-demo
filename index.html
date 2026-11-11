@@ -216,15 +216,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794385138"></script>
-<script src="src/settings.js?v=1794385138"></script>
-<script src="src/events.js?v=1794385138"></script>
-<script src="src/face.js?v=1794385138"></script>
-<script src="src/curses.js?v=1794385138"></script>
-<script src="src/sfx.js?v=1794385138"></script>
-<script src="src/mic.js?v=1794385138"></script>
-<script src="src/lightson.js?v=1794385138"></script>
-<script src="src/live.js?v=1794385138"></script>
+<script src="src/edition.js?v=1794388446"></script>
+<script src="src/settings.js?v=1794388446"></script>
+<script src="src/events.js?v=1794388446"></script>
+<script src="src/face.js?v=1794388446"></script>
+<script src="src/curses.js?v=1794388446"></script>
+<script src="src/sfx.js?v=1794388446"></script>
+<script src="src/mic.js?v=1794388446"></script>
+<script src="src/lightson.js?v=1794388446"></script>
+<script src="src/live.js?v=1794388446"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -489,6 +489,8 @@
     const off = !!face.mic && !face.mic.running;
     if (off && $('tapHint').hidden) log('👆 Tap the game once to turn on sound and the microphone.');
     $('tapHint').hidden = !off;
+    // The small line helps when it stays stuck: audio state, live mic track, context restarts.
+    if (off) $('tapHint').innerHTML = `👆 Tap here to turn on sound and the microphone<br><small style="font-weight:400">audio: ${face.mic.ctx.state} · track: ${face.mic.stream.getAudioTracks().map((t) => t.readyState + (t.muted ? '/muted' : '')).join(',') || 'none'} · restarts: ${face.mic.revives || 0}</small>`;
     if (off) setTimeout(checkAudio, 500);
   }
   for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => {
