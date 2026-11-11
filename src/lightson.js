@@ -454,11 +454,17 @@
       ctx.globalAlpha = k;
       ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'; ctx.shadowBlur = r * 0.25; ctx.shadowOffsetY = r * 0.08;
       if (b.part === 'eye') {
-        // Pirate eye patch with its strap across the head.
+        // Pirate eye patch with its strap round the head: one end runs out to the near side of the head,
+        // the other curves up over the forehead to the far side; both stop at the edge of the face.
         const p = this.facePoints(face, W, H), tilt = b.side * -0.35;
         if (p) {
+          const s = Math.sign(x - p.cx) || 1, half = p.w * 0.46;
+          const nearX = p.cx + s * half, farX = p.cx - s * half;
           ctx.strokeStyle = '#141018'; ctx.lineWidth = Math.max(2, r * 0.14); ctx.lineCap = 'round';
-          ctx.beginPath(); ctx.moveTo(x - b.side * p.w * 0.42, y - p.h * 0.3); ctx.lineTo(x + b.side * p.w * 0.42, y + p.h * 0.04); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, y); ctx.quadraticCurveTo((x + nearX) / 2, y - p.h * 0.05, nearX, y - p.h * 0.08);
+          ctx.moveTo(x, y); ctx.quadraticCurveTo(p.cx, p.eyesY - p.h * 0.34, farX, p.eyesY - p.h * 0.2);
+          ctx.stroke();
         }
         ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(sc, sc);
         ctx.fillStyle = '#1a1520';

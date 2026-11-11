@@ -47,16 +47,24 @@
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
   header { align-items: center; }
   /* Gift guide for viewers, right side of the stage. */
-  .guide { position: absolute; right: 12px; top: 54px; width: min(250px, 34%); background: rgba(0, 0, 0, 0.62); border-radius: 10px; padding: 8px 10px; font-size: 14px; pointer-events: none; transition: opacity 0.4s; }
+  /* See-through so the monster stays visible behind it; the text shadow keeps it readable on any background. */
+  .guide { position: absolute; right: 12px; top: 54px; width: min(250px, 34%); max-height: calc(100% - 120px); overflow: hidden; background: rgba(0, 0, 0, 0.32); border-radius: 10px; padding: 8px 10px; font-size: 14px; text-shadow: 0 1px 3px #000, 0 0 2px #000; pointer-events: none; transition: opacity 0.4s; }
+  @media (max-width: 600px) {
+    .guide { top: 84px; right: 8px; width: 42%; padding: 5px 7px; font-size: 11px; line-height: 1.3; }
+    .helpers .pill { font-size: 11px; }
+  }
   .guide.fade { opacity: 0; }
   .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
   .guide span { display: block; color: var(--text); }
   .guide small { color: var(--muted); }
   /* Test round inside Settings & Test: no header, no TikTok step, a narrower panel. */
   .embed header, .embed #step1 { display: none; }
-  .embed .layout { grid-template-columns: minmax(0, 1fr) 320px; }
-  .embed .stageCol .stage { width: min(100%, calc((100vh - 24px) * 4 / 3)); }
-  .embed .panel { max-height: calc(100vh - 24px); }
+  /* Side by side only when there is room; on a phone the stage and the panel stack like the normal page. */
+  @media (min-width: 901px) {
+    .embed .layout { grid-template-columns: minmax(0, 1fr) 320px; }
+    .embed .stageCol .stage { width: min(100%, calc((100vh - 24px) * 4 / 3)); }
+    .embed .panel { max-height: calc(100vh - 24px); }
+  }
   .backBtn { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 500; }
   .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
   .notice .x:hover { color: var(--text); }
@@ -198,15 +206,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794353595"></script>
-<script src="src/settings.js?v=1794353595"></script>
-<script src="src/events.js?v=1794353595"></script>
-<script src="src/face.js?v=1794353595"></script>
-<script src="src/curses.js?v=1794353595"></script>
-<script src="src/sfx.js?v=1794353595"></script>
-<script src="src/mic.js?v=1794353595"></script>
-<script src="src/lightson.js?v=1794353595"></script>
-<script src="src/live.js?v=1794353595"></script>
+<script src="src/edition.js?v=1794383465"></script>
+<script src="src/settings.js?v=1794383465"></script>
+<script src="src/events.js?v=1794383465"></script>
+<script src="src/face.js?v=1794383465"></script>
+<script src="src/curses.js?v=1794383465"></script>
+<script src="src/sfx.js?v=1794383465"></script>
+<script src="src/mic.js?v=1794383465"></script>
+<script src="src/lightson.js?v=1794383465"></script>
+<script src="src/live.js?v=1794383465"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -657,12 +665,13 @@
   window.addEventListener('beforeunload', () => { if (streamWin) streamWin.close(); });
 
   // ---------- Gift guide on stream ----------
-  // Tells viewers what each gift does: "🌹 Rose → don't blink". Long lists rotate, 8 lines at a time.
+  // Tells viewers what each gift does: "🌹 Rose → don't blink". Long lists rotate, 8 lines at a time (4 on a small stage).
   const guideCards = () => {
     const lines = [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).map((g) =>
       `<span>${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${esc(info(g.gift).label || g.gift)} <small>→ ${esc(effectShort(g.curse))}</small></span>`);
+    const per = $('cv').clientWidth && $('cv').clientWidth < 600 ? 4 : 8;
     const cards = [];
-    for (let i = 0; i < lines.length; i += 8) cards.push('<b>🎁 Gifts</b>' + lines.slice(i, i + 8).join(''));
+    for (let i = 0; i < lines.length; i += per) cards.push('<b>🎁 Gifts</b>' + lines.slice(i, i + per).join(''));
     return cards;
   };
   let guideI = 0;
