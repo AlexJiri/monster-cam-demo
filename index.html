@@ -53,10 +53,7 @@
     .guide { top: 84px; right: 8px; width: 42%; padding: 5px 7px; font-size: 11px; line-height: 1.3; }
     .helpers .pill { font-size: 11px; }
   }
-  .guide.fade { opacity: 0; }
-  .tapHint { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); background: rgba(242, 193, 78, 0.95); color: #1b1400; font-weight: 700; border-radius: 12px; padding: 10px 16px; text-align: center; max-width: 80%; }
-  .tapHint[hidden] { display: none; }
-  .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
+  .guide.fade { opacity: 0; }  .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
   .guide span { display: block; color: var(--text); }
   .guide small { color: var(--muted); }
   /* Test round inside Settings & Test: no header, no TikTok step, a narrower panel. */
@@ -158,9 +155,7 @@
       <span class="pill" id="likeBar" title="Likes chain the monster when the bar is full"></span>
     </div>
     <div class="feed" id="feed"></div>
-    <div class="guide" id="guide" aria-live="off"></div>
-    <div class="tapHint" id="tapHint" hidden>👆 Tap here to turn on sound and the microphone</div>
-    <div class="curses" id="curses"></div>
+    <div class="guide" id="guide" aria-live="off"></div>    <div class="curses" id="curses"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
     <div class="lit" id="lit">🔦 The light is on you. Freeze!</div>
     <div class="notice on" id="notice">Connect your live, start the camera, calibrate, then start a round.<br><small style="font-weight:400;color:var(--muted)">Everything runs on this computer; no video is sent anywhere.</small></div>
@@ -216,15 +211,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794388582"></script>
-<script src="src/settings.js?v=1794388582"></script>
-<script src="src/events.js?v=1794388582"></script>
-<script src="src/face.js?v=1794388582"></script>
-<script src="src/curses.js?v=1794388582"></script>
-<script src="src/sfx.js?v=1794388582"></script>
-<script src="src/mic.js?v=1794388582"></script>
-<script src="src/lightson.js?v=1794388582"></script>
-<script src="src/live.js?v=1794388582"></script>
+<script src="src/edition.js?v=1794388669"></script>
+<script src="src/settings.js?v=1794388669"></script>
+<script src="src/events.js?v=1794388669"></script>
+<script src="src/face.js?v=1794388669"></script>
+<script src="src/curses.js?v=1794388669"></script>
+<script src="src/sfx.js?v=1794388669"></script>
+<script src="src/mic.js?v=1794388669"></script>
+<script src="src/lightson.js?v=1794388669"></script>
+<script src="src/live.js?v=1794388669"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -474,7 +469,7 @@
       ready();
       log('📷 Camera ready.');
       // Microphone is optional: without it the sound rules simply never trigger.
-      try { await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); setTimeout(checkAudio, 1500); }
+      try { await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); }
       catch (err) { log('🎤 No microphone access: the "silence" rules are off. Allow the microphone and reload to use them.'); }
     }
     catch (e) {
@@ -482,17 +477,7 @@
       notice(e && e.name === 'NotAllowedError' ? 'The camera is blocked for this page.<br><small>Click the icon left of the address bar, set Camera and Microphone to Allow, then reload (F5).</small>' : `Could not start the camera or face model. Check the internet connection.<br><small>${esc(e && e.message || e)}</small>`);
     }
   };
-  // Phones keep sound and the microphone off until a tap on this page. The test round inside Settings starts
-  // without one (the tap was on the page around it), so ask for a tap on the stage when they are still off.
-  // Shown only while the microphone is still off; hides itself as soon as it runs (with or without a tap).
-  function checkAudio() {
-    const off = !!face.mic && !face.mic.running;
-    if (off && $('tapHint').hidden) log('👆 Tap the game once to turn on sound and the microphone.');
-    $('tapHint').hidden = !off;
-    // The small line helps when it stays stuck: audio state, live mic track, context restarts.
-    if (off) $('tapHint').innerHTML = `👆 Tap here to turn on sound and the microphone<br><small style="font-weight:400">audio: ${face.mic.ctx.state} · track: ${face.mic.stream.getAudioTracks().map((t) => t.readyState + (t.muted ? '/muted' : '')).join(',') || 'none'} · restarts: ${face.mic.revives || 0}</small>`;
-    if (off) setTimeout(checkAudio, 500);
-  }
+  // Phones keep sound off until a tap on this page; any tap wakes the game sounds (the microphone wakes itself, mic.js).
   for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => {
     MC.sfx.unlock(); // the microphone wakes itself on the same tap (mic.js)
   }, { capture: true, passive: true });
