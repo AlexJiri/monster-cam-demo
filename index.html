@@ -211,15 +211,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794388669"></script>
-<script src="src/settings.js?v=1794388669"></script>
-<script src="src/events.js?v=1794388669"></script>
-<script src="src/face.js?v=1794388669"></script>
-<script src="src/curses.js?v=1794388669"></script>
-<script src="src/sfx.js?v=1794388669"></script>
-<script src="src/mic.js?v=1794388669"></script>
-<script src="src/lightson.js?v=1794388669"></script>
-<script src="src/live.js?v=1794388669"></script>
+<script src="src/edition.js?v=1794390561"></script>
+<script src="src/settings.js?v=1794390561"></script>
+<script src="src/events.js?v=1794390561"></script>
+<script src="src/face.js?v=1794390561"></script>
+<script src="src/curses.js?v=1794390561"></script>
+<script src="src/sfx.js?v=1794390561"></script>
+<script src="src/mic.js?v=1794390561"></script>
+<script src="src/lightson.js?v=1794390561"></script>
+<script src="src/live.js?v=1794390561"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -350,6 +350,7 @@
   let calWasOn = false;
   function startRound() {
     if (calibrating) return; // finish calibrating first
+    if (finaleTimer) { clearTimeout(finaleTimer); finaleTimer = 0; } // a new round cuts the finale short
     if (!PREVIEW) {
       if (!canStartRound()) return;
       ED.rounds.use();
@@ -392,10 +393,19 @@
     $('timer').hidden = true;
     $('roundBtn').textContent = '▶ Start round';
   }
+  let finaleTimer = 0;
   function endRound(won) {
     if (!round.running) return;
     clearRound();
-    if (!won) game.finalHead = true; // eaten: the monster's head takes the streamer's place
+    if (won) { showResult(true); return; }
+    // Eaten: the "Devoured" finale first (the monster eats the streamer on screen), then the monster's head
+    // takes the streamer's place and the result comes up.
+    game.finalHead = true;
+    game.startFinale(performance.now());
+    finaleTimer = setTimeout(() => showResult(false), game.FINALE_MS);
+  }
+  function showResult(won) {
+    finaleTimer = 0;
     const list = (won ? S.winDares : S.loseDares).filter(Boolean);
     const dare = list.length ? pick(list) : '';
     // Lost: the viewer behind the final catch "ate" the streamer; list everyone who caught them.
