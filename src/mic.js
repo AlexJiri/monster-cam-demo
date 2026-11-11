@@ -23,18 +23,35 @@
 
     async start() {
       this.prime();
-      const stream = await MC.media.get('audio'); // shared with the page around a test round (see face.js)
-      const src = this.ctx.createMediaStreamSource(stream);
-      this.an = this.ctx.createAnalyser();
-      this.an.fftSize = 1024;
-      src.connect(this.an);
-      this.buf = new Float32Array(this.an.fftSize);
+      this.stream = await MC.media.get('audio'); // shared with the page around a test round (see face.js)
+      this.connect();
       // Phones (iOS Safari above all) start the audio context suspended and only let a tap or key press wake it,
       // so resuming from the frame loop alone left the mic deaf until something else woke it.
       const wake = () => { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); };
       for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) addEventListener(ev, wake, { capture: true, passive: true });
       wake();
       this.ready = true;
+    }
+
+    connect() {
+      const src = this.ctx.createMediaStreamSource(this.stream);
+      this.an = this.ctx.createAnalyser();
+      this.an.fftSize = 1024;
+      src.connect(this.an);
+      this.buf = new Float32Array(this.an.fftSize);
+      this.silent = 0;
+    }
+
+    // iPhones sometimes hand an audio context that started together with the microphone nothing but exact
+    // zeros (the first round was deaf, the next one fine). A real microphone is never perfectly silent,
+    // so after ~1 s of exact zeros start a fresh context on the same stream.
+    revive() {
+      const old = this.ctx;
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx.resume().catch(() => {});
+      this.connect();
+      old.close().catch(() => {});
+      this.revives = (this.revives || 0) + 1;
     }
 
     // Current loudness above the floor (0..1). Call once per frame.
@@ -44,6 +61,9 @@
       this.an.getFloatTimeDomainData(this.buf);
       let sum = 0;
       for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
+      if (sum === 0 && this.ctx.state === 'running' && this.stream.getAudioTracks().some((t) => t.readyState === 'live')) {
+        if (++this.silent > 60 && (this.revives || 0) < 5) this.revive();
+      } else this.silent = 0;
       const db = 20 * Math.log10(Math.sqrt(sum / this.buf.length) + 1e-9);
       this.raw = Math.max(0, Math.min(1, (db - MIN_DB) / (MAX_DB - MIN_DB)));
       const busy = MC.sfx && now < (MC.sfx.busyUntil || 0) + 250;

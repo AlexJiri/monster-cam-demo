@@ -117,6 +117,13 @@
     .notice .dare { font-size: 15px; }
     .lit { font-size: 14px; bottom: 44px; }
     .lives { font-size: 18px; }
+    .hud { left: 8px; right: 8px; top: 8px; gap: 4px; }
+    .hud .pill { white-space: nowrap; padding: 2px 8px; font-size: 12px; }
+    .hud .lives { font-size: 15px; }
+    .hud .timer { font-size: 16px; }
+    .feed { left: 8px; bottom: 8px; }
+    .feed div, .curse { font-size: 11px; }
+    .curses { right: 8px; bottom: 8px; }
   }
 
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
@@ -209,15 +216,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794384064"></script>
-<script src="src/settings.js?v=1794384064"></script>
-<script src="src/events.js?v=1794384064"></script>
-<script src="src/face.js?v=1794384064"></script>
-<script src="src/curses.js?v=1794384064"></script>
-<script src="src/sfx.js?v=1794384064"></script>
-<script src="src/mic.js?v=1794384064"></script>
-<script src="src/lightson.js?v=1794384064"></script>
-<script src="src/live.js?v=1794384064"></script>
+<script src="src/edition.js?v=1794385138"></script>
+<script src="src/settings.js?v=1794385138"></script>
+<script src="src/events.js?v=1794385138"></script>
+<script src="src/face.js?v=1794385138"></script>
+<script src="src/curses.js?v=1794385138"></script>
+<script src="src/sfx.js?v=1794385138"></script>
+<script src="src/mic.js?v=1794385138"></script>
+<script src="src/lightson.js?v=1794385138"></script>
+<script src="src/live.js?v=1794385138"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -467,7 +474,7 @@
       ready();
       log('📷 Camera ready.');
       // Microphone is optional: without it the sound rules simply never trigger.
-      try { await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); setTimeout(checkAudio, 400); }
+      try { await mic.start(); face.mic = mic; log('🎤 Microphone ready.'); setTimeout(checkAudio, 1500); }
       catch (err) { log('🎤 No microphone access: the "silence" rules are off. Allow the microphone and reload to use them.'); }
     }
     catch (e) {
@@ -477,14 +484,15 @@
   };
   // Phones keep sound and the microphone off until a tap on this page. The test round inside Settings starts
   // without one (the tap was on the page around it), so ask for a tap on the stage when they are still off.
+  // Shown only while the microphone is still off; hides itself as soon as it runs (with or without a tap).
   function checkAudio() {
-    const off = face.mic && !face.mic.running;
+    const off = !!face.mic && !face.mic.running;
+    if (off && $('tapHint').hidden) log('👆 Tap the game once to turn on sound and the microphone.');
     $('tapHint').hidden = !off;
-    if (off) log('👆 Tap the game once to turn on sound and the microphone.');
+    if (off) setTimeout(checkAudio, 500);
   }
   for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => {
     MC.sfx.unlock(); // the microphone wakes itself on the same tap (mic.js)
-    if (!$('tapHint').hidden) setTimeout(checkAudio, 300);
   }, { capture: true, passive: true });
   $('calBtn').onclick = async () => {
     if (round.running) return;
