@@ -21,7 +21,9 @@
 
     // Is the microphone really delivering sound? Judged by the samples, not by ctx.state: iPhones can report
     // 'suspended' or their own 'interrupted' state, or 'running' while handing over only zeros.
-    get running() { return performance.now() - (this.heardAt || -1e9) < 1000; }
+    // Once it has delivered any sound it counts as working: iPhones' echo cancellation can hand over exact
+    // zeros in a quiet room, which is silence, not a dead microphone.
+    get running() { return !!this.heardAt; }
 
     async start() {
       this.prime();
@@ -70,7 +72,7 @@
       let sum = 0;
       for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
       if (sum > 0) this.heardAt = now;
-      if (sum === 0 && this.ctx.state === 'running' && this.stream.getAudioTracks().some((t) => t.readyState === 'live')) {
+      if (sum === 0 && !this.heardAt && this.ctx.state === 'running' && this.stream.getAudioTracks().some((t) => t.readyState === 'live')) {
         if (++this.silent > 60 && (this.revives || 0) < 5) this.revive();
       } else this.silent = 0;
       const db = 20 * Math.log10(Math.sqrt(sum / this.buf.length) + 1e-9);
