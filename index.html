@@ -212,15 +212,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794951205"></script>
-<script src="src/settings.js?v=1794951205"></script>
-<script src="src/events.js?v=1794951205"></script>
-<script src="src/face.js?v=1794951205"></script>
-<script src="src/curses.js?v=1794951205"></script>
-<script src="src/sfx.js?v=1794951205"></script>
-<script src="src/mic.js?v=1794951205"></script>
-<script src="src/lightson.js?v=1794951205"></script>
-<script src="src/live.js?v=1794951205"></script>
+<script src="src/edition.js?v=1794952746"></script>
+<script src="src/settings.js?v=1794952746"></script>
+<script src="src/events.js?v=1794952746"></script>
+<script src="src/face.js?v=1794952746"></script>
+<script src="src/curses.js?v=1794952746"></script>
+<script src="src/sfx.js?v=1794952746"></script>
+<script src="src/mic.js?v=1794952746"></script>
+<script src="src/lightson.js?v=1794952746"></script>
+<script src="src/live.js?v=1794952746"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -550,6 +550,7 @@
     S.darkness = +Math.max(0, 1 - v).toFixed(2);
     S.camBoost = +Math.max(1, v).toFixed(2);
     save();
+    game.previewDarkUntil = performance.now() + 2500; // outside a round: show the darkness for a moment
   };
   $('vol').value = S.volume;
   $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
@@ -581,6 +582,8 @@
     if (effect === 'shield') { chain(users, now); return; }
     if (effect === 'cleanse') {
       const n = curses.active.length + curses.queue.length;
+      // Nothing to remove: no banner (and no "saved by" credit), just a quiet note in the log.
+      if (!n) { log(`🧹 ${who} sent a cleanse, but there were no curses.`); return; }
       curses.clear();
       users.forEach((u) => { if (!savers.includes(u)) savers.push(u); });
       banner(`🧹 ${who} removed ${n} curse${n === 1 ? '' : 's'}!`, true);
@@ -708,6 +711,8 @@
     face.frameWindow = null; if (face.restartLoop) face.restartLoop();
     $('streamBtn').textContent = '📺 Stream window';
   }
+  // The stream window is for TikTok LIVE Studio on a computer; phones block such pop-up windows.
+  if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('streamBtn').hidden = true;
   $('streamBtn').onclick = () => {
     if (streamWin && !streamWin.closed) { streamWin.focus(); return; }
     const w = window.open('', 'monstercam-stream', 'width=960,height=720');
