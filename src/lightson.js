@@ -6,7 +6,9 @@
 // A big gift makes the monster stare straight into the camera: the whole frame is lit.
 (function (MC) {
   const TAU = Math.PI * 2;
-  const FINALE_MS = 4400; // "Devoured" finale of a lost round, before the result shows
+  // End-of-round finale (ms): lights out, jump scare, then devoured (lost) or the monster pulls back (won).
+  const PORTAL_IDLE = 0.45; // Void portal size (0..1) while open but nothing is coming out of it
+  const FIN = { black: 2300, jump: 650, devour: 3500, retreat: 900 };
   const rand = (a, b) => a + Math.random() * (b - a);
   const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -61,14 +63,17 @@
         const choices = portals.filter((p) => p !== last || portals.length === 1);
         const hole = choices[Math.floor(Math.random() * choices.length)];
         last = hole;
-        emerges.push({ hole, t0: i * gap + rand(0, 200), glare: rand(1300, 2200) * (1 - 0.35 * k) + (hunting ? 400 : 0), sounded: false });
+        // Late in the round it sometimes tears its way out: claws grip the rim and pull the portal wider first.
+        const claw = k > 0.6 && Math.random() < 0.6;
+        emerges.push({ hole, claw, t0: 700 + i * gap + rand(0, 200), glare: rand(1300, 2200) * (1 - 0.35 * k) + (hunting ? 400 : 0), sounded: false });
       }
       return { portals, emerges };
     }
     // During the warning: the chosen portals open, growing and spinning up.
     updateVoidWarn(now) {
       const k = Math.min(1, (now - this.t0) / Math.max(1, this.end - this.t0));
-      this.holes.forEach((h, i) => { h.open = this.portals.includes(i) ? k * k * (3 - 2 * k) : 0; h.out = 0; });
+      // Small and spinning while announced; each one grows when the creature comes out of it (updateVoid).
+      this.holes.forEach((h, i) => { h.open = this.portals.includes(i) ? PORTAL_IDLE * k * k * (3 - 2 * k) : 0; h.out = 0; h.tear = 0; });
     }
     updateVoid(now, face) {
       const W = this.cv.width, H = this.cv.height, t = now - this.t0;
@@ -76,10 +81,18 @@
       if (box) this.faceX = box.x + box.w / 2;
       // Portals stay open for the whole pass and close in its last 0.4 s.
       const open = Math.max(0, Math.min(1, (this.end - now) / 400));
-      this.holes.forEach((h, i) => { h.open = this.portals.includes(i) ? open : 0; h.out = 0; });
+      const size = this.holes.map((h, i) => (this.portals.includes(i) ? PORTAL_IDLE : 0));
+      this.holes.forEach((h) => { h.out = 0; h.tear = 0; });
       this.voidBeams = [];
       for (const e of this.emerges) {
-        const h = this.holes[e.hole], local = t - e.t0, total = 300 + e.glare + 400;
+        const h = this.holes[e.hole], local = t - e.t0, total = 300 + e.glare + 400, pre = e.claw ? 700 : 450;
+        if (local < -pre || local > total + 450) continue;
+        // The portal grows before the creature comes out (claws tearing it wider, late in the round) and
+        // shrinks back after it has gone.
+        const grow = Math.max(0, Math.min(1, (local + pre) / pre, (total + 450 - local) / 450));
+        size[e.hole] = Math.max(size[e.hole], PORTAL_IDLE + (1 - PORTAL_IDLE) * grow * grow * (3 - 2 * grow));
+        if (e.claw) h.tear = Math.max(h.tear, Math.max(0, Math.min(1, (local + pre) / pre, (total - local) / 400)));
+        if (e.claw && !e.scratched && local >= -pre) { e.scratched = true; MC.sfx.growl(0.7, 0.6); }
         if (local < 0 || local > total) continue;
         // come out 0.3 s → glare → go back 0.4 s
         h.out = Math.max(h.out, Math.max(0, Math.min(1, local / 300, (total - local) / 400)));
@@ -97,6 +110,7 @@
         const angle = target + (1 - lock) * Math.sin(now / 200 + e.hole) * 0.7;
         this.voidBeams.push({ ox, oy, angle, half: 0.26 });
       }
+      this.holes.forEach((h, i) => { h.open = size[i] * open; });
       if (now >= this.end) {
         this.voidBeams = []; this.emerges = []; this.portals = [];
         this.set('idle', now);
@@ -116,7 +130,6 @@
       this.bites.push({ part, side, seed: Math.random() * 10, t: performance.now() });
     }
     stop(now) { this.set('off', now); this.lit = false; }
-    get FINALE_MS() { return FINALE_MS; }
 
     // Darkness before the next pass. Near the end of the round (`intensity` 0..1, set by the game) it comes back sooner.
     gap() { return rand(...this.s.patrolGap) * 1000 * (1 - 0.65 * (this.intensity || 0)); }
@@ -340,9 +353,9 @@
 
       this.drawCamera(video, face, W, H);
       this.drawScene(now, W, H);
-      // Outside a round the camera is shown normally, so the streamer can see themselves and calibrate.
-      // Brightness slider moved outside a round: show the round's darkness for a moment (previewDarkUntil).
-      const dark = this.phase !== 'off' || now < (this.previewDarkUntil || 0);
+      // The darkness shows before a round too, exactly as it will be in the round, so the brightness can be set
+      // beforehand (calibration reads the camera itself, not this picture).
+      const dark = true;
       if (dark) this.drawDarkness(now, W, H, face);
       // The scene's edges (walls, trees, pipes) stay faintly visible through the dark.
       if (dark && this.sceneLayer && this.s.scene && this.s.scene !== 'none') {
@@ -601,80 +614,90 @@
       ctx.restore();
     }
 
-    // ---------- Devoured: the finale of a lost round ----------
-    // About 4 s: the room goes dark, the monster rushes in from below and fills the screen, its open mouth
-    // lands over the streamer's face (the face shows through it), it chomps a few times with flashes and
-    // shakes, then shuts and "DEVOURED" comes up. Afterwards the game shows the monster head + result.
-    startFinale(now) { this.finale = now; this.finaleChomp = -1; this.finaleP = null; MC.sfx.growl(1.4, 1); }
+    // ---------- Finale: lights out, jump scare, then devoured (lost) or spared (won) ----------
+    // At the end of every round, after the game is decided (it changes nothing in the result):
+    // 1. lights out: the room goes black for a moment, a heartbeat, a pair of eyes blinks somewhere;
+    // 2. jump scare: the light snaps back on with the monster's huge open mouth right in the camera, a scream;
+    // 3a. lost: its mouth lands over the streamer's face and chomps a few times, then "DEVOURED";
+    // 3b. won: it pulls back into the dark and is gone.
+    // Afterwards the game shows the result (and, when lost, the monster head in the streamer's place).
+    startFinale(now, won = false) {
+      this.finale = now; this.finaleWon = won; this.finaleChomp = -1; this.finaleP = null; this.finaleJumped = false; this.finaleBeats = 0;
+      this.finaleMs = FIN.black + FIN.jump + (won ? FIN.retreat : FIN.devour);
+      MC.sfx.click(); // the light switch
+    }
+    get FINALE_MS() { return this.finaleMs || FIN.black + FIN.jump + FIN.devour; }
+    get FINALE_BLACK() { return FIN.black; } // how long the lights are out at the start of the finale
 
     drawFinale(now, face, W, H) {
-      const t = now - this.finale, ctx = this.ctx;
-      if (t > FINALE_MS) { this.finale = 0; return; }
+      const T = now - this.finale, ctx = this.ctx;
+      if (T > this.finaleMs) { this.finale = 0; return; }
       const ease = (k) => 1 - (1 - Math.min(1, Math.max(0, k))) ** 3;
       const p = this.facePoints(face, W, H) || this.finaleP || { cx: W / 2, eyesY: H * 0.4, mouthY: H * 0.55, w: W * 0.25, h: H * 0.4 };
       this.finaleP = p;
       const fx = p.cx, fy = (p.eyesY + p.mouthY) / 2, fw = Math.max(p.w, W * 0.18);
-      // Mouth opening: opens on the way in, then 5 chomps of 420 ms, then shut and chewing.
-      const IN = 900, CH = 420, N = 5, chewStart = IN + CH * N;
+
+      // 1. Lights out.
+      if (T < FIN.black) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.97 * ease(T / 250)})`; ctx.fillRect(0, 0, W, H);
+        const beat = Math.floor((T - 500) / 700);
+        if (T > 500 && beat >= this.finaleBeats) { this.finaleBeats = beat + 1; MC.sfx.heartbeat(0.7); }
+        // Two eyes open somewhere in the dark, then shut.
+        const e = (T - FIN.black * 0.45) / 500;
+        if (e > 0 && e < 1) {
+          const open = Math.sin(e * Math.PI), ex = W * (fx < W / 2 ? 0.72 : 0.28), ey = H * 0.3;
+          ctx.save(); ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 20;
+          for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(ex + side * W * 0.03, ey, W * 0.016, W * 0.01 * open + 0.5, side * 0.2, 0, TAU); ctx.fill(); }
+          ctx.restore();
+        }
+        return;
+      }
+
+      // 2. Jump scare: the light comes back with the monster right in the camera.
+      const J = T - FIN.black;
+      if (!this.finaleJumped) { this.finaleJumped = true; MC.sfx.caught(); MC.sfx.growl(1.2, 1); }
+      if (J < FIN.jump) {
+        const k = ease(J / FIN.jump);
+        ctx.save();
+        ctx.translate(rand(-22, 22) * (1 - k * 0.5), rand(-22, 22) * (1 - k * 0.5));
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'; ctx.fillRect(-30, -30, W + 60, H + 60);
+        // Bursts in huge, settles a little; mouth wide open over the face.
+        const s = fw * (2.4 - 0.5 * k);
+        this.drawBigHead(fx, fy + fw * 0.15, fw * (0.95 - 0.15 * k), fw * 0.75, s, 1);
+        ctx.restore();
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.85 * (1 - J / FIN.jump) ** 2})`; ctx.fillRect(0, 0, W, H); // the light snapping on
+        return;
+      }
+
+      // 3b. Won: it pulls back into the dark and is gone.
+      if (this.finaleWon) {
+        const k = ease((J - FIN.jump) / FIN.retreat);
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'; ctx.fillRect(0, 0, W, H);
+        const s = fw * (1.9 - 1.6 * k);
+        this.drawBigHead(fx, fy - k * H * 0.2, fw * 0.8 * (1 - k * 0.7), fw * 0.4 * (1 - k), s, 0);
+        ctx.restore();
+        return;
+      }
+
+      // 3a. Lost: devoured. The mouth sits on the face and chomps (5 bites of 420 ms), then shuts and chews.
+      const t = J - FIN.jump, CH = 420, N = 5, chewStart = CH * N, end = FIN.devour;
       let open;
-      if (t < IN) open = ease(t / IN);
-      else if (t < chewStart) {
-        const k = ((t - IN) % CH) / CH; // 0 open → 0.5 shut → 1 open
+      if (t < chewStart) {
+        const k = (t % CH) / CH; // 0 open → 0.5 shut → 1 open
         open = Math.abs(Math.cos(k * Math.PI));
-        const i = Math.floor((t - IN) / CH);
+        const i = Math.floor(t / CH);
         if (k > 0.45 && i > this.finaleChomp) { this.finaleChomp = i; MC.sfx.click(); MC.sfx.growl(0.3, 0.7); }
       } else open = 0.04 + 0.03 * Math.abs(Math.sin(t / 120));
-      const shut = t >= IN && t < chewStart ? 1 - Math.abs(Math.cos((((t - IN) % CH) / CH) * Math.PI)) : 0; // 1 at the bite
-      const fade = t > FINALE_MS - 450 ? (FINALE_MS - t) / 450 : 1;
-
+      const shut = t < chewStart ? 1 - Math.abs(Math.cos(((t % CH) / CH) * Math.PI)) : 0; // 1 at the bite
+      const fade = t > end - 450 ? (end - t) / 450 : 1;
       ctx.save();
       ctx.globalAlpha = fade;
       if (shut > 0.85) ctx.translate(rand(-14, 14), rand(-14, 14));
-      // The room goes dark around the streamer.
-      ctx.fillStyle = `rgba(0, 0, 0, ${0.7 * ease(t / 500)})`; ctx.fillRect(-20, -20, W + 40, H + 40);
-
-      // Head: rushes up from below and grows until the mouth sits on the face.
-      const a = ease(t / IN);
-      const mx = fx, my = fy + (1 - a) * H * 0.9; // mouth centre
-      const mrx = fw * (0.55 + 0.25 * a), mry = fw * 0.85 * open * a + 1;
-      const s = fw * (0.9 + 1.0 * a); // head radius
-      const hx = mx, hy = my - s * 0.45;
-      ctx.fillStyle = '#120d16';
-      ctx.shadowColor = 'rgba(255, 60, 60, 0.35)'; ctx.shadowBlur = 40;
-      // Head with the mouth cut out (even-odd), so the streamer's face shows inside the mouth.
-      ctx.beginPath();
-      ctx.ellipse(hx, hy, s * 1.25, s * 1.35, 0, 0, TAU);
-      ctx.ellipse(mx, my, mrx, mry, 0, 0, TAU);
-      ctx.fill('evenodd');
-      ctx.shadowBlur = 0;
-      // Horns.
-      ctx.strokeStyle = '#120d16'; ctx.lineWidth = s * 0.2; ctx.lineCap = 'round';
-      for (const side of [-1, 1]) {
-        ctx.beginPath(); ctx.moveTo(hx + side * s * 0.6, hy - s * 1.1);
-        ctx.bezierCurveTo(hx + side * s * 1.3, hy - s * 2, hx + side * s * 2, hy - s * 1, hx + side * s * 1.5, hy - s * 0.3);
-        ctx.stroke();
-      }
-      // Eyes, glowing brighter at each bite.
-      ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 25 + 40 * shut;
-      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.2, s * 0.12, side * 0.3, 0, TAU); ctx.fill(); }
-      ctx.shadowBlur = 0; ctx.fillStyle = '#120d16';
-      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.035, s * 0.1, 0, 0, TAU); ctx.fill(); }
-      // Teeth round the mouth: upper row points down, lower row points up.
-      ctx.fillStyle = '#efe6d2'; ctx.strokeStyle = 'rgba(60, 20, 20, 0.6)'; ctx.lineWidth = 1.5;
-      const n = 9, tl = Math.max(mrx * 0.28, 6);
-      for (const dir of [-1, 1]) {
-        for (let i = 0; i < n; i++) {
-          const ang = Math.PI * (0.12 + (0.76 * i) / (n - 1));
-          const ex = mx - Math.cos(ang) * mrx, ey = my + dir * Math.sin(ang) * mry;
-          const half = (mrx * 1.5) / n;
-          ctx.beginPath();
-          ctx.moveTo(ex - half, ey - dir * 2); ctx.lineTo(ex + half, ey - dir * 2);
-          ctx.lineTo(ex, ey - dir * tl * (0.6 + 0.4 * Math.sin(ang)));
-          ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
-      }
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(-20, -20, W + 40, H + 40);
+      this.drawBigHead(fx, fy, fw * 0.8, fw * 0.85 * open + 1, fw * 1.9, shut);
       ctx.restore();
-
       // Red flash at every bite.
       if (shut > 0.6) { ctx.fillStyle = `rgba(200, 15, 25, ${0.4 * (shut - 0.6) / 0.4 * fade})`; ctx.fillRect(0, 0, W, H); }
       // Title once the mouth is shut.
@@ -688,6 +711,51 @@
         ctx.strokeText('DEVOURED', W / 2, H * 0.2); ctx.fillText('DEVOURED', W / 2, H * 0.2);
         ctx.restore();
       }
+    }
+
+    // The monster's head filling the screen: mouth centre (mx, my) with radii mrx/mry cut out (the streamer's face
+    // shows through it), head radius s, eyes glowing brighter with `shut` (0..1, the moment of a bite).
+    drawBigHead(mx, my, mrx, mry, s, shut) {
+      // Never so big that the eyes leave the top of the picture.
+      s = Math.min(s, Math.max(this.cv.height * 0.18, my - this.cv.height * 0.1));
+      const ctx = this.ctx, hx = mx, hy = my - s * 0.45;
+      ctx.save();
+      ctx.fillStyle = '#120d16';
+      ctx.shadowColor = 'rgba(255, 60, 60, 0.35)'; ctx.shadowBlur = 40;
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, s * 1.25, s * 1.35, 0, 0, TAU);
+      ctx.ellipse(mx, my, Math.max(1, mrx), Math.max(1, mry), 0, 0, TAU);
+      ctx.fill('evenodd');
+      ctx.shadowBlur = 0;
+      // Horns.
+      ctx.strokeStyle = '#120d16'; ctx.lineWidth = s * 0.2; ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(hx + side * s * 0.6, hy - s * 1.1);
+        ctx.bezierCurveTo(hx + side * s * 1.3, hy - s * 2, hx + side * s * 2, hy - s * 1, hx + side * s * 1.5, hy - s * 0.3);
+        ctx.stroke();
+      }
+      // Eyes.
+      ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 25 + 40 * shut;
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.2, s * 0.12, side * 0.3, 0, TAU); ctx.fill(); }
+      ctx.shadowBlur = 0; ctx.fillStyle = '#120d16';
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.035, s * 0.1, 0, 0, TAU); ctx.fill(); }
+      // Teeth round the mouth: upper row points down, lower row points up.
+      if (mry > 2) {
+        ctx.fillStyle = '#efe6d2'; ctx.strokeStyle = 'rgba(60, 20, 20, 0.6)'; ctx.lineWidth = 1.5;
+        const n = 9, tl = Math.max(mrx * 0.28, 6);
+        for (const dir of [-1, 1]) {
+          for (let i = 0; i < n; i++) {
+            const ang = Math.PI * (0.12 + (0.76 * i) / (n - 1));
+            const ex = mx - Math.cos(ang) * mrx, ey = my + dir * Math.sin(ang) * mry;
+            const half = (mrx * 1.5) / n;
+            ctx.beginPath();
+            ctx.moveTo(ex - half, ey - dir * 2); ctx.lineTo(ex + half, ey - dir * 2);
+            ctx.lineTo(ex, ey - dir * tl * (0.6 + 0.4 * Math.sin(ang)));
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+          }
+        }
+      }
+      ctx.restore();
     }
 
     // End of a lost round: the monster's head where the streamer's head was.
@@ -1093,7 +1161,8 @@
         const rot = h.spin + now / (warn ? 180 : 420);
         const r = W * 0.105 * o * (1 + (warn ? 0.04 * Math.sin(now / 70) : 0));
         ctx.save();
-        ctx.translate(x, y); ctx.scale(1, 0.82); // seen a little from the side
+        const tear = h.tear || 0; // claws pulling it wider (late in the round)
+        ctx.translate(x, y); ctx.scale(1 + 0.4 * tear, 0.82 * (1 - 0.12 * tear)); // seen a little from the side
         // Glow round the portal.
         const glow = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 1.6);
         glow.addColorStop(0, 'rgba(150, 70, 255, 0.55)'); glow.addColorStop(1, 'rgba(90, 30, 200, 0)');
@@ -1119,6 +1188,34 @@
           const k = ((now / 900 + i * 0.137 + h.spin) % 1);
           const th = i * 2.4 + rot * 1.5 + k * 3, rr = r * (1.45 - 1.3 * k);
           ctx.beginPath(); ctx.arc(Math.cos(th) * rr, Math.sin(th) * rr, Math.max(1, r * 0.035 * (1 - k)), 0, TAU); ctx.fill();
+        }
+        // Claws: two dark hands grip the upper rim from inside and pull the portal apart, four bony fingers
+        // curled over the edge with pale talons hooked outside.
+        if (tear > 0) {
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          for (const side of [-1, 1]) {
+            const th = side > 0 ? -0.75 : Math.PI + 0.75; // upper right / upper left of the rim
+            const shake = Math.sin(now / 40 + side) * r * 0.025 * tear;
+            ctx.save(); ctx.globalAlpha = Math.min(1, tear * 2.5);
+            ctx.translate(Math.cos(th) * r * 0.93 + shake, Math.sin(th) * r * 0.93);
+            ctx.rotate(th); // +x points out of the portal
+            ctx.fillStyle = '#0d0812';
+            ctx.beginPath(); ctx.ellipse(-r * 0.2, 0, r * 0.2, r * 0.17, 0, 0, TAU); ctx.fill(); // the hand, inside
+            for (let f = 0; f < 4; f++) {
+              const fy = (f - 1.5) * r * 0.1;
+              // finger: from the hand, over the rim, bending back down outside
+              ctx.strokeStyle = '#0d0812'; ctx.lineWidth = r * 0.07;
+              ctx.beginPath(); ctx.moveTo(-r * 0.15, fy * 0.6);
+              ctx.quadraticCurveTo(r * 0.08, fy - r * 0.02, r * 0.16, fy * 1.15);
+              ctx.stroke();
+              // talon: a pale hook pointing back towards the outside wall
+              ctx.strokeStyle = '#e9e1cf'; ctx.lineWidth = r * 0.03;
+              ctx.beginPath(); ctx.moveTo(r * 0.16, fy * 1.15);
+              ctx.quadraticCurveTo(r * 0.26, fy * 1.2, r * 0.25, fy * 1.25 + r * 0.06 * Math.sign(fy || 1));
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
         }
         ctx.restore();
         ctx.save();

@@ -73,6 +73,8 @@
 
   .stage { position: relative; aspect-ratio: 4 / 3; background: #000; border-radius: 12px; overflow: hidden; }
   .stage canvas { width: 100%; height: 100%; display: block; }
+  .stage .hud, .stage .helpers, .stage .feed, .stage .curses, .stage .banner { transition: opacity 0.25s; }
+  .stage.lightsOut .hud, .stage.lightsOut .helpers, .stage.lightsOut .feed, .stage.lightsOut .curses, .stage.lightsOut .banner { opacity: 0; }
   .hud { position: absolute; left: 12px; right: 12px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
   .pill { background: rgba(0, 0, 0, 0.6); border-radius: 999px; padding: 2px 12px; font-size: 14px; }
   .lives { font-size: 24px; }
@@ -212,15 +214,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794952746"></script>
-<script src="src/settings.js?v=1794952746"></script>
-<script src="src/events.js?v=1794952746"></script>
-<script src="src/face.js?v=1794952746"></script>
-<script src="src/curses.js?v=1794952746"></script>
-<script src="src/sfx.js?v=1794952746"></script>
-<script src="src/mic.js?v=1794952746"></script>
-<script src="src/lightson.js?v=1794952746"></script>
-<script src="src/live.js?v=1794952746"></script>
+<script src="src/edition.js?v=1794953303"></script>
+<script src="src/settings.js?v=1794953303"></script>
+<script src="src/events.js?v=1794953303"></script>
+<script src="src/face.js?v=1794953303"></script>
+<script src="src/curses.js?v=1794953303"></script>
+<script src="src/sfx.js?v=1794953303"></script>
+<script src="src/mic.js?v=1794953303"></script>
+<script src="src/lightson.js?v=1794953303"></script>
+<script src="src/live.js?v=1794953303"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -385,6 +387,7 @@
   async function startRound() {
     if (calibrating || starting || round.running) return; // finish calibrating first; no double start
     if (finaleTimer) { clearTimeout(finaleTimer); finaleTimer = 0; } // a new round cuts the finale short
+    STAGE.classList.remove('lightsOut'); game.finale = 0;
     if (!PREVIEW) {
       if (!canStartRound()) return;
       // Free version: uses a round online for the connected TikTok username (local count when offline).
@@ -435,12 +438,14 @@
   function endRound(won) {
     if (!round.running) return;
     clearRound();
-    if (won) { showResult(true); return; }
-    // Eaten: the "Devoured" finale first (the monster eats the streamer on screen), then the monster's head
-    // takes the streamer's place and the result comes up.
-    game.finalHead = true;
-    game.startFinale(performance.now());
-    finaleTimer = setTimeout(() => showResult(false), game.FINALE_MS);
+    // The finale first (lights out, jump scare, then devoured or spared; lightson.js), then the result.
+    // Eaten: the monster's head also takes the streamer's place.
+    if (!won) game.finalHead = true;
+    game.startFinale(performance.now(), won);
+    // Lights out: the HUD on the stage goes dark too, so the jump scare comes out of real darkness.
+    STAGE.classList.add('lightsOut');
+    setTimeout(() => STAGE.classList.remove('lightsOut'), game.FINALE_BLACK);
+    finaleTimer = setTimeout(() => showResult(won), game.FINALE_MS);
   }
   function showResult(won) {
     finaleTimer = 0;
@@ -550,7 +555,6 @@
     S.darkness = +Math.max(0, 1 - v).toFixed(2);
     S.camBoost = +Math.max(1, v).toFixed(2);
     save();
-    game.previewDarkUntil = performance.now() + 2500; // outside a round: show the darkness for a moment
   };
   $('vol').value = S.volume;
   $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
