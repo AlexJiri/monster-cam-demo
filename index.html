@@ -46,16 +46,8 @@
   .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
   header { align-items: center; }
-  /* Gift guide for viewers, right side of the stage. */
-  /* See-through so the monster stays visible behind it; the text shadow keeps it readable on any background. */
-  .guide { position: absolute; right: 12px; top: 54px; width: min(250px, 34%); max-height: calc(100% - 120px); overflow: hidden; background: rgba(0, 0, 0, 0.32); border-radius: 10px; padding: 8px 10px; font-size: 14px; text-shadow: 0 1px 3px #000, 0 0 2px #000; pointer-events: none; transition: opacity 0.4s; }
-  @media (max-width: 600px) {
-    .guide { top: 84px; right: 8px; width: 42%; padding: 5px 7px; font-size: 11px; line-height: 1.3; }
-    .helpers .pill { font-size: 11px; }
-  }
-  .guide.fade { opacity: 0; }  .guide b { display: block; color: var(--lamp); margin-bottom: 2px; }
-  .guide span { display: block; color: var(--text); }
-  .guide small { color: var(--muted); }
+  /* The gift guide for viewers is drawn on the game canvas (lightson.js drawGuide), under the monster. */
+  @media (max-width: 600px) { .helpers .pill { font-size: 11px; } }
   /* Test round inside Settings & Test: no header, no TikTok step, a narrower panel. */
   .embed header, .embed #step1 { display: none; }
   /* Side by side only when there is room; on a phone the stage and the panel stack like the normal page. */
@@ -160,7 +152,7 @@
       <span class="pill" id="likeBar" title="Likes chain the monster when the bar is full"></span>
     </div>
     <div class="feed" id="feed"></div>
-    <div class="guide" id="guide" aria-live="off"></div>    <div class="curses" id="curses"></div>
+    <div class="curses" id="curses"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
     <div class="lit" id="lit">🔦 The light is on you. Freeze!</div>
     <div class="notice on" id="notice">Connect your live, start the camera, calibrate, then start a round.<br><small style="font-weight:400;color:var(--muted)">Everything runs on this computer; no video is sent anywhere.</small></div>
@@ -220,15 +212,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794949650"></script>
-<script src="src/settings.js?v=1794949650"></script>
-<script src="src/events.js?v=1794949650"></script>
-<script src="src/face.js?v=1794949650"></script>
-<script src="src/curses.js?v=1794949650"></script>
-<script src="src/sfx.js?v=1794949650"></script>
-<script src="src/mic.js?v=1794949650"></script>
-<script src="src/lightson.js?v=1794949650"></script>
-<script src="src/live.js?v=1794949650"></script>
+<script src="src/edition.js?v=1794951205"></script>
+<script src="src/settings.js?v=1794951205"></script>
+<script src="src/events.js?v=1794951205"></script>
+<script src="src/face.js?v=1794951205"></script>
+<script src="src/curses.js?v=1794951205"></script>
+<script src="src/sfx.js?v=1794951205"></script>
+<script src="src/mic.js?v=1794951205"></script>
+<script src="src/lightson.js?v=1794951205"></script>
+<script src="src/live.js?v=1794951205"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -739,26 +731,43 @@
   window.addEventListener('beforeunload', () => { if (streamWin) streamWin.close(); });
 
   // ---------- Gift guide on stream ----------
-  // Tells viewers what each gift does: "🌹 Rose → don't blink". Long lists rotate, 8 lines at a time (4 on a small stage).
-  const guideCards = () => {
-    const lines = [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).map((g) =>
-      `<span>${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${esc(info(g.gift).label || g.gift)} <small>→ ${esc(effectShort(g.curse))}</small></span>`);
+  // Tells viewers what each gift does: "🌹 Rose → don't blink". Gifts with the same effect share a line
+  // ("🌹 Rose, 🍩 Doughnut → don't blink"). Drawn on the game canvas under the monster (lightson.js drawGuide).
+  // Long lists rotate, 8 lines at a time (4 on a small stage).
+  const guidePages = () => {
+    const byEffect = new Map();
+    [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).forEach((g) => {
+      const effect = effectShort(g.curse);
+      if (!byEffect.has(effect)) byEffect.set(effect, []);
+      byEffect.get(effect).push(`${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${info(g.gift).label || g.gift}`);
+    });
+    const lines = [...byEffect].map(([effect, gifts]) => ({ gifts: gifts.join(', '), effect }));
     const per = $('cv').clientWidth && $('cv').clientWidth < 600 ? 4 : 8;
-    const cards = [];
-    for (let i = 0; i < lines.length; i += per) cards.push('<b>🎁 Gifts</b>' + lines.slice(i, i + per).join(''));
-    return cards;
+    const pages = [];
+    for (let i = 0; i < lines.length; i += per) pages.push({ title: '🎁 Gifts', lines: lines.slice(i, i + per) });
+    return pages;
   };
+  // Where the list goes, in canvas pixels: just below the HUD pills on the right; bigger text on a small stage.
+  function guideLayout() {
+    const cv = $('cv'), box = cv.getBoundingClientRect();
+    if (!box.width) return { top: 64, scale: 1 };
+    const px = cv.width / box.width; // canvas pixels per screen pixel
+    let bottom = STAGE.querySelector('.hud').getBoundingClientRect().bottom;
+    const bar = $('likeBar').getBoundingClientRect();
+    if (!$('likeBar').hidden && bar.right > box.left + box.width * 0.55) bottom = Math.max(bottom, bar.bottom); // a long taps bar
+    return { top: Math.max(56, (bottom - box.top + 8) * px), scale: Math.min(1.6, Math.max(1, px * 0.5)) };
+  }
   let guideI = 0;
-  function showGuide() {
-    const el = $('guide');
-    if (!S.showGiftGuide) { el.hidden = true; return; }
-    const cards = guideCards();
-    if (cards.length === 1) { el.innerHTML = cards[0]; return; }
-    el.classList.add('fade');
-    setTimeout(() => { el.innerHTML = cards[guideI++ % cards.length]; el.classList.remove('fade'); }, 400);
+  function showGuide(next = true) {
+    if (!S.showGiftGuide) { game.setGuide(null); return; }
+    const pages = guidePages();
+    if (!pages.length) { game.setGuide(null); return; }
+    if (next) guideI++;
+    game.setGuide(pages[guideI % pages.length], guideLayout());
   }
   showGuide();
   setInterval(showGuide, 6000);
+  addEventListener('resize', () => showGuide(false));
 
   // ---------- Test run (from Settings & Test) ----------
   if (PREVIEW) {

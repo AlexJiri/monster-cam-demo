@@ -323,6 +323,7 @@
       this.drawBites(now, face, W, H);
       if (this.finalHead && !this.finale) this.drawMonsterHead(now, face, W, H);
       this.drawCurses(now, W, H, face);
+      this.drawGuide(now, W, H); // under the monster: it walks in front of the gift list
       if (this.isVoid()) { if (this.phase !== 'off') this.drawVoid(now, W, H); }
       else if (this.phase !== 'stare') this.drawHunter(now, W, H);
       if (this.phase === 'stare' || this.phase === 'stareWarn') this.drawStare(now, W, H);
@@ -508,6 +509,68 @@
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
       }
+    }
+
+    // ---------- Gift guide ----------
+    // The list that tells viewers what each gift does, drawn on the stage itself (top right) so the monster passes
+    // in front of it. `page` = { title, lines: [{ gifts, effect }] }; `layout` = { top, scale } in canvas pixels
+    // (top: below the HUD pills; scale: bigger text on a small stage, e.g. a phone). The box fits its content.
+    setGuide(page, layout) {
+      const key = page ? JSON.stringify(page) : '';
+      if (key !== this.guideKey) { this.guideKey = key; this.guideAt = performance.now(); } // fade in a new page
+      this.guide = page; this.guideLayout = layout || {};
+    }
+
+    drawGuide(now, W, H) {
+      const g = this.guide;
+      if (!g || !g.lines.length) return;
+      const ctx = this.ctx, k = this.guideLayout.scale || 1;
+      const pad = 12 * k, fs = 21 * k, fsSmall = 17 * k, gap = 6 * k;
+      const fontTitle = `700 ${fs}px Rubik, system-ui, sans-serif`;
+      const fontGift = `500 ${fs}px Rubik, system-ui, sans-serif`;
+      const fontEffect = `400 ${fsSmall}px Rubik, system-ui, sans-serif`;
+      const boxMax = W * 0.4, inner = boxMax - pad * 2;
+      // Wrap a line into rows that fit `w` (gift lists break after a comma when they can).
+      const wrap = (text, font, w) => {
+        ctx.font = font;
+        const words = text.split(' '), rows = [];
+        let row = '';
+        for (const word of words) {
+          const next = row ? row + ' ' + word : word;
+          if (row && ctx.measureText(next).width > w) { rows.push(row); row = word; } else row = next;
+        }
+        if (row) rows.push(row);
+        return rows;
+      };
+      const items = g.lines.map((l) => ({ gifts: wrap(l.gifts, fontGift, inner), effect: wrap('→ ' + l.effect, fontEffect, inner) }));
+      // Box size from the longest row.
+      let w = 0;
+      ctx.font = fontTitle; w = Math.max(w, ctx.measureText(g.title).width);
+      ctx.font = fontGift; items.forEach((it) => it.gifts.forEach((r) => { w = Math.max(w, ctx.measureText(r).width); }));
+      ctx.font = fontEffect; items.forEach((it) => it.effect.forEach((r) => { w = Math.max(w, ctx.measureText(r).width); }));
+      const bw = Math.min(boxMax, w + pad * 2);
+      const lhG = fs * 1.25, lhE = fsSmall * 1.25;
+      const bh = pad * 2 + lhG + 4 * k + items.reduce((s, it) => s + it.gifts.length * lhG + it.effect.length * lhE + gap, 0) - gap;
+      const x = W - bw - 12 * k, y = this.guideLayout.top || 64, maxH = H - y - 12 * k;
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (now - (this.guideAt || 0)) / 400);
+      ctx.beginPath(); ctx.roundRect(x, y, bw, Math.min(bh, maxH), 10 * k);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)'; ctx.fill();
+      ctx.clip(); // a very long page is cut at the bottom of the stage
+      ctx.textBaseline = 'top';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.95)'; ctx.shadowBlur = 4 * k; ctx.shadowOffsetY = k;
+      let ty = y + pad;
+      ctx.font = fontTitle; ctx.fillStyle = '#f2c14e'; ctx.fillText(g.title, x + pad, ty);
+      ty += lhG + 4 * k;
+      for (const it of items) {
+        ctx.font = fontGift; ctx.fillStyle = '#f1efe9';
+        for (const r of it.gifts) { ctx.fillText(r, x + pad, ty); ty += lhG; }
+        ctx.font = fontEffect; ctx.fillStyle = '#c3c7d1';
+        for (const r of it.effect) { ctx.fillText(r, x + pad, ty); ty += lhE; }
+        ty += gap;
+      }
+      ctx.restore();
     }
 
     // ---------- Devoured: the finale of a lost round ----------
