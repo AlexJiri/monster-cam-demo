@@ -192,6 +192,7 @@
         <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="1.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
       </div>
       <p class="hint" id="edition"></p>
+      <p class="hint" id="appUpdate" hidden></p>
       <div class="keyForm" id="keyRow" hidden>
         <div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Unlock</button></div>
         <p class="hint keyMsg">Paste the key from your itch.io download page or email.</p>
@@ -214,15 +215,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794953303"></script>
-<script src="src/settings.js?v=1794953303"></script>
-<script src="src/events.js?v=1794953303"></script>
-<script src="src/face.js?v=1794953303"></script>
-<script src="src/curses.js?v=1794953303"></script>
-<script src="src/sfx.js?v=1794953303"></script>
-<script src="src/mic.js?v=1794953303"></script>
-<script src="src/lightson.js?v=1794953303"></script>
-<script src="src/live.js?v=1794953303"></script>
+<script src="src/edition.js?v=1794956309"></script>
+<script src="src/settings.js?v=1794956309"></script>
+<script src="src/events.js?v=1794956309"></script>
+<script src="src/face.js?v=1794956309"></script>
+<script src="src/curses.js?v=1794956309"></script>
+<script src="src/sfx.js?v=1794956309"></script>
+<script src="src/mic.js?v=1794956309"></script>
+<script src="src/lightson.js?v=1794956309"></script>
+<script src="src/live.js?v=1794956309"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -345,6 +346,19 @@
   function noRoundsLeft(nextAt) {
     notice(`No free rounds left<br><small>Next free round ${when(nextAt)}. The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
   }
+
+  // ---------- App update (desktop app) ----------
+  // The app downloads a new version in the background (desktop/main.js) and calls this when it's ready.
+  // It installs when the app closes, or now from the link, never in the middle of a round.
+  MC.appUpdateReady = (version) => {
+    $('appUpdate').hidden = false;
+    $('appUpdate').innerHTML = `🔄 Monster Cam v${esc(version)} is ready. It installs when you close the app, or <a href="#" id="restartNow">restart now</a>.`;
+    $('restartNow').onclick = (e) => {
+      e.preventDefault();
+      if (round.running) { log('🔄 Finish the round first, then restart to update.'); return; }
+      window.open('monstercam://restart-to-update', '_blank');
+    };
+  };
 
   // ---------- License key ----------
   // The TikTok username the game is connected to: free rounds are counted online for it, and it's logged with the key.
