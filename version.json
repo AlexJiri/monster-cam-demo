@@ -1,5 +1,6 @@
 {
   "latest": "0.3.2",
   "minimum": "0.3.0",
-  "download": "https://alexjiri.github.io/monster-cam-demo/"
+  "download": "https://alexjiri.github.io/monster-cam-demo/",
+  "server": "https://158.101.197.220"
 }

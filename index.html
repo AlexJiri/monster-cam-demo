@@ -64,6 +64,11 @@
     .embed .stageCol .stage { width: min(100%, calc((100vh - 24px) * 4 / 3)); }
     .embed .panel { max-height: calc(100vh - 24px); }
   }
+  /* License key: in the Play panel ("Have a key?") and on the "no free rounds left" screen. */
+  .keyForm input { flex: 1; min-width: 0; width: auto; max-width: 260px; font-size: 16px; padding: 6px 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .keyForm input::placeholder { text-transform: none; letter-spacing: 0; }
+  .notice .keyForm { margin-top: 10px; font-size: 15px; font-weight: 400; }
+  .notice .keyForm .row { justify-content: center; }
   .backBtn { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 500; }
   .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
   .notice .x:hover { color: var(--text); }
@@ -193,6 +198,10 @@
         <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="1.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
       </div>
       <p class="hint" id="edition"></p>
+      <div class="keyForm" id="keyRow" hidden>
+        <div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Unlock</button></div>
+        <p class="hint keyMsg">Paste the key from your itch.io download page or email.</p>
+      </div>
     </section>
     <section id="testBox" hidden>
       <h2>🧪 Test viewers <small class="hint">· only on this computer</small></h2>
@@ -211,15 +220,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794390561"></script>
-<script src="src/settings.js?v=1794390561"></script>
-<script src="src/events.js?v=1794390561"></script>
-<script src="src/face.js?v=1794390561"></script>
-<script src="src/curses.js?v=1794390561"></script>
-<script src="src/sfx.js?v=1794390561"></script>
-<script src="src/mic.js?v=1794390561"></script>
-<script src="src/lightson.js?v=1794390561"></script>
-<script src="src/live.js?v=1794390561"></script>
+<script src="src/edition.js?v=1794949650"></script>
+<script src="src/settings.js?v=1794949650"></script>
+<script src="src/events.js?v=1794949650"></script>
+<script src="src/face.js?v=1794949650"></script>
+<script src="src/curses.js?v=1794949650"></script>
+<script src="src/sfx.js?v=1794949650"></script>
+<script src="src/mic.js?v=1794949650"></script>
+<script src="src/lightson.js?v=1794949650"></script>
+<script src="src/live.js?v=1794949650"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -320,26 +329,58 @@
     const v = `v${ED.VERSION}`;
     if (update && update.required) { $('edition').innerHTML = `⛔ ${v} is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a>`; return; }
     const upd = update && update.available ? ` · <a href="${esc(update.download)}" target="_blank" rel="noopener">v${esc(update.latest)} available</a>` : '';
-    if (ED.PAID) { $('edition').innerHTML = `Full version ${v}${upd}`; return; }
+    if (ED.isPaid()) { $('edition').innerHTML = `Full version ${v}${upd}`; $('keyRow').hidden = true; return; }
     if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FREE_ROUNDS})`; return; }
     const left = ED.rounds.left();
     const next = ED.rounds.nextAt();
     $('edition').innerHTML = `Free version ${v}: ${left}/${ED.FREE_ROUNDS} rounds left` +
-      (next ? ` · next free round ${when(next)}` : '') + upd;
+      (next ? ` · next free round ${when(next)}` : '') + upd + ' · <a href="#" data-key-open>Have a key?</a>';
   }
   ED.checkVersion().then((r) => { update = r; renderEdition(); });
   setInterval(renderEdition, 30000); // the cooldown runs out while the page is open
   renderEdition();
-  // Returns true when a round may start; otherwise explains why on the stage.
+  // Returns true when a round may start; otherwise explains why on the stage. (Free rounds are checked in startRound.)
   function canStartRound() {
     if (update && update.required) {
       notice(`Update required<br><small>This version is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a></small>`);
       return false;
     }
-    if (ED.rounds.left() > 0) return true;
-    notice(`No free rounds left<br><small>Next free round ${when(ED.rounds.nextAt())}. The full version has unlimited rounds and no watermark.</small>`);
-    return false;
+    return true;
   }
+  const KEY_FORM = '<div class="keyForm"><div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Unlock</button></div><small class="keyMsg"></small></div>';
+  function noRoundsLeft(nextAt) {
+    notice(`No free rounds left<br><small>Next free round ${when(nextAt)}. The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
+  }
+
+  // ---------- License key ----------
+  // The TikTok username the game is connected to: free rounds are counted online for it, and it's logged with the key.
+  let liveUser = null;
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-key-open]')) { e.preventDefault(); $('keyRow').hidden = false; $('keyRow').querySelector('input').focus(); return; }
+    const btn = e.target.closest('[data-unlock]');
+    if (!btn) return;
+    const form = btn.closest('.keyForm'), input = form.querySelector('input'), msg = form.querySelector('.keyMsg');
+    if (!input.value.trim()) { input.focus(); return; }
+    btn.disabled = true; msg.textContent = 'Checking…';
+    const r = await ED.license.activate(input.value, liveUser || $('ttUser').value);
+    btn.disabled = false;
+    if (r.valid) {
+      msg.textContent = '✅ Full version unlocked. Thank you!';
+      log('🔓 Full version unlocked: unlimited rounds, no watermark.');
+      renderEdition();
+      if (form.closest('.notice')) setTimeout(hideNotice, 1200);
+    } else msg.textContent = r.offline ? '⚠️ Could not reach the server. Check the internet and try again.'
+      : r.blocked ? '⛔ This key was blocked. If you bought it, write to us for a new one.'
+      : '❌ Key not found. Check it and try again.';
+  });
+  document.addEventListener('keydown', (e) => {
+    const form = e.key === 'Enter' && e.target.closest && e.target.closest('.keyForm');
+    if (form) form.querySelector('[data-unlock]').click();
+  });
+  // Re-check a saved key quietly at start (a key blocked on the server stops working).
+  let savedUser = '';
+  try { savedUser = localStorage.getItem('monstercam-tt-user') || ''; } catch (e) {}
+  ED.license.recheck(savedUser).then(renderEdition);
 
   // Test (from Settings & Test): a 60 s round with fake viewers, TikTok off, not counted as a free round.
   const PREVIEW = location.hash.startsWith('#preview');
@@ -348,13 +389,18 @@
   if (EMBED) document.body.classList.add('embed');
   const PREVIEW_SECONDS = 60;
   let calWasOn = false;
-  function startRound() {
-    if (calibrating) return; // finish calibrating first
+  let starting = false;
+  async function startRound() {
+    if (calibrating || starting || round.running) return; // finish calibrating first; no double start
     if (finaleTimer) { clearTimeout(finaleTimer); finaleTimer = 0; } // a new round cuts the finale short
     if (!PREVIEW) {
       if (!canStartRound()) return;
-      ED.rounds.use();
+      // Free version: uses a round online for the connected TikTok username (local count when offline).
+      starting = true;
+      const r = await ED.rounds.use(liveUser);
+      starting = false;
       renderEdition();
+      if (!r.allowed) { noRoundsLeft(r.nextAt); return; }
     }
     MC.sfx.unlock();
     lives = S.lives; renderLives();
@@ -645,7 +691,15 @@
   const done = (id, on) => $(id).classList.toggle('done', !!on);
   if (!PREVIEW) MC.live.start((st) => {
     $('ttStatus').textContent = (TT_TEXT[st.state] || '') + (['connecting', 'connected', 'offline', 'error'].includes(st.state) ? st.message : '');
-    if (st.state === 'connected') log(`📡 ${esc(st.message)}`);
+    if (st.state === 'connected') {
+      log(`📡 ${esc(st.message)}`);
+      // Free rounds now count for this account online; the key (if any) is logged with it.
+      liveUser = $('ttUser').value.trim().replace(/^@/, '').toLowerCase() || null;
+      ED.rounds.refresh(liveUser).then(renderEdition);
+      ED.license.recheck(liveUser).then(renderEdition);
+    } else if (['idle', 'offline', 'error', 'nobridge'].includes(st.state)) {
+      if (liveUser) { liveUser = null; ED.rounds.refresh(null).then(renderEdition); }
+    }
     done('step1', st.state === 'connected');
   });
   $('ttUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ttConnect').click(); });
