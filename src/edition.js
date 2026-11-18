@@ -123,6 +123,7 @@
   // (counted apart from the normal free rounds, and on top of them).
   const PACKS = {
     xmas: {
+      id: 'xmas', // its card in the lobby catalog
       name: 'Christmas Pack',
       monsters: ['krampus'], scenes: ['winter'],
       rounds: counter(`${GAME}-xmas`, 1, 'monstercam-xmas-rounds'), // 1 free round a day
@@ -130,6 +131,34 @@
   };
   // The pack a game setup uses (monster or scene from a pack), or null.
   const packFor = (s) => Object.values(PACKS).find((p) => p.monsters.includes(s.monster) || p.scenes.includes(s.scene)) || null;
+
+  // ---------- Lobby catalog ----------
+  // The cards the lobby shows (games, packs, coming soon) with their Buy links, from the server (mc-catalog).
+  // The last copy is kept for offline; the built-in list is the very first fallback (no Buy links in it).
+  const CATALOG_KEY = 'monstercam-catalog';
+  const DEFAULT_CATALOG = [
+    { id: 'lightson', kind: 'game', title: 'Lights On', icon: '🔦', blurb: 'A monster hunts the room with a lantern. Viewers send gifts to curse you, send it after you or chain it up. Freeze when the light finds you.' },
+    { id: 'xmas', kind: 'pack', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night scene with snow and string lights.' },
+    { id: 'freeze', kind: 'soon', title: 'Freeze', icon: '🧊', blurb: 'Reach the finish without moving while the monster watches.' },
+    { id: 'swarm', kind: 'soon', title: 'Swarm', icon: '🦇', blurb: 'Every viewer becomes a little monster.' },
+    { id: 'duel', kind: 'soon', title: 'Monster Duel', icon: '⚔️', blurb: 'TikTok LIVE battles: gifts send the monster to your opponent.' },
+  ];
+  const catalog = {
+    items() { const c = store.get(CATALOG_KEY); return Array.isArray(c) && c.length ? c : DEFAULT_CATALOG; },
+    // Ask the server for the newest cards. Resolves to true when they changed.
+    async refresh() {
+      try {
+        const r = await fetch(server() + '/v1/catalog', { signal: AbortSignal.timeout(6000), cache: 'no-store' });
+        const items = r.ok ? (await r.json()).items : null;
+        if (!Array.isArray(items) || !items.length) return false;
+        const changed = JSON.stringify(items) !== JSON.stringify(store.get(CATALOG_KEY));
+        store.set(CATALOG_KEY, items);
+        return changed;
+      } catch (e) { return false; }
+    },
+    // Where to buy the full version ('' until the store page exists). Only https links are used.
+    buyLink(id = GAME) { const c = this.items().find((i) => i.id === id); return c && /^https:\/\//.test(c.buy || '') ? c.buy : ''; },
+  };
 
   // Resolves to { required, available, download } or null when offline (offline never blocks the game).
   async function checkVersion() {
@@ -158,5 +187,5 @@
     ctx.restore();
   }
 
-  MC.edition = { VERSION, GAME, DEV, FREE_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, license, rounds, PACKS, packFor, checkVersion, watermark };
+  MC.edition = { VERSION, GAME, DEV, FREE_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, license, rounds, PACKS, packFor, catalog, checkVersion, watermark };
 })(window.MC = window.MC || {});

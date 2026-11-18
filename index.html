@@ -57,6 +57,35 @@
     .embed .stageCol .stage { width: min(100%, calc((100vh - 24px) * 4 / 3)); }
     .embed .panel { max-height: calc(100vh - 24px); }
   }
+  /* Lobby: full-window start screen over the game page. */
+  .lobby { position: fixed; inset: 0; z-index: 50; overflow: auto; background: radial-gradient(ellipse at 50% -10%, #2c1a44 0%, var(--night) 65%); }
+  .lobby[hidden] { display: none; }
+  .lobbyIn { max-width: 980px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); }
+  .lobbyTop { display: flex; gap: 16px; align-items: center; }
+  .lobbyTop img { border-radius: 18px; box-shadow: 0 6px 30px rgba(140, 70, 220, 0.35); }
+  .lobbyTop h1 { margin: 0; font-size: 32px; letter-spacing: 0.5px; }
+  .lobbyTop p { margin: 2px 0 0; color: var(--muted); }
+  .lobbyEd { color: var(--muted); margin: 14px 0; min-height: 1.4em; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .card h2 { margin: 0; font-size: 19px; display: flex; gap: 10px; align-items: center; }
+  .card .ic { font-size: 34px; line-height: 1; }
+  .card p { margin: 0; color: #c3c7d1; font-size: 14px; }
+  .card .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; padding-top: 6px; }
+  .card .badge { position: absolute; top: 12px; right: 12px; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; background: var(--line); color: var(--muted); }
+  .card:not(.game) .badge { position: static; align-self: flex-start; } /* above the title on the small cards */
+  .card .badge.ok { background: rgba(95, 191, 122, 0.18); color: var(--moss); }
+  .card .badge.lock { background: rgba(242, 193, 78, 0.15); color: var(--lamp); }
+  .card .note { font-size: 13px; color: var(--muted); }
+  .card.game { grid-column: 1 / -1; padding: 22px; background: linear-gradient(120deg, #2a1c12 0%, #171a22 55%); border-color: #4a3424; }
+  .card.game h2 { font-size: 26px; } .card.game .ic { font-size: 46px; }
+  .card.game p { font-size: 15px; max-width: 620px; }
+  .card.pack { background: linear-gradient(160deg, #10241c 0%, #171a22 60%); border-color: #24453a; }
+  .card.soon { opacity: 0.6; }
+  .card a.buy { font-weight: 700; }
+  .lobbyKey { margin-top: 18px; max-width: 520px; }
+  .lobbyKey h3 { margin: 0 0 6px; font-size: 15px; }
+  #lobbyPlay { font-size: 18px; padding: 10px 26px; }
   /* License key: in the Play panel ("Have a key?") and on the "no free rounds left" screen. */
   .keyForm input { flex: 1; min-width: 0; width: auto; max-width: 260px; font-size: 16px; padding: 6px 8px; letter-spacing: 1px; text-transform: uppercase; }
   .keyForm input::placeholder { text-transform: none; letter-spacing: 0; }
@@ -143,10 +172,22 @@
 </style>
 </head>
 <body>
+<!-- Lobby: what opens first. The game, its packs, what's coming, where to buy, the key. -->
+<div class="lobby" id="lobby" hidden>
+  <div class="lobbyIn">
+    <div class="lobbyTop">
+      <img src="src/icon-256.png" alt="" width="76" height="76">
+      <div><h1>Monster Cam</h1><p>Horror games for TikTok LIVE. Your viewers control the monster.</p></div>
+    </div>
+    <p class="lobbyEd" id="lobbyEd"></p>
+    <div class="cards" id="cards"></div>
+    <div class="lobbyKey" id="lobbyKey"></div>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
-    <nav class="tabs" aria-label="Pages"><a href="index.html" class="on" aria-current="page">▶ Play</a><a href="bench.html">⚙️ Settings &amp; Test</a></nav>
+    <nav class="tabs" aria-label="Pages"><a href="#" data-lobby-open>🏠 Lobby</a><a href="index.html" class="on" aria-current="page">▶ Play</a><a href="bench.html">⚙️ Settings &amp; Test</a></nav>
   </header>
   <div class="layout">
     <div class="stageCol" id="stageCol">
@@ -227,15 +268,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794989687"></script>
-<script src="src/settings.js?v=1794989687"></script>
-<script src="src/events.js?v=1794989687"></script>
-<script src="src/face.js?v=1794989687"></script>
-<script src="src/curses.js?v=1794989687"></script>
-<script src="src/sfx.js?v=1794989687"></script>
-<script src="src/mic.js?v=1794989687"></script>
-<script src="src/lightson.js?v=1794989687"></script>
-<script src="src/live.js?v=1794989687"></script>
+<script src="src/edition.js?v=1794990277"></script>
+<script src="src/settings.js?v=1794990277"></script>
+<script src="src/events.js?v=1794990277"></script>
+<script src="src/face.js?v=1794990277"></script>
+<script src="src/curses.js?v=1794990277"></script>
+<script src="src/sfx.js?v=1794990277"></script>
+<script src="src/mic.js?v=1794990277"></script>
+<script src="src/lightson.js?v=1794990277"></script>
+<script src="src/live.js?v=1794990277"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -394,6 +435,7 @@
       msg.textContent = '✅ Full version unlocked. Thank you!';
       log('🔓 Full version unlocked: unlimited rounds, no watermark.');
       renderEdition();
+      if (!$('lobby').hidden) setTimeout(renderLobby, 1200); // the lobby turns into the full version's
       if (form.closest('.notice')) setTimeout(hideNotice, 1200);
     } else msg.textContent = r.offline ? '⚠️ Could not reach the server. Check the internet and try again.'
       : r.blocked ? '⛔ This key was blocked. If you bought it, write to us for a new one.'
@@ -416,6 +458,58 @@
   const PREVIEW_SECONDS = 60;
   let calWasOn = false;
   let starting = false;
+
+  // ---------- Lobby ----------
+  // Opens first (not in the test inside Settings & Test). Cards come from the server's catalog (mc-catalog): the game,
+  // its packs (included in the full version; the free version gets a free pack round a day), and what's coming soon.
+  function renderLobby() {
+    const paid = ED.isPaid() || ED.DEV;
+    const buyFull = ED.catalog.buyLink();
+    const items = ED.catalog.items();
+    const price = (items.find((i) => i.id === ED.GAME) || {}).price;
+    const buyBtn = (label) => (buyFull ? `<a class="buy" href="${esc(buyFull)}" target="_blank" rel="noopener">${label}</a>` : '');
+    $('lobbyEd').innerHTML = paid ? '✅ Full version: unlimited rounds, every pack, no watermark.'
+      : `Free version: ${ED.rounds.left()}/${ED.FREE_ROUNDS} rounds left today${ED.rounds.nextAt() ? ` · next ${when(ED.rounds.nextAt())}` : ''} · watermark on stream.`;
+    $('cards').innerHTML = items.map((c) => {
+      const head = `<h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>`;
+      if (c.kind === 'game') {
+        return `<div class="card game">${paid ? '<span class="badge ok">✓ Full version</span>' : '<span class="badge">Free version</span>'}${head}
+          <div class="acts"><button class="primary" id="lobbyPlay" data-lobby-play>▶ Play</button>
+          ${paid ? '' : buyBtn(`Get the full version${price ? ' · ' + esc(price) : ''}`)}</div></div>`;
+      }
+      if (c.kind === 'pack') {
+        const pack = Object.values(ED.PACKS).find((p) => p.id === c.id);
+        if (!pack) return ''; // a pack this version of the game doesn't have yet (update the app)
+        const left = pack.rounds.left(), next = pack.rounds.nextAt();
+        const play = `<button data-lobby-pack="${esc(pack.id)}" ${!paid && left <= 0 ? 'disabled' : ''}>▶ Play ${esc(pack.name.replace(/ Pack$/, ''))}</button>`;
+        return `<div class="card pack">${paid ? '<span class="badge ok">✓ Included</span>' : '<span class="badge lock">🔒 Full version</span>'}${head}
+          ${paid ? '' : `<span class="note">${left > 0 ? `🎁 ${left} free round today` : `Today's free round is used · next ${when(next)}`}. The full version includes it.</span>`}
+          <div class="acts">${play}${paid ? '' : buyBtn('Get the full version')}</div></div>`;
+      }
+      return `<div class="card soon"><span class="badge">Coming soon</span>${head}</div>`;
+    }).join('');
+    $('lobbyKey').innerHTML = paid ? '' : `<h3>🔑 Bought it? Paste your key</h3>${KEY_FORM}`;
+  }
+  function openLobby() { if (round.running) { log('🏠 Finish the round first.'); return; } renderLobby(); $('lobby').hidden = false; }
+  function closeLobby() { $('lobby').hidden = true; }
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-lobby-open]')) { e.preventDefault(); openLobby(); return; }
+    if (e.target.closest('[data-lobby-play]')) { closeLobby(); return; }
+    const p = e.target.closest('[data-lobby-pack]');
+    if (p) {
+      // Play the pack: its monster and its scene (changeable in Settings later).
+      const pack = Object.values(ED.PACKS).find((x) => x.id === p.dataset.lobbyPack);
+      S.monster = pack.monsters[0]; S.scene = pack.scenes[0]; save();
+      renderEdition();
+      log(`${esc(pack.name)}: ${esc(S.monster)} in the ${esc(S.scene)} scene. Change them in Settings.`);
+      closeLobby();
+    }
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('lobby').hidden) closeLobby(); });
+  if (!PREVIEW) {
+    openLobby();
+    ED.catalog.refresh().then((changed) => { if (changed && !$('lobby').hidden) renderLobby(); });
+  }
   async function startRound() {
     if (calibrating || starting || round.running) return; // finish calibrating first; no double start
     if (finaleTimer) { clearTimeout(finaleTimer); finaleTimer = 0; } // a new round cuts the finale short
