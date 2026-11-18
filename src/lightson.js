@@ -1253,6 +1253,29 @@
           }
           return pts;
         };
+        // A forest behind the two big trees, so the scene feels wide and deep: a row of small far trees in the haze
+        // (paler, see-through), then a few middle ones, darker. Kept to the sides: the streamer is in the middle.
+        const farTree = (x, base, h, color) => {
+          const wdt = h * 0.42, tiers = 4;
+          for (let i = 0; i < tiers; i++) {
+            const t0 = base - h + (h * i) / (tiers + 0.5), t1 = base - h + (h * (i + 1.5)) / (tiers + 0.5);
+            const half = (wdt / 2) * (0.4 + (0.6 * (i + 1)) / tiers);
+            c.fillStyle = color;
+            c.beginPath(); c.moveTo(x, t0); c.lineTo(x + half, t1); c.lineTo(x - half, t1); c.closePath(); c.fill();
+            c.strokeStyle = 'rgba(225, 235, 250, 0.4)'; c.lineWidth = Math.max(1, h / 90);
+            c.beginPath(); c.moveTo(x - half * 0.85, t1 - 1); c.quadraticCurveTo(x, t1 - (t1 - t0) * 0.15, x + half * 0.85, t1 - 1); c.stroke();
+          }
+        };
+        const haze = c.createLinearGradient(0, H * 0.55, 0, H); // mist low over the far trees
+        haze.addColorStop(0, 'rgba(150, 175, 215, 0)'); haze.addColorStop(1, 'rgba(150, 175, 215, 0.16)');
+        c.fillStyle = haze; c.fillRect(0, H * 0.55, W, H * 0.45);
+        for (let x = W * 0.01; x < W; x += W * (0.028 + rnd() * 0.02)) {
+          if (x > W * 0.36 && x < W * 0.64) continue;
+          farTree(x, H * (0.9 + rnd() * 0.02), H * (0.13 + rnd() * 0.09), 'rgba(28, 42, 66, 0.6)');
+        }
+        for (const [fx, fh] of [[0.2, 0.36], [0.27, 0.27], [0.33, 0.2], [0.7, 0.24], [0.79, 0.33], [0.86, 0.38]]) {
+          farTree(W * (fx + (rnd() - 0.5) * 0.01), H * 0.93, H * fh, 'rgba(22, 36, 46, 0.82)');
+        }
         const lights = [...tree(W * 0.09, H * 0.28, W * 0.2), ...tree(W * 0.935, H * 0.45, W * 0.13)];
         // Krampus's ride, bottom right: a rusty old sleigh and two gaunt monster reindeer harnessed to it,
         // waiting in the snow (their legs sink into the drift drawn next). Their eyes glow and their breath

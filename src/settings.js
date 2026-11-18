@@ -14,7 +14,10 @@
     graceMs: 1200, // warning time before a new curse starts counting
     roundSeconds: 300, // survive this long to win the round (a duel lasts about 5 minutes)
     volume: 0.8,
-    sound: { monster: 1, steps: 1, tension: 1, effects: 1 }, // each sound group's volume, 0..1 (sfx.js)
+    // Each sound group's volume, 0..1 (sfx.js). The monster's growls and steps start a bit lower: most streamers play on
+    // speakers, not headphones, and quieter game sounds leak less into the microphone.
+    sound: { monster: 0.65, steps: 0.8, tension: 1, effects: 1 },
+    soundDefaults: 2,
     // Lights On: what counts as "moving" while the flashlight is on you.
     monster: 'hunter', // hunter (walks through the room) | void (comes out of black holes) | krampus (Christmas Pack, walks like the hunter)
     scene: 'none', // atmosphere over the camera: none | basement | forest | hospital | winter (Christmas Pack)
@@ -80,6 +83,11 @@
         if (!saved.tapsRule) {
           if (s.likesForShield > 0 && !s.gifts.some((g) => g.gift === TAPS)) s.gifts.push({ gift: TAPS, every: s.likesForShield, curse: 'shield' });
           s.tapsRule = true;
+        }
+        // Saves from before the quieter monster: lower the groups still at the old default (1), once.
+        if (saved.soundDefaults !== DEFAULTS.soundDefaults) {
+          for (const k of ['monster', 'steps']) if (s.sound[k] === 1) s.sound[k] = DEFAULTS.sound[k];
+          s.soundDefaults = DEFAULTS.soundDefaults;
         }
         delete s.tiers;
         delete s.anyGiftAdded;
