@@ -10,6 +10,20 @@
   const PORTAL_IDLE = 0.45; // Void portal size (0..1) while open but nothing is coming out of it
   const FIN = { black: 2300, jump: 650, devour: 3500, retreat: 900 };
   const KRAMPUS_FUR = '#170f0b'; // Christmas Pack monster: black-brown fur
+  // How each walking monster moves: `speed` stretches the pass (2 = twice as long), `step` = ms between steps,
+  // `tint` = colour of its light ("r,g,b"). The light's origin comes from pose().
+  const WALKERS = {
+    hunter: { speed: 1, step: 420, tint: '255,214,140' },
+    krampus: { speed: 1, step: 420, tint: '255,214,140' },
+    // Christmas Pack: a fat Santa waddling slowly with a gift sack; Rudolf galloping, his red nose is the light.
+    santa: { speed: 1.4, step: 600, tint: '255,214,140', tricks: ['walk', 'turn', 'turn', 'peek'] },
+    rudolf: { speed: 0.55, step: 150, tint: '255,70,60', tricks: ['walk', 'charge', 'charge', 'peek'], hunt: 'charge' },
+    // A zombie crawling on the floor with a head lamp, leaving a trail; rises up to glare.
+    zombie: { speed: 1.75, step: 780, tint: '200,255,180', tricks: ['walk', 'rise', 'rise', 'peek'], hunt: 'rise' },
+  };
+  // The finale's big head per monster: skin colour.
+  const HEAD = { hunter: '#120d16', krampus: KRAMPUS_FUR, santa: '#3d0c10', rudolf: '#2a1d14', zombie: '#26322a' };
+  const SANTA_RED = '#5a0d12', SANTA_FUR = '#d9d4c8', ZOMBIE_SKIN = '#2f3d2f';
   const rand = (a, b) => a + Math.random() * (b - a);
   const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -37,6 +51,7 @@
     // ---------- state ----------
     start(now) {
       this.bites = []; this.finalHead = false; this.finale = 0; this.voidBeams = []; this.emerges = [];
+      this.trail = []; this.zombified = 0; this.rise = 0;
       // Void: places where a portal can open, away from the middle where the streamer sits and from the gift list
       // (top right). Each pass picks a few of them.
       const spots = [[0.13, 0.24], [0.11, 0.64], [0.88, 0.7], [0.47, 0.13], [0.3, 0.13], [0.66, 0.15]];
@@ -46,6 +61,19 @@
     }
 
     isVoid() { return this.s.monster === 'void'; }
+    walker() { return WALKERS[this.s.monster] || WALKERS.hunter; }
+    // Where the walking monster's light is (0..1 of the frame): the lantern, Rudolf's nose, the zombie's head lamp.
+    // The drawing uses the same numbers, so the beam always comes out of the right place.
+    pose(now) {
+      const m = this.monster, f = m.facing;
+      switch (this.s.monster) {
+        case 'rudolf': return { x: m.x + 0.125 * f, y: 0.555 - this.gallopBob(now) + (m.low ? 0.06 : 0) };
+        case 'zombie': return { x: m.x + 0.075 * f, y: 0.85 - 0.15 * this.rise };
+        case 'santa': return { x: m.x + 0.1 * f, y: 0.52 };
+        default: return { x: m.x + 0.075 * f, y: 0.42 };
+      }
+    }
+    gallopBob(now) { return this.monster.moving ? Math.abs(Math.sin(now / 105)) * 0.025 : 0; }
     // Every lantern beam on screen: the hunter's, or one per creature out of a hole.
     beams() { return [this.beam, ...(this.voidBeams || [])].filter(Boolean); }
 
@@ -169,6 +197,7 @@
     // Called by the game when the streamer gets caught (by the light or by a curse).
     eat(now, face) {
       MC.sfx.caught();
+      if (this.s.monster === 'zombie') this.zombified++; // each bite turns the streamer a bit more into one of them
       this.lit = false;
       this.set('eaten', now, { end: now + 1600, eatBox: face && face.box ? { ...face.box } : null });
     }
@@ -215,9 +244,13 @@
           // Find the segment of the plan we're in.
           let t = now - this.t0, seg = this.plan[this.plan.length - 1], p = 1;
           for (const g of this.plan) { if (t <= g.dur) { seg = g; p = g.dur ? t / g.dur : 1; break; } t -= g.dur; }
+          const mon = this.s.monster, wk = this.walker();
           if (seg !== this.seg) {
             // Entering a new segment: the spin round is loud.
-            if (seg.beam === 'face' && this.seg && this.seg.back) { MC.sfx.growl(0.6, 0.9); MC.sfx.click(); }
+            if (seg.beam === 'face' && this.seg && this.seg.back) { MC.sfx.growl(0.6, 0.9); MC.sfx.click(); if (mon === 'santa') MC.sfx.hoho(1); }
+            else if (seg.paw) MC.sfx.snort(1); // Rudolf paws the floor before he charges
+            else if (seg.charge) MC.sfx.growl(0.5, 0.8);
+            else if (seg.rise) MC.sfx.groan(1.4, 1); // the zombie rises up to look
             else if (seg.beam !== 'off' && (!this.seg || this.seg.beam === 'off')) MC.sfx.click();
             this.seg = seg;
           }
@@ -226,8 +259,24 @@
           m.facing = seg.facing;
           m.back = seg.back;
           m.moving = seg.x0 !== seg.x1;
-          if (m.moving && now >= this.stepAt) { MC.sfx.footstep(0.45); this.stepAt = now + 420; }
-          const ox = m.x + 0.075 * m.facing, oy = 0.42;
+          m.low = !!(seg.paw || seg.charge); // Rudolf: head down, antlers first
+          m.paw = !!seg.paw;
+          // Zombie: rises slowly, holds, sinks back.
+          this.rise = seg.rise ? Math.min(1, p * 4, (1 - p) * 4) : 0;
+          if ((m.moving || seg.paw) && now >= this.stepAt) { MC.sfx.footstep(seg.charge ? 0.7 : 0.45); this.stepAt = now + (seg.charge ? 110 : seg.paw ? 380 : wk.step); }
+          // Voices now and then: Santa's "ho ho ho", the zombie's moan.
+          if (now >= (this.voiceAt || 0)) {
+            if (mon === 'santa') MC.sfx.hoho(0.8);
+            else if (mon === 'zombie') MC.sfx.groan(1.1, 0.7);
+            this.voiceAt = now + rand(3500, 6500);
+          }
+          // Zombie: a dark wet trail along the floor where it dragged itself.
+          if (mon === 'zombie' && m.moving) {
+            const last = this.trail[this.trail.length - 1], tx = m.x - 0.06 * m.facing;
+            if (!last || Math.abs(last.x - tx) > 0.012 || now - last.t > 600) this.trail.push({ x: tx, t: now, w: rand(0.8, 1.2) });
+            if (this.trail.length > 400) this.trail.shift();
+          }
+          const lamp = this.pose(now), ox = lamp.x, oy = lamp.y;
           const box = this.screenBox(face);
           if (box) this.faceX = box.x + box.w / 2;
           const W = this.cv.width, H = this.cv.height;
@@ -237,7 +286,7 @@
           else if (seg.beam === 'face') {
             // Straight into the streamer's eyes (or the middle of the room if there's no face).
             const target = box ? Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H) : centre;
-            this.beam = { ox, oy, angle: target, half: 0.3 };
+            this.beam = { ox, oy, angle: target, half: 0.3, tint: wk.tint };
           } else {
             let angle = centre + Math.sin((now - this.t0) / 650 + this.swing) * 0.6;
             if (this.hunting && box) {
@@ -245,11 +294,11 @@
               const target = Math.atan2((box.x + box.w / 2 - ox) * W, (box.y + box.h / 2 - oy) * H);
               angle = lerp(angle, target, Math.sin(p * Math.PI) ** 0.6);
             }
-            this.beam = { ox, oy, angle, half: this.hunting ? 0.24 : 0.2 };
+            this.beam = { ox, oy, angle, half: this.hunting ? 0.24 : 0.2, tint: wk.tint };
           }
           if (now >= this.end) {
             this.beam = null;
-            this.seg = null;
+            this.seg = null; this.rise = 0; m.low = m.paw = false;
             this.set('idle', now);
             this.nextAt = now + this.gap();
           }
@@ -272,13 +321,34 @@
 
     // One pass through the room, picked at random. Times in ms, x in frame widths (−0.2 and 1.2 are off screen).
     makePlan(dir, hunting) {
-      const s = this.s, from = dir > 0 ? -0.2 : 1.2, to = dir > 0 ? 1.2 : -0.2, f = dir;
-      const walk = s.sweepSeconds * 1000;
-      const trick = hunting ? (Math.random() < 0.6 ? 'turn' : 'walk') : ['walk', 'walk', 'turn', 'peek'][Math.floor(Math.random() * 4)];
+      const s = this.s, from = dir > 0 ? -0.2 : 1.2, to = dir > 0 ? 1.2 : -0.2, f = dir, wk = this.walker();
+      const walk = s.sweepSeconds * 1000 * wk.speed;
+      const tricks = wk.tricks || ['walk', 'walk', 'turn', 'peek'];
+      const trick = hunting ? (Math.random() < 0.6 ? wk.hunt || 'turn' : 'walk') : tricks[Math.floor(Math.random() * tricks.length)];
+      const fx = this.faceX == null ? 0.5 : this.faceX;
+      if (trick === 'charge') {
+        // Rudolf: gallops in, stops near his edge, paws the floor with his nose on the streamer, then charges
+        // across the room, head down, nose light locked on them.
+        const stop = dir > 0 ? rand(0.12, 0.22) : rand(0.78, 0.88);
+        return [
+          { dur: walk * (Math.abs(stop - from) / 1.4), x0: from, x1: stop, beam: 'swing', back: false, facing: f },
+          { dur: rand(900, 1600), x0: stop, x1: stop, beam: 'face', back: false, facing: f, paw: true },
+          { dur: rand(700, 1000), x0: stop, x1: to, beam: 'face', back: false, facing: f, charge: true },
+        ];
+      }
+      if (trick === 'rise') {
+        // Zombie: crawls in, stops away from the streamer, rises up on its arms and stares with the head lamp.
+        const stop = fx < 0.5 ? rand(0.62, 0.8) : rand(0.2, 0.38);
+        const inFrac = Math.abs(stop - from) / 1.4;
+        return [
+          { dur: walk * inFrac, x0: from, x1: stop, beam: 'swing', back: false, facing: f },
+          { dur: rand(2200, 3200), x0: stop, x1: stop, beam: 'face', back: false, facing: f, rise: true },
+          { dur: walk * (1 - inFrac), x0: stop, x1: to, beam: 'swing', back: false, facing: f },
+        ];
+      }
       if (trick === 'turn') {
         // Walks in, stops with its back to the streamer, then spins round and shines the lantern in their eyes.
         // Stops on the far side from the streamer, so it doesn't stand in front of their face.
-        const fx = this.faceX == null ? 0.5 : this.faceX;
         const stop = fx < 0.5 ? rand(0.66, 0.82) : rand(0.18, 0.34);
         const inFrac = Math.abs(stop - from) / 1.4;
         return [
@@ -364,13 +434,22 @@
         ctx.save(); ctx.globalAlpha = 0.4; ctx.drawImage(this.sceneLayer.cv, 0, 0); ctx.restore();
       }
       this.drawBites(now, face, W, H);
+      if (this.zombified) this.drawZombified(now, face, W, H);
+      if (this.trail && this.trail.length) this.drawTrail(now, W, H);
       if (this.finalHead && !this.finale) this.drawMonsterHead(now, face, W, H);
       this.drawCurses(now, W, H, face);
       this.drawGuide(now, W, H); // under the monster: it walks in front of the gift list
       if (this.isVoid()) { if (this.phase !== 'off') this.drawVoid(now, W, H); }
       else if (this.phase !== 'stare') this.drawHunter(now, W, H);
       if (this.phase === 'stare' || this.phase === 'stareWarn') this.drawStare(now, W, H);
-      if (this.phase === 'eaten') this.drawJaws(now, W, H);
+      if (this.phase === 'eaten') {
+        // Each monster has its own attack when it catches the streamer.
+        const m = this.s.monster;
+        if (m === 'santa') this.drawSackSlam(now, W, H);
+        else if (m === 'rudolf') this.drawAntlerCharge(now, W, H);
+        else if (m === 'zombie') this.drawZombieGrab(now, W, H);
+        else this.drawJaws(now, W, H);
+      }
       if (now < this.shieldUntil) this.drawChains(now, W, H);
       if (this.intensity > 0.5 && this.phase !== 'off') this.drawHeartbeat(now, W, H);
       if (this.finale) this.drawFinale(now, face, W, H);
@@ -750,18 +829,23 @@
     drawBigHead(mx, my, mrx, mry, s, shut) {
       // Never so big that the eyes leave the top of the picture.
       s = Math.min(s, Math.max(this.cv.height * 0.18, my - this.cv.height * 0.1));
-      const ctx = this.ctx, hx = mx, hy = my - s * 0.45, K = this.s.monster === 'krampus';
+      const ctx = this.ctx, hx = mx, hy = my - s * 0.45, mon = this.s.monster, K = mon === 'krampus';
       ctx.save();
-      ctx.fillStyle = K ? KRAMPUS_FUR : '#120d16';
+      ctx.fillStyle = HEAD[mon] || HEAD.hunter;
       ctx.shadowColor = 'rgba(255, 60, 60, 0.35)'; ctx.shadowBlur = 40;
       ctx.beginPath();
       ctx.ellipse(hx, hy, s * 1.25, s * 1.35, 0, 0, TAU);
       ctx.ellipse(mx, my, Math.max(1, mrx), Math.max(1, mry), 0, 0, TAU);
       ctx.fill('evenodd');
       ctx.shadowBlur = 0;
-      // Horns (Krampus: tall goat horns).
+      // Horns (Krampus: tall goat horns; Santa: his hat; Rudolf: antlers; the zombie: nothing).
       if (K) this.krampusHorns(hx, hy - s * 1.1, s * 0.8, s * 0.12);
-      else {
+      else if (this.headTop(hx, hy - s * 1.3, s)) {
+        if (mon === 'santa' && mry > 2) { // a white beard round the mouth
+          ctx.strokeStyle = SANTA_FUR; ctx.lineWidth = s * 0.3;
+          ctx.beginPath(); ctx.ellipse(mx, my, mrx + s * 0.2, mry + s * 0.2, 0, 0.05 * Math.PI, 0.95 * Math.PI); ctx.stroke();
+        }
+      } else {
         ctx.strokeStyle = '#120d16'; ctx.lineWidth = s * 0.2; ctx.lineCap = 'round';
         for (const side of [-1, 1]) {
           ctx.beginPath(); ctx.moveTo(hx + side * s * 0.6, hy - s * 1.1);
@@ -775,9 +859,10 @@
         const sway = Math.sin(performance.now() / 300) * mrx * 0.15;
         ctx.beginPath(); ctx.moveTo(mx + mrx * 0.2, my + mry * 0.7); ctx.quadraticCurveTo(mx + mrx * 0.5 + sway, my + mry + s * 0.3, mx + mrx * 0.3 + sway * 2, my + mry + s * 0.6); ctx.stroke();
       }
-      // Eyes.
-      ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 25 + 40 * shut;
-      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.2, s * 0.12, side * 0.3, 0, TAU); ctx.fill(); }
+      // Eyes (and Rudolf's nose).
+      ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 25 + 40 * shut;
+      for (const side of [-1, 1]) { ctx.fillStyle = this.eyeColor(side); ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.2, s * 0.12, side * 0.3, 0, TAU); ctx.fill(); }
+      if (mon === 'rudolf') { ctx.fillStyle = '#ff3b2f'; ctx.shadowColor = '#ff1a0a'; ctx.shadowBlur = 50; ctx.beginPath(); ctx.arc(hx, hy - s * 0.25, s * 0.17, 0, TAU); ctx.fill(); }
       ctx.shadowBlur = 0; ctx.fillStyle = '#120d16';
       for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * s * 0.45, hy - s * 0.55, s * 0.035, s * 0.1, 0, 0, TAU); ctx.fill(); }
       // Teeth round the mouth: upper row points down, lower row points up.
@@ -804,13 +889,14 @@
       const p = this.facePoints(face, W, H);
       const cx = p ? p.cx : W / 2, cy = p ? (p.eyesY + p.mouthY) / 2 : H * 0.45;
       const s = p ? Math.max(p.w, p.h * 0.8) * 0.75 : H * 0.25; // head radius
-      const ctx = this.ctx, chew = Math.abs(Math.sin(now / 160)) * s * 0.06, K = this.s.monster === 'krampus';
+      const ctx = this.ctx, chew = Math.abs(Math.sin(now / 160)) * s * 0.06, mon = this.s.monster, K = mon === 'krampus';
       ctx.save();
-      ctx.fillStyle = ctx.strokeStyle = K ? KRAMPUS_FUR : '#13101a';
+      ctx.fillStyle = ctx.strokeStyle = mon === 'hunter' || mon === 'void' ? '#13101a' : HEAD[mon] || '#13101a';
       ctx.shadowColor = 'rgba(255, 205, 120, 0.45)'; ctx.shadowBlur = 25;
-      // horns (Krampus: tall goat horns)
+      // horns (Krampus: tall goat horns; Santa, Rudolf, the zombie: their own)
+      const top = mon === 'santa' || mon === 'rudolf' || mon === 'zombie';
       if (K) this.krampusHorns(cx, cy - s * 0.8, s * 0.6, s * 0.1);
-      else {
+      else if (top) { /* after the head, so the hat sits on it */ } else {
         ctx.lineWidth = s * 0.16; ctx.lineCap = 'round';
         for (const side of [-1, 1]) {
           ctx.beginPath();
@@ -821,13 +907,18 @@
       }
       // head
       ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.95, s * 1.1, 0, 0, TAU); ctx.fill();
-      // eyes
-      ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 30;
-      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * s * 0.38, cy - s * 0.25, s * 0.17, s * 0.11, side * 0.25, 0, TAU); ctx.fill(); }
+      const my = cy + s * 0.4;
+      if (top) {
+        ctx.save(); ctx.shadowBlur = 0; this.headTop(cx, cy - s * 1.05, s * 0.8); ctx.restore();
+        if (mon === 'santa') { ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = SANTA_FUR; ctx.beginPath(); ctx.ellipse(cx, my + s * 0.3, s * 0.75, s * 0.55, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+      }
+      // eyes (and Rudolf's nose)
+      ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 30;
+      for (const side of [-1, 1]) { ctx.fillStyle = this.eyeColor(side); ctx.beginPath(); ctx.ellipse(cx + side * s * 0.38, cy - s * 0.25, s * 0.17, s * 0.11, side * 0.25, 0, TAU); ctx.fill(); }
+      if (mon === 'rudolf') { ctx.fillStyle = '#ff3b2f'; ctx.shadowColor = '#ff1a0a'; ctx.shadowBlur = 40; ctx.beginPath(); ctx.arc(cx, cy + s * 0.05, s * 0.16, 0, TAU); ctx.fill(); }
       ctx.shadowBlur = 0; ctx.fillStyle = '#13101a';
       for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * s * 0.38, cy - s * 0.25, s * 0.03, s * 0.09, 0, 0, TAU); ctx.fill(); }
       // chewing mouth with teeth
-      const my = cy + s * 0.4;
       ctx.fillStyle = '#3a0a10';
       ctx.beginPath(); ctx.ellipse(cx, my, s * 0.55, s * 0.18 + chew, 0, 0, TAU); ctx.fill();
       ctx.fillStyle = '#efe6d2';
@@ -997,8 +1088,9 @@
         const x = ox * W, y = oy * H, len = H * 1.6;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const g = ctx.createRadialGradient(x, y, 0, x, y, len);
-        g.addColorStop(0, 'rgba(255,214,140,0.22)'); g.addColorStop(1, 'rgba(255,214,140,0)');
+        const g = ctx.createRadialGradient(x, y, 0, x, y, len), tint = beam.tint || '255,214,140';
+        const a = tint === '255,214,140' ? 0.22 : 0.3; // a coloured light (Rudolf's nose) shows a bit more
+        g.addColorStop(0, `rgba(${tint},${a})`); g.addColorStop(1, `rgba(${tint},0)`);
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.moveTo(x, y);
         ctx.lineTo(x + Math.sin(angle - half) * len, y + Math.cos(angle - half) * len);
@@ -1495,6 +1587,9 @@
     drawHunter(now, W, H) {
       if (this.phase !== 'sweep') return;
       if (this.s.monster === 'krampus') return this.drawKrampus(now, W, H);
+      if (this.s.monster === 'santa') return this.drawSanta(now, W, H);
+      if (this.s.monster === 'rudolf') return this.drawRudolf(now, W, H);
+      if (this.s.monster === 'zombie') return this.drawZombie(now, W, H);
       const ctx = this.ctx, m = this.monster;
       const x = m.x * W, f = m.facing;
       const walkT = now / 260;
@@ -1655,6 +1750,49 @@
       }
       ctx.restore();
     }
+    // Eye colour of the finale's big head: Santa red, Rudolf pale, the zombie one green eye and one dead white one.
+    eyeColor(side) {
+      switch (this.s.monster) {
+        case 'santa': return '#ff5a3a';
+        case 'rudolf': return '#f4f0dc';
+        case 'zombie': return side < 0 ? '#c8ff9a' : '#e8e8e0';
+        default: return '#ffe36b';
+      }
+    }
+    // On top of the finale's head (top centre cx, top; size s): Santa's hat, Rudolf's antlers, the zombie's stringy
+    // hair. Returns false for monsters that have horns instead.
+    headTop(cx, top, s) {
+      const ctx = this.ctx, mon = this.s.monster;
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (mon === 'santa') {
+        ctx.fillStyle = SANTA_RED;
+        ctx.beginPath(); ctx.moveTo(cx - s * 1.15, top + s * 0.35); ctx.quadraticCurveTo(cx - s * 0.2, top - s * 1.4, cx + s * 1.25, top - s * 0.7); ctx.lineTo(cx + s * 1.15, top + s * 0.35); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = SANTA_FUR;
+        ctx.beginPath(); ctx.ellipse(cx, top + s * 0.32, s * 1.3, s * 0.24, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 1.25, top - s * 0.7, s * 0.22, 0, TAU); ctx.fill();
+      } else if (mon === 'rudolf') {
+        ctx.strokeStyle = '#3a2c1e'; ctx.lineWidth = s * 0.13;
+        for (const side of [-1, 1]) {
+          const bx = cx + side * s * 0.5, by = top + s * 0.2, tx = cx + side * s * 1.9, ty = top - s * 1.3;
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(cx + side * s * 1.6, top, tx, ty); ctx.stroke();
+          for (let i = 1; i <= 3; i++) {
+            const q = i / 4, px = lerp(bx, tx, q) + side * s * 0.15, py = lerp(by, ty, q) + s * 0.1;
+            ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - side * s * 0.05, py - s * 0.55); ctx.stroke();
+          }
+        }
+      } else if (mon === 'zombie') {
+        ctx.strokeStyle = '#0c0c0c'; ctx.lineWidth = Math.max(1.5, s * 0.03);
+        for (let i = 0; i < 9; i++) {
+          const x0 = cx - s * 0.7 + i * s * 0.17;
+          ctx.beginPath(); ctx.moveTo(x0, top + s * 0.15); ctx.quadraticCurveTo(x0 + s * 0.1, top + s * 0.5, x0 - s * 0.05, top + s * (0.7 + (i % 3) * 0.15)); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(60, 15, 15, 0.8)'; ctx.lineWidth = Math.max(1.5, s * 0.025); // stitches across the forehead
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.6, top + s * 0.75); ctx.lineTo(cx + s * 0.3, top + s * 0.6); ctx.stroke();
+        for (let i = 0; i < 6; i++) { const x0 = cx - s * 0.55 + i * s * 0.16, y0 = top + s * 0.74 - i * s * 0.027; ctx.beginPath(); ctx.moveTo(x0, y0 - s * 0.06); ctx.lineTo(x0, y0 + s * 0.06); ctx.stroke(); }
+      } else { ctx.restore(); return false; }
+      ctx.restore();
+      return true;
+    }
     // Krampus's goat horns: up from the top of the head (cx, y), out, back in and up to a point; `s` = head size.
     krampusHorns(cx, y, s, lw) {
       const ctx = this.ctx;
@@ -1667,6 +1805,366 @@
           ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.bezierCurveTo(p[2], p[3], p[4], p[5], p[6], p[7]); ctx.stroke();
         }
       }
+      ctx.restore();
+    }
+
+    // Christmas Pack: a fat, evil Santa. Waddles slowly side to side, a big gift sack over his shoulder, a lantern in
+    // the other hand, red glowing eyes over a white beard. When he catches you he swings the sack at you.
+    drawSanta(now, W, H) {
+      const ctx = this.ctx, m = this.monster, x = m.x * W, f = m.facing;
+      const walkT = now / 340;
+      const sway = m.moving ? Math.sin(walkT) * 0.06 : Math.sin(now / 700) * 0.015; // the waddle, around his feet
+      const bob = m.moving ? Math.abs(Math.cos(walkT)) * H * 0.01 : Math.sin(now / 600) * H * 0.003;
+      const lamp = this.pose(now), lx = lamp.x * W, ly = lamp.y * H;
+      const bodyY = H * 0.63 - bob, shoulderY = H * 0.47 - bob, hx = x + f * W * 0.012, hy = H * 0.355 - bob;
+      ctx.save();
+      ctx.translate(x, H); ctx.rotate(sway); ctx.translate(-x, -H);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(255, 90, 70, 0.45)'; ctx.shadowBlur = m.back ? 10 : 22;
+      const sack = () => {
+        ctx.save();
+        ctx.fillStyle = '#3b2a1a';
+        ctx.beginPath(); ctx.ellipse(x - f * W * 0.08, H * 0.5 - bob, W * 0.07, H * 0.13, -f * 0.35, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#6b5236'; ctx.lineWidth = W * 0.005; ctx.shadowBlur = 0; // the tie and a patch
+        ctx.beginPath(); ctx.moveTo(x - f * W * 0.04, H * 0.39 - bob); ctx.lineTo(x - f * W * 0.06, H * 0.42 - bob); ctx.stroke();
+        ctx.strokeRect(x - f * W * 0.11 - W * 0.012, H * 0.52 - bob, W * 0.024, H * 0.03);
+        ctx.restore();
+      };
+      if (!m.back) sack(); // behind him, unless we see his back
+      // short legs in black boots
+      for (const side of [-1, 1]) {
+        const step = m.moving ? Math.sin(walkT) * side * W * 0.018 : 0;
+        const hip = x + side * W * 0.035, foot = x + side * W * 0.04 + step;
+        ctx.strokeStyle = '#3a080c'; ctx.lineWidth = W * 0.036;
+        ctx.beginPath(); ctx.moveTo(hip, H * 0.78 - bob); ctx.lineTo(foot, H * 0.95); ctx.stroke();
+        ctx.fillStyle = '#050505';
+        ctx.beginPath(); ctx.ellipse(foot + f * W * 0.008, H * 0.968, W * 0.03, H * 0.022, 0, 0, TAU); ctx.fill();
+      }
+      // the fat body
+      ctx.fillStyle = SANTA_RED;
+      ctx.beginPath(); ctx.ellipse(x, bodyY, W * 0.088, H * 0.19, 0, 0, TAU); ctx.fill();
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.ellipse(x, bodyY, W * 0.088, H * 0.19, 0, 0, TAU); ctx.clip();
+      ctx.fillStyle = '#0b0607'; ctx.fillRect(x - W * 0.1, bodyY + H * 0.02, W * 0.2, H * 0.032); // belt
+      if (!m.back) {
+        ctx.fillStyle = '#c9a23a'; ctx.fillRect(x + f * W * 0.02 - W * 0.012, bodyY + H * 0.014, W * 0.024, H * 0.044); // buckle
+        ctx.fillStyle = SANTA_FUR; ctx.fillRect(x + f * W * 0.025 - W * 0.008, bodyY - H * 0.2, W * 0.016, H * 0.21); // fur down the front
+      }
+      ctx.fillStyle = SANTA_FUR; ctx.fillRect(x - W * 0.1, bodyY + H * 0.16, W * 0.2, H * 0.04); // fur hem
+      ctx.restore();
+      // arms: one up holding the sack, the other out with the lantern (none while his back is turned)
+      ctx.strokeStyle = SANTA_RED; ctx.lineWidth = W * 0.026;
+      ctx.beginPath(); ctx.moveTo(x - f * W * 0.06, shoulderY); ctx.quadraticCurveTo(x - f * W * 0.085, H * 0.43 - bob, x - f * W * 0.045, H * 0.39 - bob); ctx.stroke();
+      if (!m.back) {
+        ctx.beginPath(); ctx.moveTo(x + f * W * 0.06, shoulderY); ctx.quadraticCurveTo(x + f * W * 0.09, H * 0.5, lx - f * W * 0.012, ly - H * 0.02); ctx.stroke();
+        ctx.fillStyle = SANTA_FUR; ctx.beginPath(); ctx.arc(lx - f * W * 0.014, ly - H * 0.022, W * 0.012, 0, TAU); ctx.fill(); // cuff
+      }
+      // head
+      ctx.fillStyle = '#2b1a16';
+      ctx.beginPath(); ctx.arc(hx, hy, W * 0.034, 0, TAU); ctx.fill();
+      ctx.save(); ctx.shadowBlur = 0;
+      // beard (seen from the front) or white hair (from the back)
+      ctx.fillStyle = SANTA_FUR;
+      ctx.beginPath();
+      if (!m.back) {
+        ctx.moveTo(hx - W * 0.036, hy - H * 0.004);
+        ctx.quadraticCurveTo(hx - W * 0.04, hy + H * 0.09, hx + f * W * 0.008, hy + H * 0.13);
+        ctx.quadraticCurveTo(hx + W * 0.044, hy + H * 0.08, hx + W * 0.036, hy - H * 0.004);
+        ctx.quadraticCurveTo(hx, hy + H * 0.02, hx - W * 0.036, hy - H * 0.004);
+      } else ctx.ellipse(hx, hy + H * 0.01, W * 0.034, H * 0.03, 0, 0, Math.PI);
+      ctx.fill();
+      // hat: red, flopping back, white brim and pompom
+      ctx.fillStyle = SANTA_RED;
+      ctx.beginPath(); ctx.moveTo(hx - W * 0.036, hy - H * 0.03);
+      ctx.quadraticCurveTo(hx - f * W * 0.01, hy - H * 0.13, hx - f * W * 0.07, hy - H * 0.06);
+      ctx.lineTo(hx + W * 0.036, hy - H * 0.03); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = SANTA_FUR;
+      ctx.beginPath(); ctx.ellipse(hx, hy - H * 0.032, W * 0.04, H * 0.014, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx - f * W * 0.07, hy - H * 0.055, W * 0.011, 0, TAU); ctx.fill();
+      if (!m.back) {
+        // a crooked grin of teeth in the beard
+        ctx.fillStyle = '#1a0606'; ctx.beginPath(); ctx.ellipse(hx + f * W * 0.006, hy + H * 0.035, W * 0.016, H * 0.008, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#e8dcc0';
+        for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(hx + f * W * 0.006 + i * W * 0.006 - W * 0.002, hy + H * 0.03); ctx.lineTo(hx + f * W * 0.006 + i * W * 0.006 + W * 0.002, hy + H * 0.03); ctx.lineTo(hx + f * W * 0.006 + i * W * 0.006, hy + H * 0.04); ctx.fill(); }
+      }
+      ctx.restore();
+      if (m.back) sack(); // seen from behind: the sack on his back
+      if (!m.back) {
+        ctx.fillStyle = '#ff5a3a'; ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 18;
+        for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * W * 0.013 + f * W * 0.006, hy - H * 0.008, W * 0.008, H * 0.006, -side * 0.35, 0, TAU); ctx.fill(); }
+      }
+      ctx.restore();
+      // The lantern, at exactly the beam's origin (outside the waddle).
+      ctx.save();
+      if (!m.back) {
+        ctx.fillStyle = '#fff2c4'; ctx.shadowColor = 'rgba(255, 205, 120, 0.9)'; ctx.shadowBlur = 30;
+        ctx.beginPath(); ctx.arc(lx, ly, W * 0.012, 0, TAU); ctx.fill();
+      } else {
+        const g = ctx.createRadialGradient(x - f * W * 0.07, H * 0.5, 0, x - f * W * 0.07, H * 0.5, W * 0.05);
+        g.addColorStop(0, 'rgba(255,214,140,0.35)'); g.addColorStop(1, 'rgba(255,214,140,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - W * 0.2, H * 0.35, W * 0.4, H * 0.3);
+      }
+      ctx.restore();
+    }
+
+    // Christmas Pack: Rudolf, a monster reindeer. Gallops fast, jagged antlers, and his glowing red nose is the light.
+    // Before a charge he stops and paws the floor, head down; then he runs across the room antlers first.
+    drawRudolf(now, W, H) {
+      const ctx = this.ctx, m = this.monster, x = m.x * W, f = m.facing;
+      const bob = this.gallopBob(now) * H, t = now / 105, low = m.low ? H * 0.06 : 0;
+      const nose = this.pose(now), nx = nose.x * W, ny = nose.y * H;
+      const bodyY = H * 0.665 - bob, hipY = H * 0.69 - bob;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.fillStyle = ctx.strokeStyle = '#24180f';
+      ctx.shadowColor = 'rgba(255, 70, 60, 0.4)'; ctx.shadowBlur = 18;
+      // four thin legs: a gallop (front and back pairs out of step), or one front hoof pawing the floor
+      const legs = [[0.062, 0], [0.05, 0.6], [-0.06, Math.PI], [-0.072, Math.PI + 0.6]];
+      legs.forEach(([dx, ph], i) => {
+        let a = m.moving ? Math.sin(t + ph) * 0.55 : 0;
+        if (m.paw && i === 0) a = 0.5 + Math.sin(now / 110) * 0.5; // scraping forward and back
+        const hx0 = x + f * W * dx, kx = hx0 + f * Math.sin(a) * H * 0.12, ky = hipY + Math.cos(a) * H * 0.12;
+        const fx = kx + f * Math.sin(a * 0.4 - 0.2) * H * 0.15, fy = Math.min(H * 0.975, ky + H * 0.15 - (m.paw && i === 0 ? Math.max(0, Math.sin(now / 110)) * H * 0.03 : 0));
+        ctx.lineWidth = W * 0.011;
+        ctx.beginPath(); ctx.moveTo(hx0, hipY - H * 0.02); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+        ctx.fillStyle = '#050403'; ctx.beginPath(); ctx.ellipse(fx, fy, W * 0.008, H * 0.008, 0, 0, TAU); ctx.fill();
+      });
+      // body, with ribs showing through the thin hide
+      ctx.fillStyle = '#24180f';
+      ctx.beginPath(); ctx.ellipse(x, bodyY, W * 0.085, H * 0.07, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(120, 95, 70, 0.45)'; ctx.lineWidth = W * 0.003;
+      for (let i = 0; i < 4; i++) { const rx = x + f * W * (0.0 + i * 0.015); ctx.beginPath(); ctx.arc(rx, bodyY - H * 0.01, H * 0.045, 0.4 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+      ctx.restore();
+      // short tail
+      ctx.lineWidth = W * 0.008; ctx.beginPath(); ctx.moveTo(x - f * W * 0.085, bodyY - H * 0.03); ctx.lineTo(x - f * W * 0.1, bodyY - H * 0.05 + Math.sin(t) * H * 0.01); ctx.stroke();
+      // neck up to the head (lower when he's about to charge)
+      const headX = nx - f * W * 0.028, headY = ny - H * 0.022;
+      ctx.lineWidth = W * 0.03;
+      ctx.beginPath(); ctx.moveTo(x + f * W * 0.06, bodyY - H * 0.03); ctx.quadraticCurveTo(x + f * W * 0.085, H * 0.56 - bob + low * 0.5, headX - f * W * 0.012, headY); ctx.stroke();
+      // a collar with a bell
+      ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = '#c9a23a';
+      ctx.beginPath(); ctx.arc(x + f * W * 0.08, H * 0.6 - bob + low * 0.5, W * 0.006, 0, TAU); ctx.fill(); ctx.restore();
+      // head: long, pointing at the nose
+      ctx.beginPath(); ctx.ellipse(headX, headY, W * 0.032, H * 0.026, f * (m.low ? 0.6 : 0.35), 0, TAU); ctx.fill();
+      // jagged antlers: up and back, or swung forward when the head is down
+      ctx.save(); ctx.strokeStyle = '#3a2c1e'; ctx.lineWidth = W * 0.006; ctx.shadowBlur = 8;
+      for (const off of [-0.006, 0.008]) {
+        const bx = headX - f * W * 0.012 + off * W, by = headY - H * 0.022;
+        const tipX = bx + f * W * (m.low ? 0.08 : -0.085), tipY = by - H * (m.low ? 0.08 : 0.12);
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx - f * W * 0.03, by - H * 0.08, tipX, tipY); ctx.stroke();
+        for (let k = 1; k <= 3; k++) { // tines along the beam
+          const q = k / 4, px = bx + (tipX - bx) * q - f * W * 0.012 * Math.sin(q * Math.PI), py = by + (tipY - by) * q;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + f * W * (0.012 + k * 0.004), py - H * (0.05 - k * 0.008)); ctx.stroke();
+        }
+      }
+      ctx.restore();
+      // a pale mad eye, and the red nose: the light
+      ctx.fillStyle = '#f4f0dc'; ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(headX - f * W * 0.004, headY - H * 0.009, W * 0.005, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ff3b2f'; ctx.shadowColor = '#ff1a0a'; ctx.shadowBlur = 38;
+      ctx.beginPath(); ctx.arc(nx, ny, W * 0.012, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd0c0'; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(nx - W * 0.003, ny - H * 0.004, W * 0.004, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+
+    // A zombie crawling across the floor, dragging its legs, a miner's head lamp strapped on. Leaves a dark wet trail.
+    // When it stops it rises up on its arms and stares; when it catches you it grabs you and you start turning.
+    drawZombie(now, W, H) {
+      const ctx = this.ctx, m = this.monster, x = m.x * W, f = m.facing, r = this.rise;
+      const t = now / 420, ground = H * 0.975;
+      const lamp = this.pose(now), lx = lamp.x * W, ly = lamp.y * H;
+      const hip = { x: x - f * W * 0.07, y: H * 0.925 - r * H * 0.03 };
+      const sh = { x: x + f * W * 0.03, y: H * 0.875 - r * H * 0.15 };
+      const head = { x: lx - f * W * 0.016, y: ly + H * 0.004 };
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(170, 255, 150, 0.3)'; ctx.shadowBlur = 16;
+      // legs dragged behind, limp, one twisted the wrong way
+      ctx.strokeStyle = '#1b1d22'; ctx.lineWidth = W * 0.022;
+      for (const [len, lift] of [[0.2, 0], [0.17, 0.015]]) {
+        const drag = m.moving ? Math.sin(t * 0.5 + len * 20) * W * 0.004 : 0;
+        ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.quadraticCurveTo(hip.x - f * W * len * 0.5, ground - H * 0.01 - lift * H, hip.x - f * W * len + drag, ground - lift * H * 0.5); ctx.stroke();
+      }
+      // torso in a torn shirt
+      ctx.strokeStyle = '#25292b'; ctx.lineWidth = W * 0.05;
+      ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(sh.x, sh.y); ctx.stroke();
+      ctx.save(); ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(70, 20, 20, 0.7)'; ctx.lineWidth = W * 0.004; // a bloody tear
+      ctx.beginPath(); ctx.moveTo(lerp(hip.x, sh.x, 0.3), lerp(hip.y, sh.y, 0.3) - H * 0.01); ctx.lineTo(lerp(hip.x, sh.x, 0.55), lerp(hip.y, sh.y, 0.55) + H * 0.008); ctx.stroke();
+      ctx.restore();
+      // arms: pulling itself along (hands reaching forward in turn), or pushing up when it rises
+      ctx.strokeStyle = ZOMBIE_SKIN; ctx.lineWidth = W * 0.014;
+      for (const ph of [0, Math.PI]) {
+        const reach = m.moving ? (Math.sin(t + ph) + 1) / 2 : 0.5;
+        const hand = r > 0.05 ? { x: sh.x + f * W * (ph ? 0.05 : 0.02), y: ground - H * 0.005 }
+          : { x: sh.x + f * W * (0.05 + 0.06 * reach), y: ground - H * 0.006 - (1 - reach) * H * 0.02 };
+        const elbow = { x: (sh.x + hand.x) / 2 - f * W * 0.01, y: Math.min(sh.y, hand.y) - H * (r > 0.05 ? 0.01 : 0.035) };
+        ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(elbow.x, elbow.y); ctx.lineTo(hand.x, hand.y); ctx.stroke();
+        ctx.save(); ctx.lineWidth = W * 0.004; // bony fingers clawing the floor
+        for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(hand.x, hand.y); ctx.lineTo(hand.x + f * W * 0.014, hand.y + k * H * 0.006); ctx.stroke(); }
+        ctx.restore();
+      }
+      // head, hanging jaw
+      ctx.fillStyle = ZOMBIE_SKIN;
+      ctx.beginPath(); ctx.ellipse(head.x, head.y, W * 0.027, H * 0.034, f * 0.3, 0, TAU); ctx.fill();
+      ctx.save(); ctx.shadowBlur = 0;
+      ctx.fillStyle = '#140808';
+      ctx.beginPath(); ctx.ellipse(head.x + f * W * 0.012, head.y + H * 0.03, W * 0.011, H * 0.016 + Math.abs(Math.sin(now / 300)) * H * 0.006, f * 0.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#cfc6a4';
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(head.x + f * W * (0.006 + k * 0.006), head.y + H * 0.018); ctx.lineTo(head.x + f * W * (0.009 + k * 0.006), head.y + H * 0.028); ctx.lineTo(head.x + f * W * (0.012 + k * 0.006), head.y + H * 0.018); ctx.fill(); }
+      // stringy hair
+      ctx.strokeStyle = '#0c0c0c'; ctx.lineWidth = W * 0.002;
+      for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.moveTo(head.x - f * W * 0.015 + k * W * 0.003, head.y - H * 0.03); ctx.lineTo(head.x - f * W * 0.03 + k * W * 0.002, head.y + H * 0.005 + (k % 2) * H * 0.01); ctx.stroke(); }
+      // the head lamp strap
+      ctx.strokeStyle = '#111'; ctx.lineWidth = W * 0.005;
+      ctx.beginPath(); ctx.ellipse(head.x, head.y - H * 0.012, W * 0.028, H * 0.008, f * 0.3, 0, TAU); ctx.stroke();
+      ctx.restore();
+      // one glowing eye, one dead white eye
+      ctx.fillStyle = '#c8ff9a'; ctx.shadowColor = '#9dff6a'; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(head.x + f * W * 0.012, head.y + H * 0.002, W * 0.005, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#e8e8e0'; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(head.x + f * W * 0.001, head.y + H * 0.004, W * 0.004, 0, TAU); ctx.fill();
+      // the lamp: the light
+      ctx.fillStyle = '#f2ffe8'; ctx.shadowColor = 'rgba(200, 255, 180, 0.9)'; ctx.shadowBlur = 28;
+      ctx.beginPath(); ctx.arc(lx, ly, W * 0.008, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+
+    // The zombie's trail on the floor: dark and wet, fading after about 12 s.
+    drawTrail(now, W, H) {
+      const ctx = this.ctx;
+      this.trail = this.trail.filter((p) => now - p.t < 12000);
+      ctx.save();
+      for (const p of this.trail) {
+        const a = 1 - (now - p.t) / 12000;
+        ctx.fillStyle = `rgba(45, 8, 10, ${0.65 * a})`;
+        ctx.beginPath(); ctx.ellipse(p.x * W, H * 0.972, W * 0.018 * p.w, H * 0.007, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = `rgba(130, 180, 100, ${0.18 * a})`; // a slimy glisten
+        ctx.beginPath(); ctx.ellipse(p.x * W, H * 0.97, W * 0.009 * p.w, H * 0.0025, 0, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Caught by the zombie: the face turns a little greener with every bite, dark rings round the eyes, veins.
+    drawZombified(now, face, W, H) {
+      const p = this.facePoints(face, W, H);
+      if (!p) return;
+      const ctx = this.ctx, k = Math.min(3, this.zombified) / 3;
+      const cy = (p.eyesY + p.mouthY) / 2;
+      ctx.save();
+      ctx.globalCompositeOperation = 'color';
+      ctx.fillStyle = `rgba(110, 170, 90, ${0.25 + 0.45 * k})`;
+      ctx.beginPath(); ctx.ellipse(p.cx, cy, p.w * 0.62, p.h * 0.72, 0, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(25, 35, 15, ${0.3 * k + 0.1})`;
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(p.cx + side * p.w * 0.2, p.eyesY, p.w * 0.12, p.h * 0.065, 0, 0, TAU); ctx.fill(); }
+      ctx.strokeStyle = `rgba(40, 70, 30, ${0.5 * k})`; ctx.lineWidth = Math.max(1, p.w * 0.008);
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(p.cx + side * p.w * 0.38, p.mouthY);
+        ctx.lineTo(p.cx + side * p.w * 0.3, (p.eyesY + p.mouthY) / 2); ctx.lineTo(p.cx + side * p.w * 0.34, p.eyesY + p.h * 0.05); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Santa caught you: the gift sack swings in from the side and slams into your face, presents fly everywhere.
+    drawSackSlam(now, W, H) {
+      const ctx = this.ctx, t = now - this.t0, hit = 480;
+      const b = this.eatBox ? { x: 1 - this.eatBox.x - this.eatBox.w, y: this.eatBox.y, w: this.eatBox.w, h: this.eatBox.h } : { x: 0.3, y: 0.25, w: 0.4, h: 0.5 };
+      const fx = (b.x + b.w / 2) * W, fy = (b.y + b.h / 2) * H;
+      ctx.save();
+      if (t > hit && t < hit + 350) ctx.translate(rand(-16, 16), rand(-16, 16));
+      // the swing: from the top corner on an arc to the face, getting bigger
+      const k = Math.min(1, t / hit), e = k * k;
+      const from = fx < W / 2 ? W * 1.1 : -W * 0.1;
+      const sx = lerp(from, fx, e), sy = lerp(-H * 0.2, fy, Math.sin(e * Math.PI / 2)), size = lerp(W * 0.12, W * 0.32, e);
+      if (t > hit) { ctx.fillStyle = `rgba(200, 20, 30, ${Math.max(0, 0.5 - (t - hit) / 2200)})`; ctx.fillRect(-20, -20, W + 40, H + 40); }
+      ctx.fillStyle = '#3b2a1a';
+      ctx.beginPath(); ctx.ellipse(sx, sy, size, size * 0.85, k * 1.2, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#6b5236'; ctx.lineWidth = size * 0.05;
+      ctx.beginPath(); ctx.moveTo(sx - size * 0.3, sy - size * 0.7); ctx.lineTo(sx + size * 0.2, sy - size * 0.95); ctx.stroke();
+      // presents bursting out after the hit
+      if (t > hit) {
+        const u = (t - hit) / 1100;
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * TAU + 0.3, d = u * W * (0.3 + (i % 3) * 0.12), px = fx + Math.cos(a) * d, py = fy + Math.sin(a) * d + u * u * H * 0.6;
+          const s = W * (0.025 + (i % 2) * 0.012);
+          ctx.save(); ctx.translate(px, py); ctx.rotate(u * 6 + i);
+          ctx.fillStyle = ['#b3121c', '#1e7a3a', '#c9a23a'][i % 3]; ctx.fillRect(-s / 2, -s / 2, s, s);
+          ctx.fillStyle = '#efe6d2'; ctx.fillRect(-s * 0.08, -s / 2, s * 0.16, s); ctx.fillRect(-s / 2, -s * 0.08, s, s * 0.16);
+          ctx.restore();
+        }
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, 0.8 - (t - hit) / 250)})`; ctx.fillRect(-20, -20, W + 40, H + 40); // the impact
+      }
+      ctx.restore();
+    }
+
+    // Rudolf caught you: he charges straight at the camera, antlers first, red nose blazing; the screen cracks.
+    drawAntlerCharge(now, W, H) {
+      const ctx = this.ctx, t = now - this.t0, hit = 450;
+      const k = Math.min(1, t / hit), s = lerp(H * 0.08, H * 0.75, k * k * k), cx = W / 2, cy = H * 0.55;
+      ctx.save();
+      if (t > hit && t < hit + 400) ctx.translate(rand(-18, 18), rand(-18, 18));
+      ctx.fillStyle = `rgba(160, 10, 10, ${Math.min(0.5, t / 900)})`; ctx.fillRect(-20, -20, W + 40, H + 40);
+      // the head rushing in: face, two big antlers, the nose
+      ctx.fillStyle = '#1c130c'; ctx.strokeStyle = '#2e2216'; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.42, s * 0.55, 0, 0, TAU); ctx.fill();
+      ctx.lineWidth = s * 0.07;
+      for (const side of [-1, 1]) {
+        const bx = cx + side * s * 0.3, by = cy - s * 0.4, tx = cx + side * s * 1.3, ty = cy - s * 1.1;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(cx + side * s * 1.1, cy - s * 0.3, tx, ty); ctx.stroke();
+        for (let i = 1; i <= 3; i++) {
+          const q = i / 4, px = lerp(bx, tx, q) + side * s * 0.1, py = lerp(by, ty, q) + s * 0.05;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + side * s * 0.05, py - s * 0.35); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = '#f4f0dc'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 20;
+      for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * s * 0.2, cy - s * 0.12, s * 0.06, s * 0.035, side * 0.4, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#ff3b2f'; ctx.shadowColor = '#ff1a0a'; ctx.shadowBlur = 60;
+      ctx.beginPath(); ctx.arc(cx, cy + s * 0.32, s * 0.13, 0, TAU); ctx.fill();
+      ctx.shadowBlur = 0;
+      // cracks in the "glass" where the antlers hit
+      if (t > hit) {
+        ctx.strokeStyle = `rgba(235, 235, 245, ${Math.min(0.85, (t - hit) / 120)})`; ctx.lineWidth = 2;
+        for (const [ix, iy] of [[0.3, 0.3], [0.7, 0.28]]) {
+          for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * TAU + ix * 7, len = W * (0.12 + ((i * 37) % 10) / 40);
+            ctx.beginPath(); ctx.moveTo(ix * W, iy * H);
+            ctx.lineTo(ix * W + Math.cos(a) * len * 0.5 + 6, iy * H + Math.sin(a) * len * 0.5 - 4); ctx.lineTo(ix * W + Math.cos(a) * len, iy * H + Math.sin(a) * len); ctx.stroke();
+          }
+        }
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, 0.75 - (t - hit) / 250)})`; ctx.fillRect(-20, -20, W + 40, H + 40);
+      }
+      ctx.restore();
+    }
+
+    // The zombie caught you: rotting hands reach up from the bottom of the screen and grab your face; green flash.
+    drawZombieGrab(now, W, H) {
+      const ctx = this.ctx, t = now - this.t0, grab = 520;
+      const b = this.eatBox ? { x: 1 - this.eatBox.x - this.eatBox.w, y: this.eatBox.y, w: this.eatBox.w, h: this.eatBox.h } : { x: 0.3, y: 0.25, w: 0.4, h: 0.5 };
+      const fx = (b.x + b.w / 2) * W, fy = (b.y + b.h / 2) * H, fw = Math.max(b.w * W, W * 0.2);
+      const k = Math.min(1, t / grab), e = 1 - (1 - k) ** 3;
+      ctx.save();
+      if (t > grab && t < grab + 300) ctx.translate(rand(-10, 10), rand(-10, 10));
+      ctx.fillStyle = `rgba(40, 90, 30, ${Math.min(0.45, t / 1200)})`; ctx.fillRect(-20, -20, W + 40, H + 40);
+      for (const side of [-1, 1]) {
+        const hx = lerp(fx + side * W * 0.35, fx + side * fw * 0.45, e), hy = lerp(H * 1.2, fy, e);
+        // arm from the bottom edge
+        ctx.strokeStyle = ZOMBIE_SKIN; ctx.lineWidth = W * 0.06; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(fx + side * W * 0.4, H * 1.1); ctx.quadraticCurveTo(fx + side * W * 0.42, (H + hy) / 2, hx, hy + H * 0.04); ctx.stroke();
+        // palm and long fingers curling over the face
+        ctx.fillStyle = ZOMBIE_SKIN;
+        ctx.beginPath(); ctx.ellipse(hx, hy, W * 0.045, H * 0.06, side * 0.4, 0, TAU); ctx.fill();
+        ctx.lineWidth = W * 0.013;
+        for (let i = 0; i < 4; i++) {
+          const a = -Math.PI / 2 - side * (0.2 + i * 0.25), len = W * (0.07 + (i === 1 || i === 2 ? 0.02 : 0)) * (0.6 + 0.4 * e);
+          const mx = hx + Math.cos(a) * len * 0.6, my = hy + Math.sin(a) * len * 0.6;
+          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(mx, my); ctx.lineTo(mx - side * len * 0.35 * e, my + len * 0.25 * e); ctx.stroke();
+        }
+        ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(60, 15, 15, 0.8)'; // a wound on the back of the hand
+        ctx.beginPath(); ctx.moveTo(hx - W * 0.015, hy + H * 0.01); ctx.lineTo(hx + W * 0.012, hy + H * 0.02); ctx.stroke(); ctx.restore();
+      }
+      if (t > grab) { ctx.fillStyle = `rgba(170, 255, 140, ${Math.max(0, 0.6 - (t - grab) / 300)})`; ctx.fillRect(-20, -20, W + 40, H + 40); }
       ctx.restore();
     }
 

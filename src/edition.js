@@ -160,6 +160,9 @@
     hunter: { icon: '🔦', name: 'Hunter', about: 'walks through the room with a lantern' },
     void: { icon: '🕳️', name: 'Void', about: 'crawls out of black holes' },
     krampus: { icon: '👹', name: 'Krampus', about: 'hooves, bells and chains' },
+    santa: { icon: '🎅', name: 'Santa', about: 'fat and slow, hits you with his gift sack' },
+    rudolf: { icon: '🦌', name: 'Rudolf', about: 'fast, his red nose is the light, charges with his antlers' },
+    zombie: { icon: '🧟', name: 'Zombie', about: 'crawls with a head lamp, turns you into one of them' },
     none: { icon: '🎥', name: 'Just my room' },
     basement: { icon: '🧱', name: 'Basement' },
     forest: { icon: '🌲', name: 'Forest' },
@@ -167,7 +170,7 @@
     winter: { icon: '❄️', name: 'Winter night' },
   };
   const GAMES = {
-    lightson: { monsters: ['hunter', 'void'], scenes: ['none', 'basement', 'forest', 'hospital'], packs: ['xmas'], duel: true },
+    lightson: { monsters: ['hunter', 'void', 'zombie'], scenes: ['none', 'basement', 'forest', 'hospital'], packs: ['xmas'], duel: true },
   };
 
   // ---------- Packs ----------
@@ -179,7 +182,7 @@
       product: `${GAME}-xmas`,
       game: GAME,
       name: 'Christmas Pack',
-      monsters: ['krampus'], scenes: ['winter'],
+      monsters: ['krampus', 'santa', 'rudolf'], scenes: ['winter'],
       rounds: counter(`${GAME}-xmas`, 1, 'monstercam-xmas-rounds'), // 1 free round a day
     },
   };
@@ -201,7 +204,7 @@
   const DEFAULT_CATALOG = [
     { id: 'founder', kind: 'bundle', title: 'Founder Pass', icon: '👑', blurb: 'Every game and every pack, today and every one that comes out later. Only for a limited time.' },
     { id: 'lightson', kind: 'game', title: 'Lights On', icon: '🔦', blurb: 'A monster hunts the room with a lantern. Viewers send gifts to curse you, send it after you or chain it up. Freeze when the light finds you.' },
-    { id: 'xmas', kind: 'pack', product: 'lightson-xmas', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night with snow, string lights and his monster reindeer by a rusty sleigh.' },
+    { id: 'xmas', kind: 'pack', product: 'lightson-xmas', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus, an evil Santa who hits you with his gift sack and Rudolf with a glowing red nose. Winter night with snow, string lights and monster reindeer by a rusty sleigh.' },
     { id: 'all', kind: 'bundle', title: 'All Games Bundle', icon: '🎮', blurb: 'Every Monster Cam game out today, for less than buying them one by one.' },
     { id: 'freeze', kind: 'soon', title: 'Freeze', icon: '🧊', blurb: 'Reach the finish without moving while the monster watches.' },
     { id: 'swarm', kind: 'soon', title: 'Swarm', icon: '🦇', blurb: 'Every viewer becomes a little monster.' },

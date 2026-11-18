@@ -58,7 +58,7 @@
     }
   }
 
-  // Which monster is walking: 'krampus' (Christmas Pack) has hooves and bells instead of heavy feet.
+  // Which monster is walking: krampus (hooves and bells), santa (heavier steps, bells), rudolf (quick hooves), zombie (drags itself).
   let walker = 'hunter';
   // A hoof on the floor: a short hard knock.
   function hoof(volume, pan) {
@@ -89,7 +89,16 @@
       if (foot || Math.random() < 0.3) bells(volume, pan);
       return;
     }
-    const t = ctx.currentTime, dest = out('steps', pan), hz = vary(90, 0.12);
+    if (walker === 'rudolf') { // light quick hooves, the bell on his collar now and then
+      hoof(volume * 0.7, pan);
+      if (Math.random() < 0.15) bells(volume * 0.6, pan);
+      return;
+    }
+    if (walker === 'zombie') { drag(volume, pan); return; }
+    // Santa: the same thump, heavier and lower; sleigh bells sometimes.
+    const heavy = walker === 'santa';
+    if (heavy && Math.random() < 0.25) bells(volume * 0.5, pan);
+    const t = ctx.currentTime, dest = out('steps', pan), hz = vary(heavy ? 70 : 90, 0.12);
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.setValueAtTime(hz, t);
     o.frequency.exponentialRampToValueAtTime(hz * 0.45, t + 0.18);
@@ -105,6 +114,84 @@
     ng.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
     n.connect(f).connect(ng).connect(dest);
     n.start(t);
+  }
+
+  // The zombie dragging itself along the floor: a long rough scrape.
+  function drag(volume, pan) {
+    const t = ctx.currentTime, dest = out('steps', pan), len = vary(0.45, 0.2);
+    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = noiseBuffer(len);
+    f.type = 'bandpass'; f.frequency.setValueAtTime(vary(500, 0.2), t); f.frequency.linearRampToValueAtTime(vary(300, 0.2), t + len); f.Q.value = 1.2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.9 * volume, t + len * 0.3);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    n.connect(f).connect(g).connect(dest);
+    n.start(t);
+  }
+
+  // A voice: a buzzy tone through two vowel filters, its pitch following `curve` (Hz over time).
+  function voice(seconds, volume, curve, formants, group = 'monster', wobble = 0) {
+    const t = ctx.currentTime, dest = out(group);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sawtooth';
+    curve.forEach(([at, hz], i) => (i ? o.frequency.linearRampToValueAtTime(hz, t + at * seconds) : o.frequency.setValueAtTime(hz, t)));
+    if (wobble) { // a sick, unsteady voice
+      const lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = vary(5, 0.3); lg.gain.value = wobble;
+      lfo.connect(lg).connect(o.frequency); lfo.start(t); lfo.stop(t + seconds);
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(volume, t + 0.05);
+    g.gain.setValueAtTime(volume, t + seconds * 0.7);
+    g.gain.linearRampToValueAtTime(0.0001, t + seconds);
+    for (const [hz, q, amp] of formants) {
+      const f = ctx.createBiquadFilter(), fg = ctx.createGain();
+      f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = q; fg.gain.value = amp;
+      o.connect(f).connect(fg).connect(g);
+    }
+    g.connect(dest);
+    o.start(t); o.stop(t + seconds + 0.05);
+  }
+
+  // Santa's deep, slow "ho ho ho".
+  function hoho(volume = 1) {
+    if (!ctx) return;
+    busy(1500);
+    const p = vary(1, 0.06);
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => voice(0.32, 0.35 * volume, [[0, 120 * p], [1, 85 * p]], [[500, 4, 1.4], [850, 5, 0.7]]), i * 360);
+      setTimeout(() => { // the breathy "h" before each "ho"
+        if (!ctx) return;
+        const t = ctx.currentTime, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        n.buffer = noiseBuffer(0.08); f.type = 'bandpass'; f.frequency.value = 1200; f.Q.value = 0.8;
+        g.gain.setValueAtTime(0.25 * volume, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        n.connect(f).connect(g).connect(out('monster')); n.start(t);
+      }, i * 360 - 40 < 0 ? 0 : i * 360 - 40);
+    }
+  }
+
+  // The zombie's long moan: low, wavering, falling.
+  function groan(seconds = 1.3, volume = 1) {
+    if (!ctx) return;
+    busy(seconds * 1000);
+    const p = vary(1, 0.12);
+    voice(seconds, 0.3 * volume, [[0, 95 * p], [0.4, 110 * p], [1, 70 * p]], [[420, 3, 1.3], [700, 4, 0.6]], 'monster', 6);
+  }
+
+  // Rudolf snorting before he charges: two short blasts of air.
+  function snort(volume = 1) {
+    if (!ctx) return;
+    busy(700);
+    for (let i = 0; i < 2; i++) {
+      setTimeout(() => {
+        if (!ctx) return;
+        const t = ctx.currentTime, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        n.buffer = noiseBuffer(0.25);
+        f.type = 'bandpass'; f.frequency.setValueAtTime(vary(700, 0.2), t); f.frequency.exponentialRampToValueAtTime(300, t + 0.22); f.Q.value = 1.5;
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.9 * volume, t + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+        n.connect(f).connect(g).connect(out('monster')); n.start(t);
+      }, i * 280);
+    }
   }
 
   // A series of footsteps getting louder and closer (the warning before the light comes): from one side to the middle.
@@ -194,6 +281,6 @@
   function setGroup(group, v) { if (!GROUPS.includes(group)) return; levels[group] = v; if (bus[group]) bus[group].gain.value = v; }
 
   const setMonster = (name) => { walker = name; };
-  const api = { unlock, footstep, approach, growl, heartbeat, caught, click, bells, setVolume, setGroup, setMonster, GROUPS, busyUntil: 0 };
+  const api = { unlock, footstep, approach, growl, heartbeat, caught, click, bells, hoho, groan, snort, setVolume, setGroup, setMonster, GROUPS, busyUntil: 0 };
   MC.sfx = api;
 })(window.MC = window.MC || {});
