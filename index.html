@@ -40,6 +40,20 @@
   .step.done h2 b { background: var(--moss); }
   #ttUser { flex: 1; min-width: 0; width: auto; font-size: 17px; padding: 7px 10px; }
   #roundBtn { font-size: 17px; padding: 10px 18px; }
+  /* Monster and scene: round buttons with a short name; locked ones (pack not bought) show a lock. */
+  .picker { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 8px; }
+  .picker .lbl { width: 100%; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: -2px; }
+  .pk { position: relative; display: grid; justify-items: center; gap: 1px; width: 64px; padding: 6px 2px 5px; border-radius: 12px; font-size: 12px; line-height: 1.2; }
+  .pk .e { font-size: 26px; line-height: 1.15; }
+  .pk.on { border-color: var(--lamp); background: #2a2414; box-shadow: 0 0 0 1px var(--lamp); color: var(--text); font-weight: 700; }
+  .pk .lock { position: absolute; top: -5px; right: -3px; font-size: 13px; }
+  .pk.out { opacity: 0.45; }
+  .picker.busy { opacity: 0.5; pointer-events: none; }
+  .pickAbout { min-height: 1.4em; margin: 0 0 8px; }
+  .pickAbout b { color: var(--text); font-weight: 500; }
+  .pickAbout.need { color: var(--lamp); }
+  .chip[data-lobby-pick] { cursor: pointer; }
+  .chip[data-lobby-pick]:hover { border-color: var(--lamp); color: var(--text); }
   details > summary { cursor: pointer; font-weight: 700; }
   /* Two pages: Play (this one, what goes on stream) and Settings & test. */
   .tabs { display: flex; gap: 6px; margin-left: auto; }
@@ -324,6 +338,9 @@
     </section>
     <section class="step" id="step3">
       <h2><b>3</b> Play</h2>
+      <div class="picker" id="pickMonster" role="group" aria-label="Monster"></div>
+      <div class="picker" id="pickScene" role="group" aria-label="Scene"></div>
+      <p class="hint pickAbout" id="pickAbout"></p>
       <div class="row">
         <button id="roundBtn" disabled>▶ Start round</button>
         <button id="streamBtn" title="A clean window with only the game, to add in TikTok LIVE Studio">📺 Stream window</button>
@@ -356,15 +373,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1795035556"></script>
-<script src="src/settings.js?v=1795035556"></script>
-<script src="src/events.js?v=1795035556"></script>
-<script src="src/face.js?v=1795035556"></script>
-<script src="src/curses.js?v=1795035556"></script>
-<script src="src/sfx.js?v=1795035556"></script>
-<script src="src/mic.js?v=1795035556"></script>
-<script src="src/lightson.js?v=1795035556"></script>
-<script src="src/live.js?v=1795035556"></script>
+<script src="src/edition.js?v=1795037836"></script>
+<script src="src/settings.js?v=1795037836"></script>
+<script src="src/events.js?v=1795037836"></script>
+<script src="src/face.js?v=1795037836"></script>
+<script src="src/curses.js?v=1795037836"></script>
+<script src="src/sfx.js?v=1795037836"></script>
+<script src="src/mic.js?v=1795037836"></script>
+<script src="src/lightson.js?v=1795037836"></script>
+<script src="src/live.js?v=1795037836"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -564,6 +581,55 @@
   let calWasOn = false;
   let starting = false;
 
+  // ---------- Monster and scene, picked next to Start round ----------
+  // Start round stays grey until both are picked (each time the game is opened from the lobby). The test round
+  // starts with the last ones picked. A pack's monster or scene not bought shows a lock: playable while it has a
+  // free try today, otherwise it offers Buy / the key.
+  const picked = { monster: PREVIEW, scene: PREVIEW };
+  let camReady = false;
+  const packOf = (kind, id) => Object.values(ED.PACKS).find((p) => p[kind + 's'].includes(id)) || null;
+  const pickList = (kind) => {
+    const base = ED.GAMES[ED.GAME][kind + 's'];
+    return base.concat(...Object.values(ED.PACKS).filter((p) => p.game === ED.GAME).map((p) => p[kind + 's']));
+  };
+  function updateRoundBtn() {
+    $('roundBtn').disabled = !round.running && (!camReady || !picked.monster || !picked.scene);
+  }
+  function renderPicker() {
+    for (const kind of ['monster', 'scene']) {
+      const el = $(kind === 'monster' ? 'pickMonster' : 'pickScene');
+      el.classList.toggle('busy', round.running);
+      el.innerHTML = `<span class="lbl">${kind === 'monster' ? 'Monster' : 'Scene'}</span>` + pickList(kind).map((id) => {
+        const c = ED.CONTENT[id] || { icon: '❔', name: id };
+        const pack = packOf(kind, id), owned = !pack || ED.owns(pack.product), left = owned ? 1 : pack.rounds.left();
+        const on = picked[kind] && S[kind] === id;
+        const tip = `${c.name}${c.about ? ': ' + c.about : ''}${pack ? ` · ${pack.name}${owned ? '' : left > 0 ? ' (1 free try today)' : ' (buy to play)'}` : ''}`;
+        return `<button class="pk${on ? ' on' : ''}${left > 0 ? '' : ' out'}" data-pick="${kind}" data-id="${esc(id)}" title="${esc(tip)}" aria-pressed="${on}">
+          <span class="e">${c.icon}</span>${esc(c.short || c.name)}${owned ? '' : '<span class="lock">🔒</span>'}</button>`;
+      }).join('');
+    }
+    // One line about the monster picked, or what's still missing.
+    const m = picked.monster && ED.CONTENT[S.monster], pk = picked.monster && packOf('monster', S.monster);
+    const need = !picked.monster || !picked.scene;
+    $('pickAbout').classList.toggle('need', need);
+    $('pickAbout').innerHTML = need ? `👆 Pick a ${!picked.monster ? 'monster' : 'scene'}${!picked.monster && !picked.scene ? ' and a scene' : ''} to start.`
+      : m ? `<b>${m.icon} ${esc(m.name)}</b>: ${esc(m.about || '')}${pk && !ED.owns(pk.product) ? ` · 🎁 ${esc(pk.name)}: free try` : ''}` : '';
+    updateRoundBtn();
+  }
+  // Pick a monster or scene. Returns false when it can't be played now (pack not bought, today's try used).
+  function pickItem(kind, id) {
+    const pack = packOf(kind, id);
+    if (pack && !ED.owns(pack.product) && pack.rounds.left() <= 0) { closeLobby(); packUsedUp(pack); return false; }
+    S[kind] = id; picked[kind] = true; save();
+    renderPicker(); renderEdition();
+    return true;
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pick]');
+    if (b && !round.running) pickItem(b.dataset.pick, b.dataset.id);
+  });
+  renderPicker();
+
   // ---------- Lobby ----------
   // Opens first (not in the test inside Settings & Test). A menu on the left: My games (bought), Try free (games not
   // bought yet, with their free rounds), All games (the store: games, packs, bundles, coming soon) and Duel.
@@ -581,9 +647,10 @@
   }
   // Under every Buy: where the key goes once bought (gone once it's owned).
   const keyLink = (c) => `<button class="keyLink" data-key-dlg="${esc(c.title)}">🔑 Bought it? Enter your key</button>`;
-  const chips = (ids, cls = '') => `<div class="chips">${ids.map((id) => {
+  // kind ('monster' / 'scene'): on the game's page a tap picks it and opens the game.
+  const chips = (ids, cls = '', kind = '') => `<div class="chips">${ids.map((id) => {
     const c = ED.CONTENT[id] || { icon: '', name: id };
-    return `<span class="chip ${cls}" title="${esc(c.about || '')}">${c.icon} ${esc(c.name)}</span>`;
+    return `<span class="chip ${cls}" title="${esc(c.about || (kind ? 'Play with it' : ''))}"${kind ? ` data-lobby-pick="${kind}:${esc(id)}" role="button" tabindex="0"` : ''}>${c.icon} ${esc(c.name)}</span>`;
   }).join('')}</div>`;
   // Free rounds of a game or pack not bought yet: "3/5 free rounds today" or when the next one comes.
   function roundsNote(counter, what = 'free rounds today') {
@@ -598,7 +665,7 @@
     const acts = !known ? '<span class="note">Update the app to play it.</span>'
       : owned ? '<button class="primary" data-lobby-play>▶ Play</button>'
       : `<button class="primary" data-lobby-play ${left > 0 ? '' : 'disabled'}>▶ Try free</button>${buyBtn(c)}`;
-    const inside = known && page ? `<p class="what">Monsters</p>${chips(known.monsters)}<p class="what">Scenes</p>${chips(known.scenes)}` : '';
+    const inside = known && page ? `<p class="what">Monsters · tap one to play with it</p>${chips(known.monsters, '', 'monster')}<p class="what">Scenes</p>${chips(known.scenes, '', 'scene')}` : '';
     return `<div class="card game"${page ? '' : ` data-lobby-game="${esc(c.id)}"`}>
       ${owned ? '<span class="badge ok">✓ Owned</span>' : '<span class="badge lock">Free to try</span>'}
       <h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>${inside}
@@ -754,22 +821,26 @@
     const gc = e.target.closest('[data-lobby-game]');
     if (gc && (e.target.closest('[data-lobby-game-open]') || !e.target.closest('a, button'))) { lobbyGo({ tab: lobbyView.tab, game: gc.dataset.lobbyGame }); return; }
     if (e.target.closest('[data-lobby-play]')) {
-      // The game itself: a pack's monster or scene not bought is swapped for the game's own.
-      const pack = ED.packFor(S), base = ED.GAMES[ED.GAME];
-      if (pack && !ED.owns(pack.product)) {
-        if (pack.monsters.includes(S.monster)) S.monster = base.monsters[0];
-        if (pack.scenes.includes(S.scene)) S.scene = base.scenes[0];
-        save(); renderEdition();
-      }
+      // The game itself: the streamer picks a monster and a scene next to Start round.
+      picked.monster = picked.scene = false; renderPicker();
+      closeLobby(); return;
+    }
+    // A monster or scene tapped on the game's page: picked, the other one still to choose.
+    const lp = e.target.closest('[data-lobby-pick]');
+    if (lp) {
+      const [kind, id] = lp.dataset.lobbyPick.split(':');
+      picked.monster = picked.scene = false;
+      if (!pickItem(kind, id)) return;
       closeLobby(); return;
     }
     const p = e.target.closest('[data-lobby-pack]');
     if (p) {
-      // Play the pack: its monster and its scene (changeable in Settings later).
+      // Play the pack: its monster and its scene, both picked (changeable next to Start round).
       const pack = ED.PACKS[p.dataset.lobbyPack];
       S.monster = pack.monsters[0]; S.scene = pack.scenes[0]; save();
-      renderEdition();
-      log(`${esc(pack.name)}: ${esc(S.monster)} in the ${esc(S.scene)} scene. Change them in Settings.`);
+      picked.monster = picked.scene = true;
+      renderEdition(); renderPicker();
+      log(`${esc(pack.name)}: ${esc(ED.CONTENT[S.monster].name)} in the ${esc(ED.CONTENT[S.scene].name)} scene. Change them next to Start round.`);
       closeLobby();
     }
   });
@@ -812,7 +883,7 @@
     game.shieldUntil = 0;
     renderLikes();
     curses.clear();
-    round.running = true;
+    round.running = true; renderPicker();
     // No calibrating mid-round: it would cover the game with its messages.
     calWasOn = !$('calBtn').disabled; $('calBtn').disabled = true;
     reviveUntil = 0;
@@ -839,6 +910,7 @@
     renderLikes();
     $('timer').hidden = true;
     $('roundBtn').textContent = '▶ Start round';
+    renderPicker();
   }
   let finaleTimer = 0;
   function endRound(won) {
@@ -919,9 +991,9 @@
   // ---------- Camera / calibration ----------
   function ready() {
     $('calBtn').disabled = false;
-    $('roundBtn').disabled = false;
+    camReady = true; updateRoundBtn();
     $('startBtn').disabled = true;
-    notice('Calibrate with a relaxed face, then start a round.');
+    notice('Calibrate with a relaxed face, pick a monster and a scene, then start a round.');
   }
   $('startBtn').onclick = async () => {
     MC.sfx.unlock(); MC.sfx.setVolume(S.volume);

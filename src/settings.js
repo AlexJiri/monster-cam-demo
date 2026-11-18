@@ -225,5 +225,31 @@
     cleanse: '🧹 Remove all curses (helps)',
   };
 
-  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo, TAPS, refreshCatalog, reportGift, giftPicture };
+  // Difficulty in one tap: lives, how often the monster comes, chains, how many curses at once and how long they
+  // last (`curse` scales the default curse times). The sliders can still change each one afterwards ("Custom").
+  const LEVELS = {
+    easy: { lives: 5, reviveSeconds: 5, maxCurses: 2, shieldSeconds: 10, patrolGap: [6, 12], curse: 0.7 },
+    normal: { lives: 3, reviveSeconds: 3, maxCurses: 3, shieldSeconds: 6, patrolGap: [4, 9], curse: 1 },
+    hard: { lives: 2, reviveSeconds: 2, maxCurses: 4, shieldSeconds: 4, patrolGap: [2.5, 6], curse: 1.4 },
+  };
+  const curseTimes = (scale) => Object.fromEntries(Object.entries(DEFAULTS.curses).map(([k, c]) => [k, {
+    seconds: Math.max(1, Math.round(c.seconds * scale)),
+    maxSeconds: Math.min(k === 'blink' ? 20 : 60, Math.round(c.maxSeconds * scale)),
+  }]));
+  function applyLevel(s, name) {
+    const L = LEVELS[name];
+    if (!L) return;
+    Object.assign(s, { lives: L.lives, reviveSeconds: L.reviveSeconds, maxCurses: L.maxCurses, shieldSeconds: L.shieldSeconds, patrolGap: [...L.patrolGap] });
+    for (const [k, t] of Object.entries(curseTimes(L.curse))) Object.assign(s.curses[k], t);
+  }
+  // Which level the settings match, or null (changed by hand).
+  function levelOf(s) {
+    return Object.keys(LEVELS).find((name) => {
+      const L = LEVELS[name], t = curseTimes(L.curse);
+      return s.lives === L.lives && s.reviveSeconds === L.reviveSeconds && s.maxCurses === L.maxCurses && s.shieldSeconds === L.shieldSeconds
+        && String(s.patrolGap) === String(L.patrolGap) && Object.entries(t).every(([k, v]) => s.curses[k].seconds === v.seconds && s.curses[k].maxSeconds === v.maxSeconds);
+    }) || null;
+  }
+
+  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo, TAPS, refreshCatalog, reportGift, giftPicture, LEVELS, applyLevel, levelOf };
 })(window.MC = window.MC || {});

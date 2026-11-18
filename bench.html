@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  /* Settings & Test: a few steps, one tab each (Camera → Gifts → Game → Dares → Test). Dark by design. */
+  /* Settings & Test: three tabs (Gifts, Rules, Dares) and a Test round button always at hand. Dark by design. */
   :root {
     --night: #0d0f14;
     --panel: #171a22;
@@ -46,15 +46,26 @@
   header { align-items: center; }
   h1 { color: var(--lamp); }
   .saved { color: var(--moss); font-size: 13px; }
-  /* Steps: numbered tabs, a tick when done. */
+  /* Tabs on the left, the Test round button on the right. */
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .steps { margin: 0; flex: 1; flex-wrap: nowrap; }
+  @media (max-width: 560px) {
+    .bar .steps { flex-basis: 100%; }
+    .bar .steps button { flex: 1; justify-content: center; padding: 7px 8px; }
+    #testBtn { flex: 1; }
+    label.field { grid-template-columns: 100px minmax(0, 1fr) 50px; }
+    label.field input[type=range] { min-width: 0; width: 100%; }
+    .meter { grid-template-columns: 90px 1fr 40px; }
+  }
+  #testBtn { font-size: 16px; padding: 9px 18px; }
+  .levels { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .levels button { display: grid; text-align: left; padding: 8px 14px; border-radius: 10px; font-weight: 700; }
+  .levels button small { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .levels button.on { border-color: var(--lamp); background: #2a2414; }
   .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-  .steps button { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 14px 6px 6px; }
-  .steps button b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--line); font-size: 13px; }
-  .steps button.on { border-color: var(--lamp); }
-  .steps button.on b { background: var(--lamp); color: #1b1400; }
-  .steps button.done b { background: var(--moss); color: #062010; }
+  .steps button { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 7px 16px; font-weight: 500; }
+  .steps button.on { border-color: var(--lamp); background: var(--lamp); color: #1b1400; font-weight: 700; }
   .panel[hidden] { display: none; }
-  .next { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   .camGrid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 760px) { .camGrid { grid-template-columns: 1fr; } }
   details > summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
@@ -62,17 +73,6 @@
   .rule { display: grid; grid-template-columns: 64px 18px minmax(0, 1fr) 18px minmax(0, 1.2fr) 36px; gap: 6px; align-items: center; margin: 6px 0; }
   .rule .x, .rule .arrow { color: var(--muted); text-align: center; }
   .rule .other { grid-column: 3 / 4; }
-  /* One-time tip pointing at Advanced. */
-  .tip { position: relative; margin-top: 14px; background: #2a2414; border: 1px solid var(--lamp); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; max-width: 520px; animation: tipIn 0.3s ease-out; }
-  .tip[hidden] { display: none; }
-  .tip::after { content: ''; position: absolute; left: 28px; bottom: -8px; width: 14px; height: 14px; background: #2a2414; border-right: 1px solid var(--lamp); border-bottom: 1px solid var(--lamp); transform: rotate(45deg); }
-  .tip b { color: var(--lamp); }
-  .tip span { font-size: 14px; }
-  @keyframes tipIn { from { opacity: 0; transform: translateY(6px); } }
-  .pick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
-  .pick label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
-  .pick select { font-size: 15px; padding: 6px 8px; color: var(--text); }
-  @media (max-width: 700px) { .pick { grid-template-columns: 1fr; } }
   .goodTitle { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
   /* Advanced: a clear button-like toggle, not a faint link. */
   details.adv > summary { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--night); margin-top: 14px; list-style: none; }
@@ -128,44 +128,18 @@
     <nav class="tabs" aria-label="Pages"><a href="index.html">🏠 Lobby</a><a href="index.html#play" class="play">▶ Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
   </header>
 
-  <nav class="steps" aria-label="Steps">
-    <button data-step="camera" id="step-camera"><b>1</b> Camera</button>
-    <button data-step="gifts" id="step-gifts"><b>2</b> Gifts</button>
-    <button data-step="game" id="step-game"><b>3</b> Game</button>
-    <button data-step="dares" id="step-dares"><b>4</b> Dares</button>
-    <button data-step="test" id="step-test"><b>5</b> Test</button>
-  </nav>
-
-  <section class="panel" id="p-camera">
-    <h2>Camera <small>· check that smiles, blinks, movement and sound are picked up</small></h2>
-    <div class="camGrid">
-      <div class="stage" id="stage">
-        <video id="video" playsinline muted></video>
-        <div class="empty" id="empty">Start the camera to test detection.<br>Everything runs on this computer; no video is sent anywhere.</div>
-        <div class="facebox" id="facebox"></div>
-        <div class="hud"><span></span><span class="status" id="status">Camera off</span></div>
-        <div class="notice" id="notice" aria-live="polite"></div>
-      </div>
-      <div>
-        <div class="row">
-          <button class="primary" id="startBtn">Start camera</button>
-          <button id="calBtn" disabled>Calibrate</button>
-        </div>
-        <p class="hint">Calibrate with a relaxed face and stay quiet for 3 seconds.</p>
-        <div class="meters" id="meters"></div>
-        <p class="hint">A bar turns red past its yellow line: that would get you caught.</p>
-        <details>
-          <summary>Sensitivity</summary>
-          <div id="sensSliders"></div>
-        </details>
-      </div>
-    </div>
-    <div class="next"><button class="primary" data-go="gifts">Next: Gifts →</button></div>
-  </section>
+  <div class="bar">
+    <nav class="steps" aria-label="Settings">
+      <button data-step="gifts" id="step-gifts">🎁 Gifts</button>
+      <button data-step="rules" id="step-rules">🎮 Rules</button>
+      <button data-step="dares" id="step-dares">🎲 Dares</button>
+    </nav>
+    <button class="primary" id="testBtn" title="A 60-second round with fake viewers, with these settings">🧪 Test round</button>
+  </div>
 
   <section class="panel" id="p-gifts" hidden>
     <h2>Gifts <small>· keep it short: viewers have to remember it</small></h2>
-    <h3>😈 Against the streamer <small class="hint">· curses, the hunter, big gifts</small></h3>
+    <h3>😈 Against the streamer <small class="hint">· curses, the monster, big gifts</small></h3>
     <div id="rulesBad"></div>
     <button data-addrule="bad">+ Add gift</button>
     <h3 class="goodTitle">🛡️ Help the streamer <small class="hint">· chain the monster, remove curses</small></h3>
@@ -173,34 +147,18 @@
     <button data-addrule="good">+ Add gift</button>
     <div class="row" style="margin-top:14px">
       <button id="defaultGifts">Default gifts</button>
+      <label class="check"><input type="checkbox" id="showGuide"> Show this list to viewers on stream</label>
     </div>
-    <p><label class="check"><input type="checkbox" id="showGuide"> Show this list to viewers on stream</label></p>
     <p class="hint">Each gift (and taps) can be used once. “Other gift”: type the name exactly as TikTok shows it; the bridge window prints each gift's name as it arrives.</p>
-    <div class="next"><button data-go="camera">← Back</button><button class="primary" data-go="game">Next: Game →</button></div>
   </section>
 
-  <section class="panel" id="p-game" hidden>
-    <h2>Game</h2>
-    <div class="pick">
-      <label>Monster
-        <select id="monster">
-          <option value="hunter">🔦 Hunter – walks through the room with a lantern</option>
-          <option value="void">🕳️ Void – crawls out of black holes</option>
-          <option value="zombie">🧟 Zombie – crawls on the floor with a head lamp, turns you into one of them</option>
-          <option value="krampus">👹 Krampus – Christmas Pack (1 free round a day until bought)</option>
-          <option value="santa">🎅 Santa – Christmas Pack: fat, slow, hits you with his gift sack</option>
-          <option value="rudolf">🦌 Rudolf – Christmas Pack: fast, his red nose is the light, charges with his antlers</option>
-        </select>
-      </label>
-      <label>Scene
-        <select id="scene">
-          <option value="none">🎥 Just my room</option>
-          <option value="basement">🧱 Basement</option>
-          <option value="forest">🌲 Forest</option>
-          <option value="hospital">🏥 Hospital</option>
-          <option value="winter">❄️ Winter night – Christmas Pack (1 free round a day until bought)</option>
-        </select>
-      </label>
+  <section class="panel" id="p-rules" hidden>
+    <h2>Rules <small>· the monster and the scene are picked in the game</small></h2>
+    <div class="levels" role="group" aria-label="Difficulty">
+      <button data-level="easy">😌 Easy<small>5 lives, short curses</small></button>
+      <button data-level="normal">😈 Normal<small>3 lives</small></button>
+      <button data-level="hard">💀 Hard<small>2 lives, long curses</small></button>
+      <span class="hint" id="levelNote"></span>
     </div>
     <div id="gameSliders"></div>
     <div class="row" style="margin-top:6px">
@@ -210,18 +168,36 @@
       <label class="check"><input type="checkbox" id="r-blink"> blink</label>
       <label class="check"><input type="checkbox" id="r-sound"> make a sound</label>
     </div>
-    <div class="tip" id="advTip" hidden role="note">
-      <b>⚙️ Worth a look: Advanced</b>
-      <span>How long each curse lasts and the most time it can stack to, how many curses can run at once, and how long a chain holds the monster. These decide how hard the game is.</span>
-      <div class="row"><button id="advOpen">Show me</button><button id="advGotIt">Got it</button></div>
-    </div>
     <details class="adv" id="adv">
       <summary>⚙️ Advanced</summary>
       <div id="advSliders"></div>
       <h3>Curse timers</h3>
       <div id="curseTimes"></div>
     </details>
-    <div class="next"><button data-go="gifts">← Back</button><button class="primary" data-go="dares">Next: Dares →</button></div>
+    <details class="adv" id="camCheck">
+      <summary>📷 Camera sensitivity</summary>
+      <p class="hint">Check that smiles, blinks, movement and sound are picked up, and how easily they get you caught.</p>
+      <div class="camGrid">
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted></video>
+          <div class="empty" id="empty">Start the camera to test detection.<br>Everything runs on this computer; no video is sent anywhere.</div>
+          <div class="facebox" id="facebox"></div>
+          <div class="hud"><span></span><span class="status" id="status">Camera off</span></div>
+          <div class="notice" id="notice" aria-live="polite"></div>
+        </div>
+        <div>
+          <div class="row">
+            <button class="primary" id="startBtn">Start camera</button>
+            <button id="calBtn" disabled>Calibrate</button>
+          </div>
+          <p class="hint">Calibrate with a relaxed face and stay quiet for 3 seconds.</p>
+          <div class="meters" id="meters"></div>
+          <p class="hint">A bar turns red past its yellow line: that would get you caught. Move the line:</p>
+          <div id="sensSliders"></div>
+        </div>
+      </div>
+    </details>
+    <div class="row" style="margin-top:18px"><button id="restoreAll">Restore all defaults</button><span class="hint" style="margin:0">Everything is saved as you go.</span></div>
   </section>
 
   <section class="panel" id="p-dares" hidden>
@@ -233,20 +209,12 @@
     <div id="winDares" class="dares"></div>
     <button data-adddare="winDares">+ Add dare</button>
     <p class="hint">Keep dares harmless: TikTok ends lives with dangerous challenges.</p>
-    <div class="next"><button data-go="game">← Back</button><button class="primary" data-go="test">Next: Test →</button></div>
   </section>
 
-  <section class="panel" id="p-test" hidden>
-    <h2>Test <small>· play one round with your settings</small></h2>
+  <section id="testBox" hidden>
+    <h2>🧪 Test round <small class="hint">· 60 seconds, fake viewers send your gifts and taps; TikTok stays off and it doesn't count as a free round</small></h2>
     <p class="hint" id="fileNote" hidden>⚠️ This page is open as a file, so the test opens full page. Start the game with <b>start-bridge.bat</b> (http://127.0.0.1:8787) to test right here.</p>
-    <p>A 60-second round with fake viewers sending your gifts and taps, right here. TikTok stays off and it doesn't count as a free round. You can also send gifts yourself from the test buttons.</p>
-    <div class="row">
-      <button class="primary bigBtn" id="testBtn">🧪 Start test round</button>
-      <button id="restoreAll">Restore all defaults</button>
-      <span class="hint" style="margin:0">Everything is saved as you go.</span>
-    </div>
-    <iframe class="testFrame" id="testFrame" title="Test round" allow="camera; microphone; autoplay" hidden></iframe>
-    <div class="next"><button data-go="dares">← Back</button></div>
+    <iframe class="testFrame" id="testFrame" title="Test round" allow="camera; microphone; autoplay"></iframe>
   </section>
 
   <section style="margin-top:16px">
@@ -255,10 +223,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1795035556"></script>
-<script src="src/events.js?v=1795035556"></script>
-<script src="src/face.js?v=1795035556"></script>
-<script src="src/mic.js?v=1795035556"></script>
+<script src="src/settings.js?v=1795037836"></script>
+<script src="src/events.js?v=1795037836"></script>
+<script src="src/face.js?v=1795037836"></script>
+<script src="src/mic.js?v=1795037836"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -272,35 +240,31 @@
     save.t = setTimeout(() => { $('saved').textContent = ''; }, 1500);
   }
 
-  // ---------- Steps ----------
-  const STEPS = ['camera', 'gifts', 'game', 'dares', 'test'];
+  // ---------- Tabs ----------
+  const STEPS = ['gifts', 'rules', 'dares'];
   function go(step) {
     STEPS.forEach((k) => {
       $('p-' + k).hidden = k !== step;
       $('step-' + k).classList.toggle('on', k === step);
+      $('step-' + k).setAttribute('aria-pressed', k === step);
     });
-    // Leaving a step counts as done with it.
-    for (const k of STEPS.slice(0, STEPS.indexOf(step))) $('step-' + k).classList.add('done');
     try { localStorage.setItem('monstercam-settings-step', step); } catch (e) {}
-    window.scrollTo(0, 0);
-    if (step === 'game') showAdvTip();
   }
-  // The Advanced tip shows on the Game step until the streamer dismisses it (or opens Advanced).
-  const TIP_KEY = 'monstercam-tip-advanced';
-  function showAdvTip() {
-    let seen = false;
-    try { seen = localStorage.getItem(TIP_KEY) === '1'; } catch (e) {}
-    $('advTip').hidden = seen;
-  }
-  const hideAdvTip = () => { $('advTip').hidden = true; try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} };
-  $('advGotIt').onclick = hideAdvTip;
-  $('advOpen').onclick = () => { hideAdvTip(); $('adv').open = true; $('adv').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  $('adv').addEventListener('toggle', () => { if ($('adv').open) hideAdvTip(); });
   document.querySelectorAll('[data-step]').forEach((b) => b.onclick = () => go(b.dataset.step));
-  document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => go(b.dataset.go));
-  let lastStep = 'camera';
-  try { lastStep = localStorage.getItem('monstercam-settings-step') || 'camera'; } catch (e) {}
-  go(STEPS.includes(lastStep) ? lastStep : 'camera');
+  let lastStep = 'gifts';
+  try { lastStep = localStorage.getItem('monstercam-settings-step') || 'gifts'; } catch (e) {}
+  go(STEPS.includes(lastStep) ? lastStep : 'gifts');
+
+  // ---------- Difficulty: one tap sets lives, curse times, chains and how often the monster comes ----------
+  function renderLevel() {
+    const lv = MC.settings.levelOf(S);
+    document.querySelectorAll('[data-level]').forEach((b) => b.classList.toggle('on', b.dataset.level === lv));
+    $('levelNote').textContent = lv ? '' : 'Custom (changed by hand)';
+  }
+  document.querySelectorAll('[data-level]').forEach((b) => b.onclick = () => {
+    MC.settings.applyLevel(S, b.dataset.level); save(); renderAll();
+    log(`Difficulty: ${b.textContent.replace(/[A-Z0-9].*$/, '').trim()} ${b.dataset.level}.`);
+  });
 
   // ---------- Camera test ----------
   const METERS = [
@@ -370,9 +334,7 @@
     } else if (r.samples) {
       calibrated = true;
       if (r.noiseFloor != null) log(`🎤 Room noise measured: ${r.noiseFloor.toFixed(2)}`);
-      notice('Calibrated ✓<br><small>Next: your gifts</small>', 1800);
-      $('step-camera').classList.add('done');
-      setTimeout(() => go('gifts'), 1800); // done here: on to the next step
+      notice('Calibrated ✓', 1800);
       log(`🎯 Calibrated (${r.samples} frames). Neutral smile ${r.smile.toFixed(2)}, eyes ${r.blink.toFixed(2)}.`);
     } else {
       notice('No face seen. Face the camera and try again.', 3000);
@@ -390,9 +352,9 @@
   const GAME = [
     ['lives', 'Lives', 1, 9, 1, ''],
     ['roundMinutes', 'Round length', 1, 10, 0.5, ' min'],
-    ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
   ];
   const ADV = [
+    ['reviveSeconds', 'Safe after losing a life', 0, 10, 1, ' s'],
     ['maxCurses', 'Curses at once (there are 4)', 1, 4, 1, ''],
     ['shieldSeconds', 'Chain lasts', 2, 20, 1, ' s'],
   ];
@@ -402,7 +364,7 @@
   function sliders(el, list) {
     $(el).innerHTML = list.map(([k, label, min, max, step, unit]) =>
       `<label class="field"><span>${label}</span><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}" value="${get(k)}"><output>${get(k)}${unit}</output></label>`).join('');
-    list.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); }; });
+    list.forEach(([k, , , , , unit]) => { const i = $('s-' + k); i.oninput = () => { set(k, +i.value); i.nextElementSibling.textContent = i.value + unit; save(); renderLevel(); }; });
   }
 
   // ---------- Gifts: [count] × [gift] → [effect], in two lists: against / help ----------
@@ -499,7 +461,7 @@
         S.curses[k].maxSeconds = +max.value;
         per.nextElementSibling.textContent = per.value + ' s';
         max.nextElementSibling.textContent = max.value + ' s';
-        save();
+        save(); renderLevel();
       };
       per.oninput = sync;
       max.oninput = sync;
@@ -509,13 +471,10 @@
     sliders('sensSliders', SENS);
     sliders('gameSliders', GAME);
     sliders('advSliders', ADV);
+    renderLevel();
     renderCurseTimes();
     renderRules();
     renderDares();
-    $('monster').value = S.monster || 'hunter';
-    $('monster').onchange = () => { S.monster = $('monster').value; save(); };
-    $('scene').value = S.scene || 'none';
-    $('scene').onchange = () => { S.scene = $('scene').value; save(); };
     $('showGuide').checked = !!S.showGiftGuide;
     $('showGuide').onchange = () => { S.showGiftGuide = $('showGuide').checked; save(); };
     ['move', 'smile', 'blink', 'sound'].forEach((k) => {
@@ -536,20 +495,20 @@
     try { await MC.media.get('video'); }
     catch (e) {
       log(`⚠️ ${e && e.name === 'NotAllowedError' ? 'The camera is blocked for this page. Click the icon left of the address bar, set Camera and Microphone to Allow, then reload.' : 'The camera could not start: ' + esc(e && e.message || e)}`);
-      $('testFrame').hidden = true;
+      $('testBox').hidden = true;
       return;
     }
     try { await MC.media.get('audio'); } catch (e) {} // the microphone is optional
-    $('testFrame').hidden = false;
+    $('testBox').hidden = false;
     $('testFrame').src = 'index.html?t=' + Date.now() + '#preview-embed'; // ?t: always the latest page, never a cached one
     $('testBtn').textContent = '🔁 Restart test round';
-    $('testFrame').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('testBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   window.addEventListener('pagehide', tidy);
   $('restoreAll').onclick = () => { if (!confirm('Restore every setting to its default?')) return; S = MC.settings.defaults(); save(); renderAll(); log('All settings restored to defaults.'); };
   renderAll();
   $('fileNote').hidden = location.protocol !== 'file:';
-  log('Start the camera to test detection.');
+  log('Settings are saved as you change them. 🧪 Test round tries them out.');
 </script>
 </body>
 </html>

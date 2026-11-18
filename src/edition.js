@@ -163,7 +163,7 @@
     santa: { icon: '🎅', name: 'Santa', about: 'fat and slow, hits you with his gift sack' },
     rudolf: { icon: '🦌', name: 'Rudolf', about: 'fast, his red nose is the light, charges with his antlers' },
     zombie: { icon: '🧟', name: 'Zombie', about: 'crawls with a head lamp, turns you into one of them' },
-    none: { icon: '🎥', name: 'Just my room' },
+    none: { icon: '🎥', name: 'Just my room', short: 'Room' },
     basement: { icon: '🧱', name: 'Basement' },
     forest: { icon: '🌲', name: 'Forest' },
     hospital: { icon: '🏥', name: 'Hospital' },
