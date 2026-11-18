@@ -128,6 +128,13 @@
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .row + .row { margin-top: 8px; }
   label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
+  .mixer { margin-top: 8px; font-size: 14px; }
+  .mixer summary { cursor: pointer; color: var(--muted, #9aa0ad); width: max-content; }
+  .mixGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
+  .mixGrid label { justify-content: space-between; min-width: 0; }
+  .mixGrid label span { white-space: nowrap; }
+  .mixGrid input { flex: 1; min-width: 50px; max-width: 120px; }
+  @media (max-width: 520px) { .mixGrid { grid-template-columns: 1fr; } }
   input[type=text] { background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; width: 120px; }
   .log { height: 110px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
@@ -192,6 +199,10 @@
         <label class="check" title="Volume">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
         <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="1.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
       </div>
+      <details class="mixer" id="mixer">
+        <summary>🎚️ Sounds</summary>
+        <div class="mixGrid" id="mixGrid"></div>
+      </details>
       <p class="hint" id="edition"></p>
       <p class="hint" id="appUpdate" hidden></p>
       <div class="keyForm" id="keyRow" hidden>
@@ -216,15 +227,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794987677"></script>
-<script src="src/settings.js?v=1794987677"></script>
-<script src="src/events.js?v=1794987677"></script>
-<script src="src/face.js?v=1794987677"></script>
-<script src="src/curses.js?v=1794987677"></script>
-<script src="src/sfx.js?v=1794987677"></script>
-<script src="src/mic.js?v=1794987677"></script>
-<script src="src/lightson.js?v=1794987677"></script>
-<script src="src/live.js?v=1794987677"></script>
+<script src="src/edition.js?v=1794988145"></script>
+<script src="src/settings.js?v=1794988145"></script>
+<script src="src/events.js?v=1794988145"></script>
+<script src="src/face.js?v=1794988145"></script>
+<script src="src/curses.js?v=1794988145"></script>
+<script src="src/sfx.js?v=1794988145"></script>
+<script src="src/mic.js?v=1794988145"></script>
+<script src="src/lightson.js?v=1794988145"></script>
+<script src="src/live.js?v=1794988145"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -573,6 +584,19 @@
   };
   $('vol').value = S.volume;
   $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
+  MC.sfx.setVolume(S.volume);
+  // Sound mixer: one volume per group of sounds (0 = off), under the master volume. Open/closed is remembered.
+  const MIX = [['monster', '👹 Monster', 'Growls and the scream when it catches you'], ['steps', '👣 Footsteps', 'The warning before the light comes'],
+    ['tension', '💓 Heartbeat', 'Last half minute of the round'], ['effects', '🔦 Clicks', 'The flashlight switching on']];
+  $('mixGrid').innerHTML = MIX.map(([k, label, tip]) => `<label class="check" title="${tip}"><span>${label}</span><input type="range" min="0" max="1" step="0.05" data-mix="${k}" aria-label="${label.slice(3)} volume"></label>`).join('');
+  $('mixGrid').querySelectorAll('[data-mix]').forEach((i) => {
+    const k = i.dataset.mix;
+    i.value = S.sound[k];
+    MC.sfx.setGroup(k, S.sound[k]);
+    i.oninput = () => { S.sound[k] = +i.value; MC.sfx.setGroup(k, S.sound[k]); save(); };
+  });
+  try { $('mixer').open = localStorage.getItem('monstercam-mixer') === '1'; } catch (e) {}
+  $('mixer').ontoggle = () => { try { localStorage.setItem('monstercam-mixer', $('mixer').open ? '1' : '0'); } catch (e) {} };
 
   // ---------- Simulator / live events ----------
   const viewer = () => $('viewer').value.trim() || 'viewer';

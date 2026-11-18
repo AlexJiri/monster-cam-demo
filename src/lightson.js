@@ -830,7 +830,7 @@
       const bpm = 70 + 80 * this.intensity;
       const t = (now / (60000 / bpm)) % 1; // 0..1 within one beat
       const beat = Math.max(Math.exp(-((t - 0.05) ** 2) / 0.002), 0.6 * Math.exp(-((t - 0.25) ** 2) / 0.002)); // lub-dub
-      if (beat > 0.5 && !this.lastBeat) MC.sfx.heartbeat(0.25 + 0.35 * this.intensity);
+      if (beat > 0.5 && !this.lastBeat) MC.sfx.heartbeat((0.25 + 0.35 * this.intensity) * (t < 0.15 ? 1 : 0.55)); // the "dub" is softer
       this.lastBeat = beat > 0.5;
       const ctx = this.ctx;
       const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.7);

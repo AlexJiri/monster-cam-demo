@@ -14,6 +14,7 @@
     graceMs: 1200, // warning time before a new curse starts counting
     roundSeconds: 300, // survive this long to win the round (a duel lasts about 5 minutes)
     volume: 0.8,
+    sound: { monster: 1, steps: 1, tension: 1, effects: 1 }, // each sound group's volume, 0..1 (sfx.js)
     // Lights On: what counts as "moving" while the flashlight is on you.
     monster: 'hunter', // hunter (walks through the room) | void (comes out of black holes)
     scene: 'none', // atmosphere over the camera: none | basement | forest | hospital
@@ -67,7 +68,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved) {
-        const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules } };
+        const s = { ...clone(DEFAULTS), ...saved, curses: { ...clone(DEFAULTS.curses), ...saved.curses }, lightRules: { ...DEFAULTS.lightRules, ...saved.lightRules }, sound: { ...DEFAULTS.sound, ...saved.sound } };
         // Saves from older gift lists: the new short list, 5-minute rounds and the likes target.
         if (saved.giftsVersion !== DEFAULTS.giftsVersion) {
           s.gifts = clone(DEFAULTS.gifts);
