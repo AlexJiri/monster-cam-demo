@@ -353,15 +353,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1795032741"></script>
-<script src="src/settings.js?v=1795032741"></script>
-<script src="src/events.js?v=1795032741"></script>
-<script src="src/face.js?v=1795032741"></script>
-<script src="src/curses.js?v=1795032741"></script>
-<script src="src/sfx.js?v=1795032741"></script>
-<script src="src/mic.js?v=1795032741"></script>
-<script src="src/lightson.js?v=1795032741"></script>
-<script src="src/live.js?v=1795032741"></script>
+<script src="src/edition.js?v=1795033715"></script>
+<script src="src/settings.js?v=1795033715"></script>
+<script src="src/events.js?v=1795033715"></script>
+<script src="src/face.js?v=1795033715"></script>
+<script src="src/curses.js?v=1795033715"></script>
+<script src="src/sfx.js?v=1795033715"></script>
+<script src="src/mic.js?v=1795033715"></script>
+<script src="src/lightson.js?v=1795033715"></script>
+<script src="src/live.js?v=1795033715"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -458,6 +458,12 @@
     const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
     return days === 0 ? t : days === 1 ? `tomorrow ${t}` : `${d.toLocaleDateString([], { weekday: 'short' })} ${t}`;
   }
+  // "5 free rounds the first day with a game, then 3 a day" (the numbers set in the backoffice).
+  function roundsRule() {
+    const l = ED.rounds.limits(), per = l.cooldownH === 24 ? 'a day' : `every ${l.cooldownH} hours`;
+    return l.firstDay !== l.rounds ? `${l.firstDay} free rounds the first ${l.cooldownH === 24 ? 'day' : `${l.cooldownH} hours`} with a game, then ${l.rounds} ${per}`
+      : `${l.rounds} free rounds ${per}`;
+  }
   function renderEdition() {
     const v = `v${ED.VERSION}`;
     if (update && update.required) { $('edition').innerHTML = `⛔ ${v} is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a>`; return; }
@@ -467,7 +473,7 @@
       const packText = pk && !ED.owns(pk.product) ? ` · 🎄 ${pk.rounds.left()}/${pk.rounds.max} ${esc(pk.name)} round today · <a href="#" data-key-dlg>Have a key?</a>` : '';
       $('edition').innerHTML = `Full version ${v}${packText}${upd}`; $('keyRow').hidden = true; return;
     }
-    if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FIRST_DAY_ROUNDS} the first day, then ${ED.FREE_ROUNDS} a day)`; return; }
+    if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${roundsRule()})`; return; }
     const left = ED.rounds.left();
     const next = ED.rounds.nextAt();
     // The pack in use (Krampus or the winter scene picked) and not bought: its own free rounds.
@@ -489,7 +495,7 @@
   }
   const KEY_FORM = '<div class="keyForm"><div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Unlock</button></div><small class="keyMsg"></small></div>';
   function noRoundsLeft(nextAt) {
-    notice(`No free rounds left<br><small>Next free round ${when(nextAt)}. The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
+    notice(`No free rounds left<br><small>${nextAt ? `Next free round ${when(nextAt)}.` : "This game has no free rounds right now."} The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
   }
   function packUsedUp(pack) {
     const card = ED.catalog.items().find((c) => c.id === pack.id) || {};
@@ -577,7 +583,7 @@
   // Free rounds of a game or pack not bought yet: "3/5 free rounds today" or when the next one comes.
   function roundsNote(counter, what = 'free rounds today') {
     const left = counter.left();
-    return left > 0 ? `🎁 ${left}/${counter.max} ${what}` : `Free rounds used · next ${when(counter.nextAt())}`;
+    return left > 0 ? `🎁 ${left}/${counter.max} ${what}` : counter.nextAt() ? `Free rounds used · next ${when(counter.nextAt())}` : "No free rounds right now";
   }
   function gameCard(c, page) {
     const known = ED.GAMES[c.id]; // a game this version of the app has (a newer one needs an update)
@@ -628,7 +634,7 @@
     free() {
       const games = cardsOf('game').filter((c) => !ED.owns(c.id));
       if (!games.length) return '<div class="empty"><b>You own every game 🎉</b>Thank you! New ones show up here first.</div>';
-      return `<p class="lead">${ED.FIRST_DAY_ROUNDS} free rounds the first day with a game, then ${ED.FREE_ROUNDS} a day. The free version shows a watermark on stream.</p>` +
+      return `<p class="lead">${roundsRule()[0].toUpperCase() + roundsRule().slice(1)}. The free version shows a watermark on stream.</p>` +
         grid(games.map((c) => gameCard(c)).join(''));
     },
     all() {

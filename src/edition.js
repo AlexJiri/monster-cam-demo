@@ -98,14 +98,22 @@
   // (`firstDay` in the first 24 h, games only), counted on the server per TikTok username, with a local list (start
   // times, saved under `storeKey`) as the fallback and offline count. Unlimited once `id` is owned.
   function counter(game, max, storeKey, firstDay = max) {
+    // The numbers set in the backoffice come with the lobby catalog; the built-in ones until it has loaded.
+    const limits = () => {
+      const c = catalog.items().find((i) => i.product === game || (!i.product && i.id === game));
+      const n = (v, d) => (Number.isInteger(v) && v >= 0 ? v : d);
+      return c ? { rounds: n(c.rounds, max), firstDay: n(c.firstDay, firstDay), cooldownH: n(c.cooldownH, COOLDOWN_HOURS) || COOLDOWN_HOURS }
+        : { rounds: max, firstDay, cooldownH: COOLDOWN_HOURS };
+    };
+    const hold = () => limits().cooldownH * 3600e3;
     const local = {
       list() {
-        const since = Date.now() - COOLDOWN_HOURS * 3600e3;
+        const since = Date.now() - hold();
         return (store.get(storeKey) || []).filter((t) => t > since);
       },
-      max() { const f = store.get(storeKey + '-first'); return !f || Date.now() - f < COOLDOWN_HOURS * 3600e3 ? firstDay : max; },
+      max() { const f = store.get(storeKey + '-first'), l = limits(); return !f || Date.now() - f < hold() ? l.firstDay : l.rounds; },
       left() { return Math.max(0, this.max() - this.list().length); },
-      nextAt() { const l = this.list().sort((a, b) => a - b), m = this.max(); return l.length < m ? 0 : l[l.length - m] + COOLDOWN_HOURS * 3600e3; },
+      nextAt() { const l = this.list().sort((a, b) => a - b), m = this.max(); return l.length < m || !m ? 0 : l[l.length - m] + hold(); },
       use() {
         const l = this.list(); l.push(Date.now()); store.set(storeKey, l);
         if (!store.get(storeKey + '-first')) store.set(storeKey + '-first', Date.now());
@@ -114,6 +122,7 @@
     let online = null; // last answer from the server for the connected username: { user, left, nextAt, max }
     return {
       id: game,
+      limits,
       get max() { return online && online.max ? online.max : local.max(); },
       left() { return owns(game) ? Infinity : online ? online.left : local.left(); },
       // When the next free round becomes available (ms timestamp), or 0 if one is available now.
@@ -192,7 +201,7 @@
   const DEFAULT_CATALOG = [
     { id: 'founder', kind: 'bundle', title: 'Founder Pass', icon: '👑', blurb: 'Every game and every pack, today and every one that comes out later. Only for a limited time.' },
     { id: 'lightson', kind: 'game', title: 'Lights On', icon: '🔦', blurb: 'A monster hunts the room with a lantern. Viewers send gifts to curse you, send it after you or chain it up. Freeze when the light finds you.' },
-    { id: 'xmas', kind: 'pack', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night with snow, string lights and his monster reindeer by a rusty sleigh.' },
+    { id: 'xmas', kind: 'pack', product: 'lightson-xmas', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night with snow, string lights and his monster reindeer by a rusty sleigh.' },
     { id: 'all', kind: 'bundle', title: 'All Games Bundle', icon: '🎮', blurb: 'Every Monster Cam game out today, for less than buying them one by one.' },
     { id: 'freeze', kind: 'soon', title: 'Freeze', icon: '🧊', blurb: 'Reach the finish without moving while the monster watches.' },
     { id: 'swarm', kind: 'soon', title: 'Swarm', icon: '🦇', blurb: 'Every viewer becomes a little monster.' },
