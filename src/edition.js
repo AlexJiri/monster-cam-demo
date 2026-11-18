@@ -12,13 +12,15 @@
   // The bridge switches this on; the desktop app never does.
   const DEV = false;
   const FREE_ROUNDS = 3;
+  const FIRST_DAY_ROUNDS = 5; // the first 24 h with a game (from its first free round)
   const COOLDOWN_HOURS = 24;
   // Public file with { "latest", "minimum", "download", "server" }. Older than `minimum` = must update.
   const VERSION_URL = 'https://alexjiri.github.io/monster-cam-demo/version.json';
   // The Monster Cam server; version.json's "server" overrides it, so a new address needs no new build.
   const DEFAULT_SERVER = 'https://158.101.197.220';
   const KEY = 'monstercam-rounds';
-  const LICENSE = 'monstercam-license';
+  const LICENSE = 'monstercam-license'; // old: one key
+  const LICENSES = 'monstercam-licenses';
   const SERVER_KEY = 'monstercam-server';
 
   const store = {
@@ -50,45 +52,70 @@
   // Test site only (the public demo): add #reset-rounds to the link to get the free rounds back.
   if (location.hostname === 'alexjiri.github.io' && location.hash === '#reset-rounds') store.set(KEY, null);
 
-  // ---------- License key ----------
+  // ---------- License keys ----------
+  // Every key bought is kept: { key, product }. A product is a game ('lightson'), a pack ('lightson-xmas'),
+  // 'all' (the All Games bundle: every game, no packs) or 'founder' (everything, now and later). Same rule as the server.
+  const isPackId = (id) => id.includes('-');
+  const unlocks = (product, id) => product === id || product === 'founder' || (product === 'all' && !isPackId(id));
+  const keys = () => {
+    const list = store.get(LICENSES);
+    if (Array.isArray(list)) return list;
+    const old = store.get(LICENSE); // before packs: one key, for this game
+    const moved = old && old.key ? [{ key: old.key, product: GAME, at: old.at }] : [];
+    store.set(LICENSES, moved);
+    return moved;
+  };
   const license = {
-    // The saved key, once the server said it was valid.
-    get() { const l = store.get(LICENSE); return l && l.key ? l.key : null; },
-    // Check a typed key and save it when valid. Resolves to { valid, blocked?, offline? }.
+    keys,
+    // The first saved key (the game's own when there is one).
+    get() { const l = keys(); return (l.find((k) => k.product === GAME) || l[0] || {}).key || null; },
+    // Check a typed key (any product) and save it when valid. Resolves to { valid, product?, blocked?, offline? }.
     async activate(key, username) {
-      const r = await call('/v1/key/check', { key, username: cleanUser(username) });
+      const r = await call('/v1/key/check', { game: 'any', key, username: cleanUser(username) });
       if (!r) return { valid: false, offline: true };
-      if (r.valid) store.set(LICENSE, { key: String(key).trim().toUpperCase(), at: Date.now() });
+      if (r.valid) {
+        const k = String(key).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^MC(\w{4})(\w{4})(\w{4})$/, 'MC-$1-$2-$3');
+        store.set(LICENSES, keys().filter((x) => x.key !== k).concat({ key: k, product: r.product || GAME, at: Date.now() }));
+      }
       return r;
     },
-    // Quiet re-check (app start, TikTok connect): logs the username with the key, and drops a key the server
-    // has blocked. Offline keeps the key.
+    // Quiet re-check (app start, TikTok connect): logs the username with each key, and drops a key the server
+    // has blocked. Offline keeps the keys.
     async recheck(username) {
-      const key = this.get();
-      if (!key) return;
-      const r = await call('/v1/key/check', { key, username: cleanUser(username) });
-      if (r && r.valid === false) store.set(LICENSE, null);
+      for (const k of keys()) {
+        const r = await call('/v1/key/check', { game: 'any', key: k.key, username: cleanUser(username) });
+        if (r && r.valid === false) store.set(LICENSES, keys().filter((x) => x.key !== k.key));
+      }
     },
   };
-  const isPaid = () => PAID || !!license.get();
+  // Owns a game, pack or bundle (a bundle key counts for what it unlocks).
+  const owns = (id) => PAID || DEV || keys().some((k) => unlocks(k.product, id));
+  // The full version of this game: no round limit, no watermark.
+  const isPaid = () => PAID || keys().some((k) => unlocks(k.product, GAME));
 
   // ---------- Free rounds ----------
-  // A counter of free rounds: `max` per COOLDOWN_HOURS, counted on the server under `game` per TikTok username,
-  // with a local list (start times, saved under `storeKey`) as the fallback and offline count.
-  function counter(game, max, storeKey) {
+  // A counter of free rounds for a game or pack (`id`, the server's name for it too): `max` per COOLDOWN_HOURS
+  // (`firstDay` in the first 24 h, games only), counted on the server per TikTok username, with a local list (start
+  // times, saved under `storeKey`) as the fallback and offline count. Unlimited once `id` is owned.
+  function counter(game, max, storeKey, firstDay = max) {
     const local = {
       list() {
         const since = Date.now() - COOLDOWN_HOURS * 3600e3;
         return (store.get(storeKey) || []).filter((t) => t > since);
       },
-      left() { return Math.max(0, max - this.list().length); },
-      nextAt() { const l = this.list().sort((a, b) => a - b); return l.length < max ? 0 : l[l.length - max] + COOLDOWN_HOURS * 3600e3; },
-      use() { const l = this.list(); l.push(Date.now()); store.set(storeKey, l); },
+      max() { const f = store.get(storeKey + '-first'); return !f || Date.now() - f < COOLDOWN_HOURS * 3600e3 ? firstDay : max; },
+      left() { return Math.max(0, this.max() - this.list().length); },
+      nextAt() { const l = this.list().sort((a, b) => a - b), m = this.max(); return l.length < m ? 0 : l[l.length - m] + COOLDOWN_HOURS * 3600e3; },
+      use() {
+        const l = this.list(); l.push(Date.now()); store.set(storeKey, l);
+        if (!store.get(storeKey + '-first')) store.set(storeKey + '-first', Date.now());
+      },
     };
-    let online = null; // last answer from the server for the connected username: { user, left, nextAt }
+    let online = null; // last answer from the server for the connected username: { user, left, nextAt, max }
     return {
-      max,
-      left() { return isPaid() || DEV ? Infinity : online ? online.left : local.left(); },
+      id: game,
+      get max() { return online && online.max ? online.max : local.max(); },
+      left() { return owns(game) ? Infinity : online ? online.left : local.left(); },
       // When the next free round becomes available (ms timestamp), or 0 if one is available now.
       nextAt() { return this.left() > 0 ? 0 : online ? online.nextAt : local.nextAt(); },
       // Refresh the online count for the TikTok username the game is connected to (null = not connected).
@@ -96,16 +123,16 @@
         const user = cleanUser(username);
         if (!user) { online = null; return; }
         const r = await call('/v1/rounds/status', { game, username: user });
-        online = r ? { user, left: r.left, nextAt: r.nextAt } : null;
+        online = r ? { user, left: r.left, nextAt: r.nextAt, max: r.max } : null;
       },
       // Use up a free round. Resolves to { allowed, left, nextAt }. Online for a connected username;
       // otherwise (or offline) the local count decides.
       async use(username) {
-        if (isPaid() || DEV) return { allowed: true, left: Infinity, nextAt: 0 };
+        if (owns(game)) return { allowed: true, left: Infinity, nextAt: 0 };
         const user = cleanUser(username);
         const r = user ? await call('/v1/rounds/use', { game, username: user }) : null;
         if (r) {
-          online = { user, left: r.left, nextAt: r.nextAt };
+          online = { user, left: r.left, nextAt: r.nextAt, max: r.max };
           if (r.allowed) local.use(); // keep the local count in step for offline use
           return { allowed: r.allowed, left: r.left, nextAt: r.nextAt };
         }
@@ -116,19 +143,45 @@
       },
     };
   }
-  const rounds = counter(GAME, FREE_ROUNDS, KEY);
+  const rounds = counter(GAME, FREE_ROUNDS, KEY, FIRST_DAY_ROUNDS);
+
+  // ---------- What's in the game ----------
+  // Each game has its own monsters and scenes (they don't carry over to other games). Packs add more, sold apart.
+  const CONTENT = {
+    hunter: { icon: '🔦', name: 'Hunter', about: 'walks through the room with a lantern' },
+    void: { icon: '🕳️', name: 'Void', about: 'crawls out of black holes' },
+    krampus: { icon: '👹', name: 'Krampus', about: 'hooves, bells and chains' },
+    none: { icon: '🎥', name: 'Just my room' },
+    basement: { icon: '🧱', name: 'Basement' },
+    forest: { icon: '🌲', name: 'Forest' },
+    hospital: { icon: '🏥', name: 'Hospital' },
+    winter: { icon: '❄️', name: 'Winter night' },
+  };
+  const GAMES = {
+    lightson: { monsters: ['hunter', 'void'], scenes: ['none', 'basement', 'forest', 'hospital'], packs: ['xmas'], duel: true },
+  };
 
   // ---------- Packs ----------
-  // Extra content, included in the full version. The free version may try each pack for a few rounds
-  // (counted apart from the normal free rounds, and on top of them).
+  // Extra monsters and scenes for one game, sold apart (`product`: what their keys unlock). Until bought, a pack
+  // can be tried for a round a day (counted apart from the game's free rounds, and on top of them).
   const PACKS = {
     xmas: {
       id: 'xmas', // its card in the lobby catalog
+      product: `${GAME}-xmas`,
+      game: GAME,
       name: 'Christmas Pack',
       monsters: ['krampus'], scenes: ['winter'],
       rounds: counter(`${GAME}-xmas`, 1, 'monstercam-xmas-rounds'), // 1 free round a day
     },
   };
+  // A catalog card's product id (what a key for it is saved as).
+  const productOf = (cardId) => (PACKS[cardId] ? PACKS[cardId].product : cardId);
+  // A product's name for messages ("✅ Unlocked: Christmas Pack").
+  function productName(product) {
+    const pack = Object.values(PACKS).find((p) => p.product === product);
+    const card = catalog.items().find((c) => c.id === (pack ? pack.id : product));
+    return card ? card.title : pack ? pack.name : product;
+  }
   // The pack a game setup uses (monster or scene from a pack), or null.
   const packFor = (s) => Object.values(PACKS).find((p) => p.monsters.includes(s.monster) || p.scenes.includes(s.scene)) || null;
 
@@ -137,8 +190,10 @@
   // The last copy is kept for offline; the built-in list is the very first fallback (no Buy links in it).
   const CATALOG_KEY = 'monstercam-catalog';
   const DEFAULT_CATALOG = [
+    { id: 'founder', kind: 'bundle', title: 'Founder Pass', icon: '👑', blurb: 'Every game and every pack, today and every one that comes out later. Only for a limited time.' },
     { id: 'lightson', kind: 'game', title: 'Lights On', icon: '🔦', blurb: 'A monster hunts the room with a lantern. Viewers send gifts to curse you, send it after you or chain it up. Freeze when the light finds you.' },
     { id: 'xmas', kind: 'pack', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night with snow, string lights and his monster reindeer by a rusty sleigh.' },
+    { id: 'all', kind: 'bundle', title: 'All Games Bundle', icon: '🎮', blurb: 'Every Monster Cam game out today, for less than buying them one by one.' },
     { id: 'freeze', kind: 'soon', title: 'Freeze', icon: '🧊', blurb: 'Reach the finish without moving while the monster watches.' },
     { id: 'swarm', kind: 'soon', title: 'Swarm', icon: '🦇', blurb: 'Every viewer becomes a little monster.' },
     { id: 'duel', kind: 'soon', title: 'Monster Duel', icon: '⚔️', blurb: 'TikTok LIVE battles: gifts send the monster to your opponent.' },
@@ -187,5 +242,8 @@
     ctx.restore();
   }
 
-  MC.edition = { VERSION, GAME, DEV, FREE_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, license, rounds, PACKS, packFor, catalog, checkVersion, watermark };
+  MC.edition = {
+    VERSION, GAME, DEV, FREE_ROUNDS, FIRST_DAY_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, owns, license, rounds,
+    CONTENT, GAMES, PACKS, packFor, productOf, productName, catalog, checkVersion, watermark,
+  };
 })(window.MC = window.MC || {});

@@ -67,7 +67,58 @@
   .lobbyTop img { border-radius: 18px; box-shadow: 0 6px 30px rgba(140, 70, 220, 0.35); }
   .lobbyTop h1 { margin: 0; font-size: 32px; letter-spacing: 0.5px; }
   .lobbyTop p { margin: 2px 0 0; color: var(--muted); }
-  .lobbyEd { color: var(--muted); margin: 14px 0; min-height: 1.4em; }
+  .lobbyTop > div { flex: 1; min-width: 0; }
+  .keyBtn .short { display: none; }
+  .keyBtn { font-weight: 700; padding: 9px 14px; border-color: var(--lamp); color: var(--lamp); white-space: nowrap; }
+  /* Menu on the left (a row of tabs on a phone), the chosen list on the right. */
+  .lobbyBody { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px; margin-top: 22px; }
+  .lnav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; align-self: start; }
+  .lnav button { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 10px 12px; font-size: 15px; color: var(--muted); }
+  .lnav button:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+  .lnav button.on { background: var(--panel); color: var(--text); font-weight: 700; box-shadow: inset 3px 0 0 var(--lamp); }
+  .lnav .n { font-size: 12px; background: var(--line); border-radius: 999px; padding: 0 8px; color: var(--muted); font-weight: 600; }
+  @media (max-width: 700px) {
+    .lobbyBody { grid-template-columns: 1fr; gap: 14px; }
+    .lnav { flex-direction: row; overflow-x: auto; position: static; margin: 0 -4px; padding-bottom: 2px; scrollbar-width: none; }
+    .lnav::-webkit-scrollbar { display: none; }
+    .lnav button { white-space: nowrap; padding: 8px 10px; font-size: 14px; }
+    .lnav button.on { box-shadow: inset 0 -3px 0 var(--lamp); }
+    .lobbyTop img { width: 56px; height: 56px; }
+    .lobbyTop h1 { font-size: 24px; }
+    .lobbyTop p, .keyBtn .long { display: none; }
+    .keyBtn .short { display: inline; }
+    .lobbyTop { gap: 12px; }
+    .keyBtn { padding: 8px 11px; }
+  }
+  .sec { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 22px 0 10px; font-weight: 700; }
+  .sec:first-child { margin-top: 0; }
+  .lmain .lead { color: var(--muted); margin: 0 0 14px; }
+  .empty { text-align: center; padding: 34px 16px; color: var(--muted); background: var(--panel); border: 1px dashed var(--line); border-radius: 14px; }
+  .empty b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
+  .empty button { margin-top: 12px; }
+  /* Buy: the most visible button on every card that isn't owned yet. */
+  a.buy, button.buy { display: inline-block; background: linear-gradient(180deg, #ffd166 0%, #e0a21c 100%); color: #1b1200; font-weight: 800; border: 0; border-radius: 10px; padding: 9px 18px; text-decoration: none; box-shadow: 0 4px 18px rgba(242, 193, 78, 0.28); }
+  a.buy:hover, button.buy:hover { filter: brightness(1.08); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; color: #d6d9e0; }
+  .chip.new { border-color: #24453a; }
+  .card .what { font-size: 13px; color: var(--muted); margin: 2px 0 -2px; }
+  .card[data-lobby-game] { cursor: pointer; }
+  .card[data-lobby-game]:hover { border-color: #6b4a30; }
+  .card.bundle { background: linear-gradient(160deg, #221a33 0%, #171a22 60%); border-color: #3b2f55; }
+  .card.founder { grid-column: 1 / -1; background: linear-gradient(110deg, #3d2c08 0%, #241a36 55%, #171a22 100%); border-color: #7a5a16; }
+  .card.founder h2 { font-size: 22px; }
+  .card.duel { grid-column: 1 / -1; }
+  .duelForm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .duelForm input { width: 11em; text-transform: uppercase; letter-spacing: 2px; font-size: 16px; padding: 6px 8px; }
+  .duelForm input::placeholder { text-transform: none; letter-spacing: 0; }
+  .back { background: transparent; border: 0; color: var(--muted); padding: 0; margin: 0 0 12px; font-size: 15px; }
+  .back:hover { color: var(--text); }
+  .askBox { position: relative; }
+  .askBox .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
+  .askBox h3 { margin: 0 0 6px; font-size: 19px; }
+  .askBox .lead { color: var(--muted); font-size: 14px; font-weight: 400; margin: 0 0 12px; }
+  .askBox .keyForm .row { justify-content: center; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
   .card h2 { margin: 0; font-size: 19px; display: flex; gap: 10px; align-items: center; }
@@ -85,9 +136,7 @@
   .card.pack { background: linear-gradient(160deg, #10241c 0%, #171a22 60%); border-color: #24453a; }
   .card.soon { opacity: 0.6; }
   .card a.buy { font-weight: 700; }
-  .lobbyKey { margin-top: 18px; max-width: 520px; }
-  .lobbyKey h3 { margin: 0 0 6px; font-size: 15px; }
-  #lobbyPlay { font-size: 18px; padding: 10px 26px; }
+  .card .acts .primary { font-size: 17px; padding: 9px 24px; }
   /* License key: in the Play panel ("Have a key?") and on the "no free rounds left" screen. */
   .keyForm input { flex: 1; min-width: 0; width: auto; max-width: 260px; font-size: 16px; padding: 6px 8px; letter-spacing: 1px; text-transform: uppercase; }
   .keyForm input::placeholder { text-transform: none; letter-spacing: 0; }
@@ -197,10 +246,21 @@
     <div class="lobbyTop">
       <img src="src/icon-256.png" alt="" width="76" height="76">
       <div><h1>Monster Cam</h1><p>Horror games for TikTok LIVE. Your viewers control the monster.</p></div>
+      <button class="keyBtn" data-key-dlg>🔑 <span class="long">Activate key</span><span class="short">Key</span></button>
     </div>
-    <p class="lobbyEd" id="lobbyEd"></p>
-    <div class="cards" id="cards"></div>
-    <div class="lobbyKey" id="lobbyKey"></div>
+    <div class="lobbyBody">
+      <nav class="lnav" id="lnav" aria-label="Games"></nav>
+      <div class="lmain" id="lmain"></div>
+    </div>
+  </div>
+</div>
+<!-- Activate a bought key: a game, a pack or a bundle. -->
+<div class="ask" id="keyDlg" role="dialog" aria-modal="true" aria-labelledby="keyDlgTitle" hidden>
+  <div class="askBox">
+    <button class="x" data-key-close aria-label="Close" title="Close">✕</button>
+    <h3 id="keyDlgTitle">🔑 Activate a key</h3>
+    <p class="lead" id="keyDlgLead"></p>
+    <div class="keyForm"><div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Activate</button></div><small class="keyMsg"></small></div>
   </div>
 </div>
 <button class="sndBtn" id="sndBtn" data-snd-open aria-expanded="false" aria-controls="sndPop" title="Sounds">🔊</button>
@@ -293,15 +353,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1795020646"></script>
-<script src="src/settings.js?v=1795020646"></script>
-<script src="src/events.js?v=1795020646"></script>
-<script src="src/face.js?v=1795020646"></script>
-<script src="src/curses.js?v=1795020646"></script>
-<script src="src/sfx.js?v=1795020646"></script>
-<script src="src/mic.js?v=1795020646"></script>
-<script src="src/lightson.js?v=1795020646"></script>
-<script src="src/live.js?v=1795020646"></script>
+<script src="src/edition.js?v=1795032741"></script>
+<script src="src/settings.js?v=1795032741"></script>
+<script src="src/events.js?v=1795032741"></script>
+<script src="src/face.js?v=1795032741"></script>
+<script src="src/curses.js?v=1795032741"></script>
+<script src="src/sfx.js?v=1795032741"></script>
+<script src="src/mic.js?v=1795032741"></script>
+<script src="src/lightson.js?v=1795032741"></script>
+<script src="src/live.js?v=1795032741"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -402,14 +462,18 @@
     const v = `v${ED.VERSION}`;
     if (update && update.required) { $('edition').innerHTML = `⛔ ${v} is no longer supported. <a href="${esc(update.download)}" target="_blank" rel="noopener">Download v${esc(update.latest)}</a>`; return; }
     const upd = update && update.available ? ` · <a href="${esc(update.download)}" target="_blank" rel="noopener">v${esc(update.latest)} available</a>` : '';
-    if (ED.isPaid()) { $('edition').innerHTML = `Full version ${v}${upd}`; $('keyRow').hidden = true; return; }
-    if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FREE_ROUNDS})`; return; }
+    const pk = ED.packFor(S);
+    if (ED.isPaid()) {
+      const packText = pk && !ED.owns(pk.product) ? ` · 🎄 ${pk.rounds.left()}/${pk.rounds.max} ${esc(pk.name)} round today · <a href="#" data-key-dlg>Have a key?</a>` : '';
+      $('edition').innerHTML = `Full version ${v}${packText}${upd}`; $('keyRow').hidden = true; return;
+    }
+    if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FIRST_DAY_ROUNDS} the first day, then ${ED.FREE_ROUNDS} a day)`; return; }
     const left = ED.rounds.left();
     const next = ED.rounds.nextAt();
-    // The pack in use (Krampus or the winter scene picked): its own free rounds.
+    // The pack in use (Krampus or the winter scene picked) and not bought: its own free rounds.
     const pack = ED.packFor(S);
-    const packText = pack ? ` · 🎄 ${pack.rounds.left()}/${pack.rounds.max} ${esc(pack.name)} round today` : '';
-    $('edition').innerHTML = `Free version ${v}: ${left}/${ED.FREE_ROUNDS} rounds left` +
+    const packText = pack && !ED.owns(pack.product) ? ` · 🎄 ${pack.rounds.left()}/${pack.rounds.max} ${esc(pack.name)} round today` : '';
+    $('edition').innerHTML = `Free version ${v}: ${left}/${ED.rounds.max} rounds left` +
       (next ? ` · next free round ${when(next)}` : '') + packText + upd + ' · <a href="#" data-key-open>Have a key?</a>';
   }
   ED.checkVersion().then((r) => { update = r; renderEdition(); });
@@ -428,7 +492,10 @@
     notice(`No free rounds left<br><small>Next free round ${when(nextAt)}. The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
   }
   function packUsedUp(pack) {
-    notice(`🎄 Today's free ${esc(pack.name)} round is used<br><small>Next one ${when(pack.rounds.nextAt())}. Pick another monster and scene in Settings to keep playing, or unlock the full version: the ${esc(pack.name)} is included.</small>${KEY_FORM}`);
+    const card = ED.catalog.items().find((c) => c.id === pack.id) || {};
+    const buy = ED.catalog.buyLink(pack.id);
+    notice(`🎄 Today's free ${esc(pack.name)} round is used<br><small>Next one ${when(pack.rounds.nextAt())}. Pick another monster and scene in Settings to keep playing, or buy the ${esc(pack.name)}${card.price ? ` (${esc(card.price)})` : ''} to play it any time.` +
+      `${buy ? ` <a href="${esc(buy)}" target="_blank" rel="noopener">Buy it</a>` : ''}</small>${KEY_FORM}`);
   }
 
   // ---------- App update (desktop app) ----------
@@ -457,11 +524,15 @@
     const r = await ED.license.activate(input.value, liveUser || $('ttUser').value);
     btn.disabled = false;
     if (r.valid) {
-      msg.textContent = '✅ Full version unlocked. Thank you!';
-      log('🔓 Full version unlocked: unlimited rounds, no watermark.');
+      const name = ED.productName(r.product || ED.GAME);
+      msg.textContent = `✅ Unlocked: ${name}. Thank you!`;
+      log(`🔓 Unlocked: ${esc(name)}.`);
+      input.value = '';
       renderEdition();
-      if (!$('lobby').hidden) setTimeout(renderLobby, 1200); // the lobby turns into the full version's
-      if (form.closest('.notice')) setTimeout(hideNotice, 1200);
+      // The lobby shows it under My games.
+      if (!$('lobby').hidden) setTimeout(() => { lobbyView = { tab: 'mine' }; renderLobby(); }, 1300);
+      if (form.closest('.notice')) setTimeout(hideNotice, 1300);
+      if (form.closest('#keyDlg')) setTimeout(closeKeyDlg, 1300);
     } else msg.textContent = r.offline ? '⚠️ Could not reach the server. Check the internet and try again.'
       : r.blocked ? '⛔ This key was blocked. If you bought it, write to us for a new one.'
       : '❌ Key not found. Check it and try again.';
@@ -485,41 +556,160 @@
   let starting = false;
 
   // ---------- Lobby ----------
-  // Opens first (not in the test inside Settings & Test). Cards come from the server's catalog (mc-catalog): the game,
-  // its packs (included in the full version; the free version gets a free pack round a day), and what's coming soon.
-  function renderLobby() {
-    const paid = ED.isPaid() || ED.DEV;
-    const buyFull = ED.catalog.buyLink();
-    const items = ED.catalog.items();
-    const price = (items.find((i) => i.id === ED.GAME) || {}).price;
-    const buyBtn = (label) => (buyFull ? `<a class="buy" href="${esc(buyFull)}" target="_blank" rel="noopener">${label}</a>` : '');
-    $('lobbyEd').innerHTML = paid ? '✅ Full version: unlimited rounds, every pack, no watermark.'
-      : `Free version: ${ED.rounds.left()}/${ED.FREE_ROUNDS} rounds left today${ED.rounds.nextAt() ? ` · next ${when(ED.rounds.nextAt())}` : ''} · watermark on stream.`;
-    $('cards').innerHTML = items.map((c) => {
-      const head = `<h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>`;
-      if (c.kind === 'game') {
-        return `<div class="card game">${paid ? '<span class="badge ok">✓ Full version</span>' : '<span class="badge">Free version</span>'}${head}
-          <div class="acts"><button class="primary" id="lobbyPlay" data-lobby-play>▶ Play</button>
-          ${paid ? '' : buyBtn(`Get the full version${price ? ' · ' + esc(price) : ''}`)}</div></div>`;
-      }
-      if (c.kind === 'pack') {
-        const pack = Object.values(ED.PACKS).find((p) => p.id === c.id);
-        if (!pack) return ''; // a pack this version of the game doesn't have yet (update the app)
-        const left = pack.rounds.left(), next = pack.rounds.nextAt();
-        const play = `<button data-lobby-pack="${esc(pack.id)}" ${!paid && left <= 0 ? 'disabled' : ''}>▶ Play ${esc(pack.name.replace(/ Pack$/, ''))}</button>`;
-        return `<div class="card pack">${paid ? '<span class="badge ok">✓ Included</span>' : '<span class="badge lock">🔒 Full version</span>'}${head}
-          ${paid ? '' : `<span class="note">${left > 0 ? `🎁 ${left} free round today` : `Today's free round is used · next ${when(next)}`}. The full version includes it.</span>`}
-          <div class="acts">${play}${paid ? '' : buyBtn('Get the full version')}</div></div>`;
-      }
-      return `<div class="card soon"><span class="badge">Coming soon</span>${head}</div>`;
-    }).join('');
-    $('lobbyKey').innerHTML = paid ? '' : `<h3>🔑 Bought it? Paste your key</h3>${KEY_FORM}`;
+  // Opens first (not in the test inside Settings & Test). A menu on the left: My games (bought), Try free (games not
+  // bought yet, with their free rounds), All games (the store: games, packs, bundles, coming soon) and Duel.
+  // A game's card opens its page (what's in it, its packs). Cards come from the server's catalog (mc-catalog).
+  const LOBBY_TABS = [['mine', '🎮', 'My games'], ['free', '🆓', 'Try free'], ['all', '🛒', 'All games'], ['duel', '⚔️', 'Duel']];
+  let lobbyView = null; // { tab, game? }
+  try { const t = localStorage.getItem('monstercam-lobby-tab'); if (LOBBY_TABS.some(([id]) => id === t)) lobbyView = { tab: t }; } catch (e) {}
+  const cardsOf = (kind) => ED.catalog.items().filter((c) => c.kind === kind);
+  const ownedGames = () => cardsOf('game').filter((c) => ED.owns(c.id));
+  // Buy button: the store link from the catalog, or "the store opens soon" until there is one.
+  function buyBtn(c, label = 'Buy') {
+    const text = `${label}${c.price ? ' · ' + esc(c.price) : ''}`;
+    const link = ED.catalog.buyLink(c.id);
+    return link ? `<a class="buy" href="${esc(link)}" target="_blank" rel="noopener">🛒 ${text}</a>` : `<button class="buy" data-buy-soon>🛒 ${text}</button>`;
   }
+  const chips = (ids, cls = '') => `<div class="chips">${ids.map((id) => {
+    const c = ED.CONTENT[id] || { icon: '', name: id };
+    return `<span class="chip ${cls}" title="${esc(c.about || '')}">${c.icon} ${esc(c.name)}</span>`;
+  }).join('')}</div>`;
+  // Free rounds of a game or pack not bought yet: "3/5 free rounds today" or when the next one comes.
+  function roundsNote(counter, what = 'free rounds today') {
+    const left = counter.left();
+    return left > 0 ? `🎁 ${left}/${counter.max} ${what}` : `Free rounds used · next ${when(counter.nextAt())}`;
+  }
+  function gameCard(c, page) {
+    const known = ED.GAMES[c.id]; // a game this version of the app has (a newer one needs an update)
+    const owned = ED.owns(c.id);
+    const counter = c.id === ED.GAME ? ED.rounds : null;
+    const left = counter ? counter.left() : 0;
+    const acts = !known ? '<span class="note">Update the app to play it.</span>'
+      : owned ? '<button class="primary" data-lobby-play>▶ Play</button>'
+      : `<button class="primary" data-lobby-play ${left > 0 ? '' : 'disabled'}>▶ Try free</button>${buyBtn(c)}`;
+    const inside = known && page ? `<p class="what">Monsters</p>${chips(known.monsters)}<p class="what">Scenes</p>${chips(known.scenes)}` : '';
+    return `<div class="card game"${page ? '' : ` data-lobby-game="${esc(c.id)}"`}>
+      ${owned ? '<span class="badge ok">✓ Owned</span>' : '<span class="badge lock">Free to try</span>'}
+      <h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>${inside}
+      ${!owned && counter ? `<span class="note">${roundsNote(counter)} · watermark on stream</span>` : ''}
+      <div class="acts">${acts}${page ? '' : '<button data-lobby-game-open>More ›</button>'}</div></div>`;
+  }
+  function packCard(c) {
+    const pack = ED.PACKS[c.id];
+    if (!pack) return ''; // a pack this version of the app doesn't have yet
+    const owned = ED.owns(pack.product);
+    const left = pack.rounds.left();
+    const play = `<button ${owned ? 'class="primary" ' : ''}data-lobby-pack="${esc(pack.id)}" ${owned || left > 0 ? '' : 'disabled'}>▶ ${owned ? 'Play' : 'Try'} it</button>`;
+    return `<div class="card pack">${owned ? '<span class="badge ok">✓ Owned</span>' : '<span class="badge lock">Pack</span>'}
+      <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
+      ${chips(pack.monsters.concat(pack.scenes), 'new')}
+      ${owned ? '' : `<span class="note">${roundsNote(pack.rounds, 'free try today')}</span>`}
+      <div class="acts">${play}${owned ? '' : buyBtn(c)}</div></div>`;
+  }
+  function bundleCard(c) {
+    const owned = ED.owns(c.id);
+    return `<div class="card bundle${c.id === 'founder' ? ' founder' : ''}">${owned ? '<span class="badge ok">✓ Owned</span>' : `<span class="badge lock">${c.id === 'founder' ? 'Limited time' : 'Bundle'}</span>`}
+      <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
+      ${owned ? '' : `<div class="acts">${buyBtn(c)}</div>`}</div>`;
+  }
+  const soonCard = (c) => `<div class="card soon"><span class="badge">Coming soon</span><h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p></div>`;
+  const founderBanner = () => cardsOf('bundle').filter((c) => c.id === 'founder' && !ED.owns('founder')).map(bundleCard).join('');
+  const grid = (html) => (html ? `<div class="cards">${html}</div>` : '');
+
+  const LOBBY_VIEWS = {
+    mine() {
+      const games = ownedGames(), packs = cardsOf('pack').filter((c) => ED.PACKS[c.id] && ED.owns(ED.PACKS[c.id].product));
+      if (!games.length && !packs.length) {
+        return `<div class="empty"><b>No games yet</b>The games and packs you buy show up here.<br>
+          <button class="primary" data-lobby-tab="free">🆓 Try a game for free</button> <button data-key-dlg>🔑 I have a key</button></div>`;
+      }
+      return grid(games.map((c) => gameCard(c)).join('')) + (packs.length ? `<h3 class="sec">Packs</h3>${grid(packs.map(packCard).join(''))}` : '');
+    },
+    free() {
+      const games = cardsOf('game').filter((c) => !ED.owns(c.id));
+      if (!games.length) return '<div class="empty"><b>You own every game 🎉</b>Thank you! New ones show up here first.</div>';
+      return `<p class="lead">${ED.FIRST_DAY_ROUNDS} free rounds the first day with a game, then ${ED.FREE_ROUNDS} a day. The free version shows a watermark on stream.</p>` +
+        grid(games.map((c) => gameCard(c)).join(''));
+    },
+    all() {
+      const bundles = cardsOf('bundle').filter((c) => c.id !== 'founder');
+      return grid(founderBanner()) +
+        `<h3 class="sec">Games</h3>${grid(cardsOf('game').map((c) => gameCard(c)).join(''))}` +
+        (cardsOf('pack').length ? `<h3 class="sec">Packs</h3>${grid(cardsOf('pack').map(packCard).join(''))}` : '') +
+        (bundles.length ? `<h3 class="sec">Bundles</h3>${grid(bundles.map(bundleCard).join(''))}` : '') +
+        (cardsOf('soon').length ? `<h3 class="sec">Coming soon</h3>${grid(cardsOf('soon').map(soonCard).join(''))}` : '');
+    },
+    duel() {
+      const games = cardsOf('game').filter((c) => ED.GAMES[c.id] && ED.GAMES[c.id].duel);
+      return `<div class="cards"><div class="card duel"><span class="badge">Coming soon</span>
+        <h2><span class="ic">⚔️</span>Duel</h2>
+        <p>Challenge another streamer playing the same game. Your viewers' gifts send the monster to your opponent, theirs send it to you. The last one standing wins.</p>
+        <span class="note">Free version too: hosting or joining a duel uses one of that game's free rounds.</span>
+        <p class="what">Game</p><div class="chips">${games.map((c) => `<span class="chip">${esc(c.icon || '')} ${esc(c.title)}</span>`).join('')}</div>
+        <div class="acts"><button class="primary" disabled>⚔️ Host a duel</button>
+        <span class="duelForm"><input type="text" placeholder="Invite code" aria-label="Invite code" disabled><button disabled>Join</button></span></div>
+        </div></div>`;
+    },
+    // A game's own page: what's in it, its packs, play / try / buy.
+    game(id) {
+      const c = cardsOf('game').find((x) => x.id === id);
+      if (!c) return LOBBY_VIEWS.all();
+      const packs = cardsOf('pack').filter((p) => ED.PACKS[p.id] && ED.PACKS[p.id].game === id);
+      return `<button class="back" data-lobby-back>‹ Back</button>${grid(gameCard(c, true))}` +
+        (packs.length ? `<h3 class="sec">Packs for ${esc(c.title)}</h3>${grid(packs.map(packCard).join(''))}` : '') +
+        (founderBanner() ? `<h3 class="sec">Get everything</h3>${grid(founderBanner())}` : '');
+    },
+  };
+  function renderLobby() {
+    if (!lobbyView) lobbyView = { tab: ownedGames().length ? 'mine' : 'free' };
+    const counts = { mine: ownedGames().length, free: cardsOf('game').filter((c) => !ED.owns(c.id)).length };
+    $('lnav').innerHTML = LOBBY_TABS.map(([id, ic, name]) => `<button data-lobby-tab="${id}" class="${lobbyView.tab === id ? 'on' : ''}"${lobbyView.tab === id ? ' aria-current="page"' : ''}>
+      <span>${ic} ${name}</span>${counts[id] ? `<span class="n">${counts[id]}</span>` : ''}</button>`).join('');
+    $('lmain').innerHTML = lobbyView.game ? LOBBY_VIEWS.game(lobbyView.game) : LOBBY_VIEWS[lobbyView.tab]();
+    const on = $('lnav').querySelector('.on'); // phone: the tab row scrolls to the open tab
+    if (on && $('lnav').scrollWidth > $('lnav').clientWidth) $('lnav').scrollLeft = on.offsetLeft - 40;
+  }
+  function lobbyGo(view) {
+    lobbyView = view;
+    try { localStorage.setItem('monstercam-lobby-tab', view.tab); } catch (e) {}
+    renderLobby();
+    $('lobby').scrollTop = 0;
+  }
+
+  // ---------- Activate key (lobby button, "Have a key?", a key pasted or copied) ----------
+  function openKeyDlg(key, lead) {
+    $('keyDlgLead').textContent = lead || 'Paste the key from your purchase (the store shows it after you buy and emails it to you). It unlocks a game, a pack or a bundle for good.';
+    const input = $('keyDlg').querySelector('input');
+    input.value = key || '';
+    $('keyDlg').querySelector('.keyMsg').textContent = '';
+    $('keyDlg').hidden = false;
+    (key ? $('keyDlg').querySelector('[data-unlock]') : input).focus();
+  }
+  function closeKeyDlg() { $('keyDlg').hidden = true; }
+  $('keyDlg').onclick = (e) => { if (e.target === $('keyDlg') || e.target.closest('[data-key-close]')) closeKeyDlg(); };
+  const KEY_RE = /\bMC-?[A-Z0-9]{4}-?[A-Z0-9]{4}-?[A-Z0-9]{4}\b/i;
+  const ownKey = (k) => ED.license.keys().some((x) => x.key.replace(/-/g, '') === k.toUpperCase().replace(/-/g, ''));
+  // A key pasted anywhere in the lobby (not into a box) opens Activate with it.
+  document.addEventListener('paste', (e) => {
+    if ($('lobby').hidden || e.target.closest('input, textarea')) return;
+    const m = KEY_RE.exec((e.clipboardData || window.clipboardData).getData('text') || '');
+    if (m && !ownKey(m[0])) { e.preventDefault(); openKeyDlg(m[0].toUpperCase(), 'Found a key in what you pasted. Activate it?'); }
+  });
+  // Desktop app: back from the store with a key copied, the lobby offers it (once per key).
+  let offeredKey = '';
+  addEventListener('focus', async () => {
+    if ($('lobby').hidden || !$('keyDlg').hidden || !/Electron/.test(navigator.userAgent) || !navigator.clipboard) return;
+    try {
+      const m = KEY_RE.exec(await navigator.clipboard.readText());
+      if (m && m[0].toUpperCase() !== offeredKey && !ownKey(m[0])) { offeredKey = m[0].toUpperCase(); openKeyDlg(offeredKey, 'You copied a key. Activate it?'); }
+    } catch (e) {}
+  });
   // "Are you sure?" in a box over the page. Resolves to true (yes) or false (no, Escape, click outside).
   function ask(html, yes, no) {
     return new Promise((done) => {
-      $('askText').innerHTML = html; $('askYes').textContent = yes; $('askNo').textContent = no;
-      $('ask').hidden = false; $('askNo').focus();
+      $('askText').innerHTML = html; $('askYes').textContent = yes; $('askNo').textContent = no || '';
+      $('askNo').hidden = !no; // just an OK
+      $('ask').hidden = false; (no ? $('askNo') : $('askYes')).focus();
       ask.end = (v) => { $('ask').hidden = true; ask.end = null; done(v); };
     });
   }
@@ -540,11 +730,27 @@
   function closeLobby() { $('lobby').hidden = true; }
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-lobby-open]')) { e.preventDefault(); openLobby(); return; }
-    if (e.target.closest('[data-lobby-play]')) { closeLobby(); return; }
+    if (e.target.closest('[data-key-dlg]')) { e.preventDefault(); openKeyDlg(); return; }
+    if (e.target.closest('[data-buy-soon]')) { ask('The store opens soon<small>Until then, play the free rounds. Once you buy, paste your key with 🔑 Activate key.</small>', 'OK'); return; }
+    const tab = e.target.closest('[data-lobby-tab]');
+    if (tab) { lobbyGo({ tab: tab.dataset.lobbyTab }); return; }
+    if (e.target.closest('[data-lobby-back]')) { lobbyGo({ tab: lobbyView.tab }); return; }
+    const gc = e.target.closest('[data-lobby-game]');
+    if (gc && (e.target.closest('[data-lobby-game-open]') || !e.target.closest('a, button'))) { lobbyGo({ tab: lobbyView.tab, game: gc.dataset.lobbyGame }); return; }
+    if (e.target.closest('[data-lobby-play]')) {
+      // The game itself: a pack's monster or scene not bought is swapped for the game's own.
+      const pack = ED.packFor(S), base = ED.GAMES[ED.GAME];
+      if (pack && !ED.owns(pack.product)) {
+        if (pack.monsters.includes(S.monster)) S.monster = base.monsters[0];
+        if (pack.scenes.includes(S.scene)) S.scene = base.scenes[0];
+        save(); renderEdition();
+      }
+      closeLobby(); return;
+    }
     const p = e.target.closest('[data-lobby-pack]');
     if (p) {
       // Play the pack: its monster and its scene (changeable in Settings later).
-      const pack = Object.values(ED.PACKS).find((x) => x.id === p.dataset.lobbyPack);
+      const pack = ED.PACKS[p.dataset.lobbyPack];
       S.monster = pack.monsters[0]; S.scene = pack.scenes[0]; save();
       renderEdition();
       log(`${esc(pack.name)}: ${esc(S.monster)} in the ${esc(S.scene)} scene. Change them in Settings.`);
@@ -553,7 +759,9 @@
   });
   addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (ask.end) ask.end(false); else if ($('sndPop').hidden && !$('lobby').hidden) closeLobby(); // an open Sounds panel closes first
+    if (ask.end) ask.end(false);
+    else if (!$('keyDlg').hidden) closeKeyDlg();
+    else if ($('sndPop').hidden && !$('lobby').hidden) closeLobby(); // an open Sounds panel closes first
   });
   // #play (the Play tab on Settings & Test, "Play for real" after a test) goes straight to the game.
   if (!PREVIEW) {
@@ -567,10 +775,10 @@
     if (!PREVIEW) {
       if (!canStartRound()) return;
       // Free version: uses a round online for the connected TikTok username (local count when offline).
-      // With a pack's monster or scene it also uses one of that pack's free rounds (checked first, so a
-      // used-up pack doesn't cost a normal round).
+      // With a pack's monster or scene not bought it also uses one of that pack's free rounds (checked first, so a
+      // used-up pack doesn't cost a normal round). The pack is sold apart, so the full game still counts them.
       starting = true;
-      const pack = ED.isPaid() || ED.DEV ? null : ED.packFor(S);
+      const pack = ED.packFor(S) && !ED.owns(ED.packFor(S).product) ? ED.packFor(S) : null;
       if (pack) await pack.rounds.refresh(liveUser);
       if (pack && pack.rounds.left() <= 0) { starting = false; packUsedUp(pack); return; }
       const r = await ED.rounds.use(liveUser);
