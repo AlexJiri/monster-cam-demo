@@ -9,6 +9,7 @@
   // End-of-round finale (ms): lights out, jump scare, then devoured (lost) or the monster pulls back (won).
   const PORTAL_IDLE = 0.45; // Void portal size (0..1) while open but nothing is coming out of it
   const FIN = { black: 2300, jump: 650, devour: 3500, retreat: 900 };
+  const KRAMPUS_FUR = '#170f0b'; // Christmas Pack monster: black-brown fur
   const rand = (a, b) => a + Math.random() * (b - a);
   const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -175,6 +176,7 @@
     update(now, face) {
       const s = this.s;
       this.lastSound = face.sound || 0;
+      MC.sfx.setMonster(s.monster); // Krampus walks on hooves, with bells
       switch (this.phase) {
         case 'idle':
           this.beam = null;
@@ -748,21 +750,30 @@
     drawBigHead(mx, my, mrx, mry, s, shut) {
       // Never so big that the eyes leave the top of the picture.
       s = Math.min(s, Math.max(this.cv.height * 0.18, my - this.cv.height * 0.1));
-      const ctx = this.ctx, hx = mx, hy = my - s * 0.45;
+      const ctx = this.ctx, hx = mx, hy = my - s * 0.45, K = this.s.monster === 'krampus';
       ctx.save();
-      ctx.fillStyle = '#120d16';
+      ctx.fillStyle = K ? KRAMPUS_FUR : '#120d16';
       ctx.shadowColor = 'rgba(255, 60, 60, 0.35)'; ctx.shadowBlur = 40;
       ctx.beginPath();
       ctx.ellipse(hx, hy, s * 1.25, s * 1.35, 0, 0, TAU);
       ctx.ellipse(mx, my, Math.max(1, mrx), Math.max(1, mry), 0, 0, TAU);
       ctx.fill('evenodd');
       ctx.shadowBlur = 0;
-      // Horns.
-      ctx.strokeStyle = '#120d16'; ctx.lineWidth = s * 0.2; ctx.lineCap = 'round';
-      for (const side of [-1, 1]) {
-        ctx.beginPath(); ctx.moveTo(hx + side * s * 0.6, hy - s * 1.1);
-        ctx.bezierCurveTo(hx + side * s * 1.3, hy - s * 2, hx + side * s * 2, hy - s * 1, hx + side * s * 1.5, hy - s * 0.3);
-        ctx.stroke();
+      // Horns (Krampus: tall goat horns).
+      if (K) this.krampusHorns(hx, hy - s * 1.1, s * 0.8, s * 0.12);
+      else {
+        ctx.strokeStyle = '#120d16'; ctx.lineWidth = s * 0.2; ctx.lineCap = 'round';
+        for (const side of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(hx + side * s * 0.6, hy - s * 1.1);
+          ctx.bezierCurveTo(hx + side * s * 1.3, hy - s * 2, hx + side * s * 2, hy - s * 1, hx + side * s * 1.5, hy - s * 0.3);
+          ctx.stroke();
+        }
+      }
+      // Krampus's tongue hangs out over the lower teeth.
+      if (K && mry > 2) {
+        ctx.strokeStyle = '#b01e2a'; ctx.lineWidth = Math.max(4, mrx * 0.22); ctx.lineCap = 'round';
+        const sway = Math.sin(performance.now() / 300) * mrx * 0.15;
+        ctx.beginPath(); ctx.moveTo(mx + mrx * 0.2, my + mry * 0.7); ctx.quadraticCurveTo(mx + mrx * 0.5 + sway, my + mry + s * 0.3, mx + mrx * 0.3 + sway * 2, my + mry + s * 0.6); ctx.stroke();
       }
       // Eyes.
       ctx.fillStyle = '#ffe36b'; ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 25 + 40 * shut;
@@ -793,17 +804,20 @@
       const p = this.facePoints(face, W, H);
       const cx = p ? p.cx : W / 2, cy = p ? (p.eyesY + p.mouthY) / 2 : H * 0.45;
       const s = p ? Math.max(p.w, p.h * 0.8) * 0.75 : H * 0.25; // head radius
-      const ctx = this.ctx, chew = Math.abs(Math.sin(now / 160)) * s * 0.06;
+      const ctx = this.ctx, chew = Math.abs(Math.sin(now / 160)) * s * 0.06, K = this.s.monster === 'krampus';
       ctx.save();
-      ctx.fillStyle = ctx.strokeStyle = '#13101a';
+      ctx.fillStyle = ctx.strokeStyle = K ? KRAMPUS_FUR : '#13101a';
       ctx.shadowColor = 'rgba(255, 205, 120, 0.45)'; ctx.shadowBlur = 25;
-      // horns
-      ctx.lineWidth = s * 0.16; ctx.lineCap = 'round';
-      for (const side of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(cx + side * s * 0.45, cy - s * 0.75);
-        ctx.bezierCurveTo(cx + side * s * 1.1, cy - s * 1.6, cx + side * s * 1.75, cy - s * 0.7, cx + side * s * 1.25, cy - s * 0.05);
-        ctx.stroke();
+      // horns (Krampus: tall goat horns)
+      if (K) this.krampusHorns(cx, cy - s * 0.8, s * 0.6, s * 0.1);
+      else {
+        ctx.lineWidth = s * 0.16; ctx.lineCap = 'round';
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + side * s * 0.45, cy - s * 0.75);
+          ctx.bezierCurveTo(cx + side * s * 1.1, cy - s * 1.6, cx + side * s * 1.75, cy - s * 0.7, cx + side * s * 1.25, cy - s * 0.05);
+          ctx.stroke();
+        }
       }
       // head
       ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.95, s * 1.1, 0, 0, TAU); ctx.fill();
@@ -821,6 +835,11 @@
         const tx = cx + i * s * 0.11;
         ctx.beginPath(); ctx.moveTo(tx - s * 0.05, my - s * 0.14 - chew); ctx.lineTo(tx + s * 0.05, my - s * 0.14 - chew); ctx.lineTo(tx, my - s * 0.02); ctx.fill();
         ctx.beginPath(); ctx.moveTo(tx - s * 0.05, my + s * 0.14 + chew); ctx.lineTo(tx + s * 0.05, my + s * 0.14 + chew); ctx.lineTo(tx, my + s * 0.02); ctx.fill();
+      }
+      if (K) { // the tongue lolling out of the corner of the mouth
+        const sway = Math.sin(now / 350) * s * 0.06;
+        ctx.strokeStyle = '#b01e2a'; ctx.lineWidth = s * 0.12; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx + s * 0.25, my + s * 0.1); ctx.quadraticCurveTo(cx + s * 0.45 + sway, my + s * 0.5, cx + s * 0.3 + sway * 2, my + s * 0.85); ctx.stroke();
       }
       ctx.restore();
     }
@@ -997,6 +1016,7 @@
         case 'basement': return { x: 0.5, y: 0.05, r: 0.45, a: 0.45 * (0.85 + 0.15 * Math.sin(now / 900)) }; // swinging bulb
         case 'forest': return { x: 0.3, y: 0.2, r: 0.6, a: 0.3 }; // moonlight from the moon (top left)
         case 'hospital': return { x: 0.5, y: 0.0, r: 0.55, a: 0.5 * flick }; // flickering tube
+        case 'winter': return { x: 0.1, y: 0.6, r: 0.45, a: 0.3 * (0.8 + 0.2 * Math.sin(now / 700)) }; // the tree's string lights
         default: return null;
       }
     }
@@ -1048,6 +1068,26 @@
           const x = (side + 0.06 * Math.sin(t * 0.7 + i) + 0.03 * Math.sin(t * 1.9)) * W, y = (0.35 + 0.45 * ((i * 0.13) % 1) + 0.04 * Math.sin(t * 1.1)) * H;
           ctx.globalAlpha = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.3 + i));
           ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (scene === 'winter') {
+        // String lights on the trees, blinking out of step (one bulb is failing), and snow falling.
+        const COLORS = ['#ff3b3b', '#3bff7a', '#ffd23b', '#5ab4ff'];
+        ctx.save();
+        this.sceneLayer.lights.forEach(([lx, ly], i) => {
+          const on = i === 5 ? this.flicker(now) === 1 && Math.sin(now / 90) > -0.2 : Math.sin(now / 600 + i * 2.1) > -0.4;
+          ctx.globalAlpha = on ? 0.95 : 0.25;
+          ctx.fillStyle = ctx.shadowColor = COLORS[i % COLORS.length]; ctx.shadowBlur = on ? 14 : 0;
+          ctx.beginPath(); ctx.arc(lx, ly, 4, 0, TAU); ctx.fill();
+        });
+        ctx.shadowBlur = 0; ctx.fillStyle = '#f2f6ff';
+        for (let i = 0; i < 80; i++) {
+          const speed = 0.04 + ((i * 37) % 10) / 160, size = 1 + ((i * 53) % 3);
+          const y = ((now / 1000) * speed + ((i * 0.618) % 1)) % 1.05 - 0.03;
+          const x = (((i * 0.381) % 1) + 0.02 * Math.sin(now / 1300 + i)) * W;
+          ctx.globalAlpha = 0.35 + size * 0.15;
+          ctx.beginPath(); ctx.arc(x, y * H, size, 0, TAU); ctx.fill();
         }
         ctx.restore();
       }
@@ -1176,6 +1216,50 @@
         // stains on the tiles
         c.fillStyle = 'rgba(80, 45, 25, 0.28)'; c.beginPath(); c.ellipse(W * 0.06, H * 0.75, 30, 18, 0.4, 0, TAU); c.fill();
         vignette('rgba(0, 18, 10, 0.72)');
+      } else if (scene === 'winter') {
+        // Christmas Pack: a frozen winter night round the streamer. Dark pine trees with string lights at the sides
+        // (the bulbs are drawn per frame), snow drifts along the bottom, frost creeping in from the corners.
+        c.fillStyle = 'rgba(40, 70, 115, 0.24)'; c.fillRect(0, 0, W, H); // cold blue
+        const tree = (x, top, wdt) => {
+          const bottom = H * 0.95, tiers = 5, pts = [];
+          c.fillStyle = 'rgba(20, 12, 8, 0.95)'; c.fillRect(x - wdt * 0.06, bottom - H * 0.02, wdt * 0.12, H * 0.06); // trunk
+          for (let i = 0; i < tiers; i++) {
+            const t0 = top + ((bottom - top) * i) / (tiers + 0.6), t1 = top + ((bottom - top) * (i + 1.6)) / (tiers + 0.6);
+            const half = (wdt / 2) * (0.35 + (0.65 * (i + 1)) / tiers);
+            c.fillStyle = 'rgba(6, 18, 13, 0.97)';
+            c.beginPath(); c.moveTo(x, t0); c.lineTo(x + half, t1); c.lineTo(x - half, t1); c.closePath(); c.fill();
+            // snow lying on each tier's lower edge
+            c.strokeStyle = 'rgba(235, 242, 255, 0.85)'; c.lineWidth = 3; c.lineCap = 'round';
+            c.beginPath(); c.moveTo(x - half * 0.95, t1 - 2); c.quadraticCurveTo(x, t1 - (t1 - t0) * 0.18, x + half * 0.95, t1 - 2); c.stroke();
+            // bulbs along a sagging wire across the tier
+            for (let k = 1; k < 4; k++) pts.push([x - half * 0.75 + (half * 1.5 * k) / 4, t1 - (t1 - t0) * (0.12 + 0.12 * Math.sin((k / 4) * Math.PI))]);
+          }
+          return pts;
+        };
+        const lights = [...tree(W * 0.09, H * 0.28, W * 0.2), ...tree(W * 0.935, H * 0.45, W * 0.13)];
+        // snow drifts along the bottom
+        const snow = c.createLinearGradient(0, H * 0.86, 0, H);
+        snow.addColorStop(0, 'rgba(225, 235, 250, 0.75)'); snow.addColorStop(1, 'rgba(170, 190, 220, 0.9)');
+        c.fillStyle = snow; c.beginPath(); c.moveTo(0, H);
+        for (let x = 0; x <= W; x += 20) c.lineTo(x, H * (0.93 - 0.03 * Math.sin(x / 70) - (x < W * 0.2 || x > W * 0.8 ? 0.03 : 0)));
+        c.lineTo(W, H); c.closePath(); c.fill();
+        // frost in the corners: a pale glow and branching ice crystals
+        for (const [fx, fy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+          const fr = c.createRadialGradient(fx, fy, 0, fx, fy, W * 0.22);
+          fr.addColorStop(0, 'rgba(220, 235, 255, 0.4)'); fr.addColorStop(1, 'rgba(220, 235, 255, 0)');
+          c.fillStyle = fr; c.fillRect(fx - W * 0.22, fy - W * 0.22, W * 0.44, W * 0.44);
+          c.strokeStyle = 'rgba(235, 245, 255, 0.45)'; c.lineWidth = 1.2;
+          const crystal = (x, y, a, len, depth) => {
+            const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+            c.beginPath(); c.moveTo(x, y); c.lineTo(x2, y2); c.stroke();
+            if (depth > 0) for (const da of [-0.6, 0.6]) crystal(x + (x2 - x) * 0.5, y + (y2 - y) * 0.5, a + da, len * 0.45, depth - 1);
+            if (depth > 0) crystal(x2, y2, a + (rnd() - 0.5) * 0.6, len * 0.6, depth - 1);
+          };
+          const base = Math.atan2(H / 2 - fy, W / 2 - fx);
+          for (let i = 0; i < 4; i++) crystal(fx, fy, base + (i - 1.5) * 0.35, W * (0.06 + rnd() * 0.04), 3);
+        }
+        vignette('rgba(0, 8, 25, 0.75)');
+        return { cv, key: scene + W, lights };
       }
       return { cv, key: scene + W };
     }
@@ -1272,6 +1356,7 @@
     // Seen from behind (`back`) it has no eyes and the lantern is hidden.
     drawHunter(now, W, H) {
       if (this.phase !== 'sweep') return;
+      if (this.s.monster === 'krampus') return this.drawKrampus(now, W, H);
       const ctx = this.ctx, m = this.monster;
       const x = m.x * W, f = m.facing;
       const walkT = now / 260;
@@ -1335,6 +1420,114 @@
         const g = ctx.createRadialGradient(x - f * W * 0.06, H * 0.42, 0, x - f * W * 0.06, H * 0.42, W * 0.05);
         g.addColorStop(0, 'rgba(255,214,140,0.35)'); g.addColorStop(1, 'rgba(255,214,140,0)');
         ctx.shadowBlur = 0; ctx.fillStyle = g; ctx.fillRect(x - W * 0.2, H * 0.3, W * 0.4, H * 0.25);
+      }
+      ctx.restore();
+    }
+
+    // Christmas Pack: Krampus walks the room like the Hunter (same lantern, same rules). Shaggy black fur, goat legs
+    // with hooves, tall goat horns, a long red tongue, chains across the chest, bells on the belt, birch rods in one hand.
+    drawKrampus(now, W, H) {
+      const ctx = this.ctx, m = this.monster;
+      const x = m.x * W, f = m.facing;
+      const walkT = now / 260;
+      const stride = m.moving ? Math.sin(walkT) : 0;
+      const bob = m.moving ? Math.abs(Math.cos(walkT)) * H * 0.012 : Math.sin(now / 500) * H * 0.004;
+      const hipY = H * 0.6 - bob, shoulderY = H * 0.28 - bob, headY = H * 0.18 - bob, hemY = hipY + H * 0.06;
+      ctx.save();
+      ctx.fillStyle = ctx.strokeStyle = KRAMPUS_FUR;
+      ctx.shadowColor = 'rgba(255, 110, 70, 0.45)';
+      ctx.shadowBlur = m.back ? 10 : 22;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // goat legs: furry thigh, thin shin bent backwards at the hock, black hoof
+      for (const side of [-1, 1]) {
+        const sw = stride * side, hip = x + side * W * 0.025;
+        const knee = { x: hip + sw * W * 0.05 + f * W * 0.016, y: H * 0.77 };
+        const hock = { x: hip + sw * W * 0.07 - f * W * 0.012, y: H * 0.89 };
+        const foot = { x: hip + sw * W * 0.09, y: H * 0.985 };
+        ctx.lineWidth = W * 0.034; ctx.beginPath(); ctx.moveTo(hip, hipY); ctx.lineTo(knee.x, knee.y); ctx.stroke();
+        ctx.lineWidth = W * 0.013; ctx.beginPath(); ctx.moveTo(knee.x, knee.y); ctx.lineTo(hock.x, hock.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
+        ctx.fillStyle = '#030303';
+        ctx.beginPath(); ctx.moveTo(foot.x - W * 0.013, H); ctx.lineTo(foot.x - W * 0.008, foot.y - H * 0.022); ctx.lineTo(foot.x + W * 0.009, foot.y - H * 0.022); ctx.lineTo(foot.x + W * 0.015, H); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = KRAMPUS_FUR;
+      }
+      // shaggy body: jagged fur along the sides and a ragged hem over the hips
+      const N = 12, edge = (side) => {
+        const pts = [];
+        for (let i = 0; i <= N; i++) {
+          const t = i / N, y = shoulderY + (hemY - shoulderY) * t;
+          const wdt = W * (0.05 + 0.025 * Math.sin(t * Math.PI));
+          const shag = (i % 2 ? 1 : -0.3) * W * 0.011 * (1 + 0.25 * Math.sin(now / 280 + i * 1.7));
+          pts.push([x + side * (wdt + shag), y]);
+        }
+        return pts;
+      };
+      ctx.beginPath();
+      edge(-1).forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+      for (let i = 0; i <= 8; i++) ctx.lineTo(x - W * 0.07 + (W * 0.14 * i) / 8, hemY + (i % 2 ? H * 0.035 : 0)); // ragged hem
+      edge(1).reverse().forEach(([px, py]) => ctx.lineTo(px, py));
+      ctx.closePath(); ctx.fill();
+      // head: long goat face pushed forward, ears sticking out sideways, tall horns
+      const hx = x + f * W * 0.015;
+      ctx.beginPath(); ctx.ellipse(hx, headY, W * 0.036, H * 0.07, 0, 0, TAU); ctx.fill();
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(hx + side * W * 0.03, headY - H * 0.035); ctx.lineTo(hx + side * W * 0.07, headY - H * 0.02); ctx.lineTo(hx + side * W * 0.032, headY - H * 0.005); ctx.closePath(); ctx.fill();
+      }
+      this.krampusHorns(hx, headY - H * 0.05, W * 0.026, W * 0.011);
+      // chains over the chest and bells on the belt
+      ctx.save(); ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(150, 156, 168, 0.9)'; ctx.lineWidth = W * 0.003;
+      for (let i = 0; i <= 9; i++) {
+        const t = i / 9, cx = x - W * 0.05 + W * 0.1 * t, cy = shoulderY + H * 0.03 + (hipY - shoulderY - H * 0.06) * t + Math.sin(t * Math.PI) * H * 0.02;
+        ctx.beginPath(); ctx.ellipse(cx, cy, W * 0.007, H * 0.007, i % 2 ? 0.6 : -0.6, 0, TAU); ctx.stroke();
+      }
+      ctx.fillStyle = '#c9a23a';
+      for (let i = -1; i <= 1; i++) {
+        const swing = m.moving ? Math.sin(walkT * 2 + i) * W * 0.004 : 0;
+        ctx.beginPath(); ctx.arc(x + i * W * 0.025 + swing, hipY + H * 0.01, W * 0.006, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+      // arms: the lantern arm reaching forward, the other hanging with a bundle of birch rods
+      ctx.lineWidth = W * 0.016;
+      const lx = (m.x + 0.075 * f) * W, ly = H * 0.42;
+      if (!m.back) { ctx.beginPath(); ctx.moveTo(x + f * W * 0.045, shoulderY + H * 0.02); ctx.quadraticCurveTo(x + f * W * 0.08, H * 0.3, lx, ly); ctx.stroke(); }
+      const hang = x - f * W * 0.05, hand = { x: hang - stride * W * 0.03, y: H * 0.6 };
+      ctx.beginPath(); ctx.moveTo(hang, shoulderY + H * 0.02); ctx.quadraticCurveTo(hang - f * W * 0.025, H * 0.4, hand.x, hand.y); ctx.stroke();
+      ctx.save(); ctx.shadowBlur = 0; ctx.strokeStyle = '#4a3523'; ctx.lineWidth = W * 0.0025;
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI / 2 + (i - 3) * 0.09 - f * 0.15;
+        ctx.beginPath(); ctx.moveTo(hand.x, hand.y - H * 0.04); ctx.lineTo(hand.x + Math.cos(a) * H * 0.2, hand.y + Math.sin(a) * H * 0.2); ctx.stroke();
+      }
+      ctx.restore();
+      if (!m.back) {
+        // long red tongue lolling down to the chest
+        const sway = Math.sin(now / 400) * W * 0.008;
+        ctx.save(); ctx.shadowBlur = 0; ctx.strokeStyle = '#b01e2a'; ctx.lineWidth = W * 0.01;
+        ctx.beginPath(); ctx.moveTo(hx + f * W * 0.004, headY + H * 0.045);
+        ctx.quadraticCurveTo(hx + f * W * 0.02 + sway, headY + H * 0.1, hx + f * W * 0.008 + sway * 1.5, headY + H * 0.16); ctx.stroke();
+        ctx.restore();
+        // red glowing eyes and the lantern
+        ctx.fillStyle = '#ff6a3a'; ctx.shadowColor = '#ff3a1a'; ctx.shadowBlur = 18;
+        for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * W * 0.014 + f * W * 0.006, headY - H * 0.012, W * 0.008, H * 0.006, side * 0.35, 0, TAU); ctx.fill(); }
+        ctx.shadowBlur = 30; ctx.fillStyle = '#fff2c4';
+        ctx.beginPath(); ctx.arc(lx, ly, W * 0.012, 0, TAU); ctx.fill();
+      } else {
+        const g = ctx.createRadialGradient(x - f * W * 0.06, H * 0.42, 0, x - f * W * 0.06, H * 0.42, W * 0.05);
+        g.addColorStop(0, 'rgba(255,214,140,0.35)'); g.addColorStop(1, 'rgba(255,214,140,0)');
+        ctx.shadowBlur = 0; ctx.fillStyle = g; ctx.fillRect(x - W * 0.2, H * 0.3, W * 0.4, H * 0.25);
+      }
+      ctx.restore();
+    }
+    // Krampus's goat horns: up from the top of the head (cx, y), out, back in and up to a point; `s` = head size.
+    krampusHorns(cx, y, s, lw) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        const p = [cx + side * s * 0.5, y, cx + side * s * 2.4, y - s * 0.6, cx + side * s * 1.4, y - s * 2.2, cx + side * s * 2.5, y - s * 2.7];
+        for (const [w, color] of [[lw * 1.6, KRAMPUS_FUR], [lw * 0.7, '#3a2a1e']]) { // dark horn, a faint ridge along it
+          ctx.strokeStyle = color; ctx.lineWidth = w;
+          ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.bezierCurveTo(p[2], p[3], p[4], p[5], p[6], p[7]); ctx.stroke();
+        }
       }
       ctx.restore();
     }

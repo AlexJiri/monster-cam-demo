@@ -16,8 +16,8 @@
     volume: 0.8,
     sound: { monster: 1, steps: 1, tension: 1, effects: 1 }, // each sound group's volume, 0..1 (sfx.js)
     // Lights On: what counts as "moving" while the flashlight is on you.
-    monster: 'hunter', // hunter (walks through the room) | void (comes out of black holes)
-    scene: 'none', // atmosphere over the camera: none | basement | forest | hospital
+    monster: 'hunter', // hunter (walks through the room) | void (comes out of black holes) | krampus (Christmas Pack, walks like the hunter)
+    scene: 'none', // atmosphere over the camera: none | basement | forest | hospital | winter (Christmas Pack)
     lightRules: { move: true, smile: true, blink: false, sound: true },
     showGiftGuide: true, // on stream: which gift curses, hunts, eats or helps
     patrolGap: [4, 9], // seconds of darkness between flashlight sweeps (random in this range)

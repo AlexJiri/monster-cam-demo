@@ -1,7 +1,7 @@
 // Procedural sound effects (Web Audio): no sound files, so nothing to license.
 // The browser only allows audio after a click, so call MC.sfx.unlock() from a button handler.
 // Sounds come in groups, each with its own volume (the streamer's sound mixer in the game panel):
-//   monster: growls, the scream when caught · steps: footsteps · tension: heartbeat · effects: flashlight clicks.
+//   monster: growls, the scream when caught · steps: footsteps (and Krampus's bells) · tension: heartbeat · effects: flashlight clicks.
 // Every sound varies a little each time it plays (pitch, loudness, left/right), so repeats don't sound copy-pasted.
 (function (MC) {
   const GROUPS = ['monster', 'steps', 'tension', 'effects'];
@@ -39,13 +39,56 @@
     return buf;
   }
 
-  // One heavy footstep: low thump plus a short scrape. Steps alternate between a heavier and a lighter foot.
+  // Sleigh bells jingling: a few bright metallic hits close together (Krampus wears them on his belt).
+  function bells(volume = 0.5, pan) {
+    if (!ctx) return;
+    busy(400);
+    const dest = out('steps', pan), hits = 2 + Math.floor(Math.random() * 3);
+    for (let h = 0; h < hits; h++) {
+      const t = ctx.currentTime + h * vary(0.06, 0.4);
+      for (const hz of [vary(2600, 0.2), vary(3900, 0.15), vary(5200, 0.1)]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = hz;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.05 * volume, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + vary(0.3, 0.3));
+        o.connect(g).connect(dest);
+        o.start(t); o.stop(t + 0.4);
+      }
+    }
+  }
+
+  // Which monster is walking: 'krampus' (Christmas Pack) has hooves and bells instead of heavy feet.
+  let walker = 'hunter';
+  // A hoof on the floor: a short hard knock.
+  function hoof(volume, pan) {
+    const t = ctx.currentTime, dest = out('steps', pan);
+    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = noiseBuffer(0.06);
+    f.type = 'bandpass'; f.frequency.value = vary(900, 0.2); f.Q.value = 4;
+    g.gain.setValueAtTime(1.4 * volume, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    n.connect(f).connect(g).connect(dest);
+    n.start(t);
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(vary(160, 0.1), t); o.frequency.exponentialRampToValueAtTime(70, t + 0.08);
+    og.gain.setValueAtTime(0.5 * volume, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(og).connect(dest);
+    o.start(t); o.stop(t + 0.12);
+  }
+
+  // One heavy footstep: low thump plus a short scrape (Krampus: a hoof and bells). Steps alternate between a heavier and a lighter foot.
   let foot = 0;
   function footstep(volume = 1, pan) {
     if (!ctx) return;
     busy(300);
     foot ^= 1;
     volume = vary(volume * (foot ? 1 : 0.8), 0.12);
+    if (walker === 'krampus') {
+      hoof(volume, pan);
+      if (foot || Math.random() < 0.3) bells(volume, pan);
+      return;
+    }
     const t = ctx.currentTime, dest = out('steps', pan), hz = vary(90, 0.12);
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.setValueAtTime(hz, t);
@@ -149,6 +192,7 @@
   function setVolume(v) { levels.master = v; if (master) master.gain.value = v; }
   function setGroup(group, v) { if (!GROUPS.includes(group)) return; levels[group] = v; if (bus[group]) bus[group].gain.value = v; }
 
-  const api = { unlock, footstep, approach, growl, heartbeat, caught, click, setVolume, setGroup, GROUPS, busyUntil: 0 };
+  const setMonster = (name) => { walker = name; };
+  const api = { unlock, footstep, approach, growl, heartbeat, caught, click, bells, setVolume, setGroup, setMonster, GROUPS, busyUntil: 0 };
   MC.sfx = api;
 })(window.MC = window.MC || {});
