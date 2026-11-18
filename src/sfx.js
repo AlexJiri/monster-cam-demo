@@ -117,6 +117,7 @@
   // would deafen the microphone for the whole last half minute. Echo cancellation keeps it out of the mic.
   function heartbeat(volume = 0.4) {
     if (!ctx) return;
+    busy(250); // the microphone ignores it too (it was the one game sound it could hear)
     const t = ctx.currentTime;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine'; o.frequency.setValueAtTime(62, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.18);
