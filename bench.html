@@ -248,10 +248,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794957751"></script>
-<script src="src/events.js?v=1794957751"></script>
-<script src="src/face.js?v=1794957751"></script>
-<script src="src/mic.js?v=1794957751"></script>
+<script src="src/settings.js?v=1794987677"></script>
+<script src="src/events.js?v=1794987677"></script>
+<script src="src/face.js?v=1794987677"></script>
+<script src="src/mic.js?v=1794987677"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();
@@ -399,7 +399,9 @@
   }
 
   // ---------- Gifts: [count] × [gift] → [effect], in two lists: against / help ----------
-  const CAT = [...MC.settings.CATALOG].sort((a, b) => a.coins - b.coins);
+  let CAT = [...MC.settings.CATALOG].sort((a, b) => a.coins - b.coins);
+  // Gifts the Monster Cam server learned since: added to the lists when it answers.
+  MC.settings.refreshCatalog().then((ok) => { if (ok) { CAT = [...MC.settings.CATALOG].sort((a, b) => a.coins - b.coins); renderRules(); } });
   const TAPS = MC.settings.TAPS;
   const OTHER = '__other__';
   const HELP = ['shield', 'cleanse'];

@@ -216,15 +216,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794957751"></script>
-<script src="src/settings.js?v=1794957751"></script>
-<script src="src/events.js?v=1794957751"></script>
-<script src="src/face.js?v=1794957751"></script>
-<script src="src/curses.js?v=1794957751"></script>
-<script src="src/sfx.js?v=1794957751"></script>
-<script src="src/mic.js?v=1794957751"></script>
-<script src="src/lightson.js?v=1794957751"></script>
-<script src="src/live.js?v=1794957751"></script>
+<script src="src/edition.js?v=1794987677"></script>
+<script src="src/settings.js?v=1794987677"></script>
+<script src="src/events.js?v=1794987677"></script>
+<script src="src/face.js?v=1794987677"></script>
+<script src="src/curses.js?v=1794987677"></script>
+<script src="src/sfx.js?v=1794987677"></script>
+<script src="src/mic.js?v=1794987677"></script>
+<script src="src/lightson.js?v=1794987677"></script>
+<script src="src/live.js?v=1794987677"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -661,6 +661,7 @@
     }
     if (e.type === 'follow') { feed(`➕ ${esc(e.user)} followed`); return; }
     if (e.type !== 'gift') return;
+    if (e.live) MC.settings.reportGift(liveUser, e); // teaches the server new gifts and their pictures
     const rule = MC.settings.ruleFor(S, e.gift);
     giftCount[e.gift] = (giftCount[e.gift] || 0) + (e.count || 1);
     if (!rule || giftCount[e.gift] % Math.max(1, rule.every)) { feed(`🎁 ${esc(e.user)}: ${esc(e.gift)}`); return; }
@@ -763,9 +764,10 @@
     [...S.gifts].sort((a, b) => info(a.gift).coins - info(b.gift).coins).forEach((g) => {
       const effect = effectShort(g.curse);
       if (!byEffect.has(effect)) byEffect.set(effect, []);
-      byEffect.get(effect).push(`${info(g.gift).icon} ${g.every > 1 ? `${g.every}× ` : ''}${info(g.gift).label || g.gift}`);
+      const gi = info(g.gift);
+      byEffect.get(effect).push({ icon: gi.icon, img: gi.img || '', text: `${g.every > 1 ? `${g.every}× ` : ''}${gi.label || g.gift}` });
     });
-    const lines = [...byEffect].map(([effect, gifts]) => ({ gifts: gifts.join(', '), effect }));
+    const lines = [...byEffect].map(([effect, gifts]) => ({ gifts, effect }));
     const per = $('cv').clientWidth && $('cv').clientWidth < 600 ? 4 : 8;
     const pages = [];
     for (let i = 0; i < lines.length; i += per) pages.push({ title: '🎁 Gifts', lines: lines.slice(i, i + per) });
@@ -791,6 +793,8 @@
   }
   showGuide();
   setInterval(showGuide, 6000);
+  // Newest gift list and pictures from the Monster Cam server.
+  MC.settings.refreshCatalog().then((ok) => ok && showGuide(false));
   addEventListener('resize', () => showGuide(false));
 
   // ---------- Test run (from Settings & Test) ----------

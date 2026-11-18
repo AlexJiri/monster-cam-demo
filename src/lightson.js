@@ -554,7 +554,7 @@
 
     // ---------- Gift guide ----------
     // The list that tells viewers what each gift does, drawn on the stage itself (top right) so the monster passes
-    // in front of it. `page` = { title, lines: [{ gifts, effect }] }; `layout` = { top, scale } in canvas pixels
+    // in front of it. `page` = { title, lines: [{ gifts: [{ icon, img, text }], effect }] }; `layout` = { top, scale } in canvas pixels
     // (top: below the HUD pills; scale: bigger text on a small stage, e.g. a phone). The box fits its content.
     setGuide(page, layout) {
       const key = page ? JSON.stringify(page) : '';
@@ -583,11 +583,31 @@
         if (row) rows.push(row);
         return rows;
       };
-      const items = g.lines.map((l) => ({ gifts: wrap(l.gifts, fontGift, inner), effect: wrap('→ ' + l.effect, fontEffect, inner) }));
+      // Gifts: their picture (from the Monster Cam server) or, until it has loaded, their emoji; then the name.
+      // Rows break between gifts; every gift but the last of a line gets a comma.
+      const pic = fs * 1.15, space = () => ctx.measureText(' ').width;
+      const giftRows = (gifts, w) => {
+        ctx.font = fontGift;
+        const rows = [];
+        let row = [], rw = 0;
+        gifts.forEach((gift, i) => {
+          const img = MC.settings.giftPicture(gift.img);
+          const text = gift.text + (i < gifts.length - 1 ? ',' : '');
+          const head = img ? pic + 5 * k : ctx.measureText(gift.icon + ' ').width;
+          const iw = head + ctx.measureText(text).width;
+          const gap = row.length ? space() : 0;
+          if (row.length && rw + gap + iw > w) { rows.push({ items: row, w: rw }); row = []; rw = 0; }
+          rw += (row.length ? space() : 0) + iw;
+          row.push({ img, icon: gift.icon, text, head });
+        });
+        if (row.length) rows.push({ items: row, w: rw });
+        return rows;
+      };
+      const items = g.lines.map((l) => ({ gifts: giftRows(l.gifts, inner), effect: wrap('→ ' + l.effect, fontEffect, inner) }));
       // Box size from the longest row.
       let w = 0;
       ctx.font = fontTitle; w = Math.max(w, ctx.measureText(g.title).width);
-      ctx.font = fontGift; items.forEach((it) => it.gifts.forEach((r) => { w = Math.max(w, ctx.measureText(r).width); }));
+      items.forEach((it) => it.gifts.forEach((r) => { w = Math.max(w, r.w); }));
       ctx.font = fontEffect; items.forEach((it) => it.effect.forEach((r) => { w = Math.max(w, ctx.measureText(r).width); }));
       const bw = Math.min(boxMax, w + pad * 2);
       const lhG = fs * 1.25, lhE = fsSmall * 1.25;
@@ -606,7 +626,17 @@
       ty += lhG + 4 * k;
       for (const it of items) {
         ctx.font = fontGift; ctx.fillStyle = '#f1efe9';
-        for (const r of it.gifts) { ctx.fillText(r, x + pad, ty); ty += lhG; }
+        for (const r of it.gifts) {
+          let tx = x + pad;
+          for (const gift of r.items) {
+            if (gift.img) ctx.drawImage(gift.img, tx, ty + (lhG - pic) / 2 - k, pic, pic);
+            else ctx.fillText(gift.icon + ' ', tx, ty);
+            tx += gift.head;
+            ctx.fillText(gift.text, tx, ty);
+            tx += ctx.measureText(gift.text).width + space();
+          }
+          ty += lhG;
+        }
         ctx.font = fontEffect; ctx.fillStyle = '#c3c7d1';
         for (const r of it.effect) { ctx.fillText(r, x + pad, ty); ty += lhE; }
         ty += gap;

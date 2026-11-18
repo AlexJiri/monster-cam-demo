@@ -118,6 +118,75 @@
     { name: 'Lion', coins: 29999, icon: '🦁' },
     { name: 'Universe', coins: 34999, icon: '🪐' },
   ];
+  // ---------- Gift list from the Monster Cam server ----------
+  // The server learns new gifts from lives (name, price, picture) and keeps a copy of each picture. Its last list
+  // is kept in this browser and added to CATALOG, so new gifts and pictures arrive without a new version of the game.
+  // Offline: the built-in list above, with its emoji.
+  const SERVER_KEY = 'monstercam-server'; // set by edition.js from version.json
+  const GIFTS_KEY = 'monstercam-gifts';
+  const DEFAULT_SERVER = 'https://158.101.197.220';
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const server = () => store.get(SERVER_KEY) || DEFAULT_SERVER;
+  const sameName = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+  function mergeCatalog(saved) {
+    if (!saved || !Array.isArray(saved.gifts)) return;
+    for (const g of saved.gifts) {
+      if (!g || typeof g.name !== 'string' || !g.name) continue;
+      const img = typeof g.img === 'string' && g.img.startsWith('/') ? saved.base + g.img : '';
+      const old = CATALOG.find((c) => sameName(c.name, g.name));
+      if (old) { if (g.coins > 0) old.coins = g.coins; if (img) old.img = img; } else CATALOG.push({ name: g.name, coins: g.coins || 0, icon: '🎁', img });
+    }
+    CATALOG.sort((a, b) => a.coins - b.coins);
+  }
+  mergeCatalog(store.get(GIFTS_KEY));
+  // Ask the server for its list (game start). Resolves to true when it was reached.
+  async function refreshCatalog() {
+    try {
+      const base = server();
+      const r = await fetch(base + '/v1/gifts', { signal: AbortSignal.timeout(6000), cache: 'no-store' });
+      if (!r.ok) return false;
+      const saved = { base, gifts: (await r.json()).gifts };
+      store.set(GIFTS_KEY, saved);
+      mergeCatalog(saved);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // Gifts seen on the streamer's live go to the server (each name once per session, sent in small batches):
+  // that's how it learns new gifts and their pictures.
+  const reported = new Set();
+  let outbox = [], outUser = null, outTimer = null;
+  function reportGift(username, e) {
+    const name = String(e && e.gift || '');
+    if (!username || !name || reported.has(name.toLowerCase())) return;
+    reported.add(name.toLowerCase());
+    if (outUser && outUser !== username) outbox = [];
+    outUser = username;
+    outbox.push({ name, coins: Number(e.diamonds) || 0, image: String(e.image || '') });
+    clearTimeout(outTimer);
+    outTimer = setTimeout(() => {
+      const gifts = outbox.splice(0, 30);
+      fetch(server() + '/v1/gifts/seen', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ game: 'lightson', username: outUser, gifts }) }).catch(() => {});
+    }, 5000);
+  }
+
+  // The picture of a gift, ready to draw on the canvas, or null while it loads (or when there is none).
+  const pictures = new Map();
+  function giftPicture(url) {
+    if (!url) return null;
+    let img = pictures.get(url);
+    if (!img) {
+      img = new Image();
+      img.crossOrigin = 'anonymous'; // the stage canvas stays capturable
+      img.src = url;
+      pictures.set(url, img);
+    }
+    return img.complete && img.naturalWidth ? img : null;
+  }
+
   // Likes (taps) work like a gift: `every` taps fill the bar and trigger the effect.
   const TAPS = '__taps__';
   const giftInfo = (name) => (name === TAPS ? { name, label: 'taps', coins: 0, icon: '❤️' }
@@ -147,5 +216,5 @@
     cleanse: '🧹 Remove all curses (helps)',
   };
 
-  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo, TAPS };
+  MC.settings = { load, save, defaults: () => clone(DEFAULTS), ruleFor, EFFECTS, GROUPS, CATALOG, giftInfo, TAPS, refreshCatalog, reportGift, giftPicture };
 })(window.MC = window.MC || {});
