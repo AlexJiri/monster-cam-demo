@@ -170,13 +170,19 @@
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .row + .row { margin-top: 8px; }
   label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
-  .mixer { margin-top: 8px; font-size: 14px; }
-  .mixer summary { cursor: pointer; color: var(--muted, #9aa0ad); width: max-content; }
-  .mixGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
-  .mixGrid label { justify-content: space-between; min-width: 0; }
-  .mixGrid label span { white-space: nowrap; }
-  .mixGrid input { flex: 1; min-width: 50px; max-width: 120px; }
-  @media (max-width: 520px) { .mixGrid { grid-template-columns: 1fr; } }
+  /* Sounds: a round button in the bottom right corner (lobby, game, test) opening a small panel. Not on stream. */
+  .sndBtn { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 56; width: 52px; height: 52px; border-radius: 50%; padding: 0; font-size: 24px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5); }
+  .sndBtn[aria-expanded="true"] { border-color: var(--lamp); }
+  .sndPop { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 62px); z-index: 56; width: min(320px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); }
+  .sndPop[hidden] { display: none; }
+  .sndPop h3 { margin: 0 0 8px; font-size: 16px; }
+  .sndPop .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
+  .sndPop label { display: grid; grid-template-columns: 112px 1fr 40px; align-items: center; gap: 8px; font-size: 14px; margin: 6px 0; }
+  .sndPop label span { white-space: nowrap; }
+  .sndPop label.master { font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .sndPop input { width: 100%; }
+  .sndPop output { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .sndPop .hint { margin-top: 8px; }
   input[type=text] { background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; width: 120px; }
   .log { height: 110px; overflow: auto; font-size: 13px; color: var(--muted); background: var(--night); border-radius: 8px; padding: 8px; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
@@ -196,6 +202,13 @@
     <div class="cards" id="cards"></div>
     <div class="lobbyKey" id="lobbyKey"></div>
   </div>
+</div>
+<button class="sndBtn" id="sndBtn" data-snd-open aria-expanded="false" aria-controls="sndPop" title="Sounds">🔊</button>
+<div class="sndPop" id="sndPop" role="dialog" aria-label="Sounds" hidden>
+  <button class="x" data-snd-close aria-label="Close" title="Close">✕</button>
+  <h3>🔊 Sounds</h3>
+  <div id="sndList"></div>
+  <p class="hint">Changes apply right away, even mid-round. Let go of a slider to hear it.</p>
 </div>
 <div class="ask" id="ask" role="dialog" aria-modal="true" aria-labelledby="askText" hidden>
   <div class="askBox"><p id="askText"></p><div class="row"><button id="askNo"></button><button class="primary" id="askYes"></button></div></div>
@@ -253,13 +266,9 @@
         <button id="streamBtn" title="A clean window with only the game, to add in TikTok LIVE Studio">📺 Stream window</button>
       </div>
       <div class="row">
-        <label class="check" title="Volume">🔊 <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volume" style="width:110px"></label>
+        <button data-snd-open title="Volume of each sound, applied right away">🔊 Sounds</button>
         <label class="check" title="Brightness between flashlight sweeps">☀️ <input type="range" id="bright" min="0.03" max="1.5" step="0.01" aria-label="Brightness" style="width:110px"></label>
       </div>
-      <details class="mixer" id="mixer">
-        <summary>🎚️ Sounds</summary>
-        <div class="mixGrid" id="mixGrid"></div>
-      </details>
       <p class="hint" id="edition"></p>
       <p class="hint" id="appUpdate" hidden></p>
       <div class="keyForm" id="keyRow" hidden>
@@ -284,15 +293,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794995245"></script>
-<script src="src/settings.js?v=1794995245"></script>
-<script src="src/events.js?v=1794995245"></script>
-<script src="src/face.js?v=1794995245"></script>
-<script src="src/curses.js?v=1794995245"></script>
-<script src="src/sfx.js?v=1794995245"></script>
-<script src="src/mic.js?v=1794995245"></script>
-<script src="src/lightson.js?v=1794995245"></script>
-<script src="src/live.js?v=1794995245"></script>
+<script src="src/edition.js?v=1794997666"></script>
+<script src="src/settings.js?v=1794997666"></script>
+<script src="src/events.js?v=1794997666"></script>
+<script src="src/face.js?v=1794997666"></script>
+<script src="src/curses.js?v=1794997666"></script>
+<script src="src/sfx.js?v=1794997666"></script>
+<script src="src/mic.js?v=1794997666"></script>
+<script src="src/lightson.js?v=1794997666"></script>
+<script src="src/live.js?v=1794997666"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -544,7 +553,7 @@
   });
   addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (ask.end) ask.end(false); else if (!$('lobby').hidden) closeLobby();
+    if (ask.end) ask.end(false); else if ($('sndPop').hidden && !$('lobby').hidden) closeLobby(); // an open Sounds panel closes first
   });
   // #play (the Play tab on Settings & Test, "Play for real" after a test) goes straight to the game.
   if (!PREVIEW) {
@@ -734,21 +743,35 @@
     S.camBoost = +Math.max(1, v).toFixed(2);
     save();
   };
-  $('vol').value = S.volume;
-  $('vol').oninput = () => { S.volume = +$('vol').value; MC.sfx.setVolume(S.volume); save(); };
-  MC.sfx.setVolume(S.volume);
-  // Sound mixer: one volume per group of sounds (0 = off), under the master volume. Open/closed is remembered.
-  const MIX = [['monster', '👹 Monster', 'Growls and the scream when it catches you'], ['steps', '👣 Footsteps', 'The warning before the light comes'],
-    ['tension', '💓 Heartbeat', 'Last half minute of the round'], ['effects', '🔦 Clicks', 'The flashlight switching on']];
-  $('mixGrid').innerHTML = MIX.map(([k, label, tip]) => `<label class="check" title="${tip}"><span>${label}</span><input type="range" min="0" max="1" step="0.05" data-mix="${k}" aria-label="${label.slice(3)} volume"></label>`).join('');
-  $('mixGrid').querySelectorAll('[data-mix]').forEach((i) => {
+  // ---------- Sounds panel (the 🔊 button in the corner, also in the lobby and the test) ----------
+  // Master volume and one volume per group of sounds (0 = off), applied right away. Letting go of a slider plays a sample.
+  const MIX = [['master', '🔊 Volume', 'Every game sound'], ['monster', '👹 Monster', 'Growls and the scream when it catches you'],
+    ['steps', '👣 Footsteps', 'The warning before the light comes'], ['tension', '💓 Heartbeat', 'Last half minute of the round'],
+    ['effects', '🔦 Clicks', 'The flashlight switching on']];
+  const SAMPLE = {
+    master: () => { MC.sfx.footstep(1); setTimeout(() => MC.sfx.growl(0.8, 0.8), 350); },
+    monster: () => MC.sfx.growl(0.8, 0.8),
+    steps: () => { MC.sfx.footstep(1); setTimeout(() => MC.sfx.footstep(1), 420); },
+    tension: () => MC.sfx.heartbeat(0.6),
+    effects: () => MC.sfx.click(),
+  };
+  const sndGet = (k) => (k === 'master' ? S.volume : S.sound[k]);
+  const sndSet = (k, v) => { if (k === 'master') { S.volume = v; MC.sfx.setVolume(v); } else { S.sound[k] = v; MC.sfx.setGroup(k, v); } };
+  const pct = (v) => Math.round(v * 100) + '%';
+  $('sndList').innerHTML = MIX.map(([k, label, tip]) => `<label title="${tip}"${k === 'master' ? ' class="master"' : ''}><span>${label}</span><input type="range" min="0" max="1" step="0.05" data-mix="${k}" aria-label="${label.slice(3)} volume"><output>${pct(sndGet(k))}</output></label>`).join('');
+  $('sndList').querySelectorAll('[data-mix]').forEach((i) => {
     const k = i.dataset.mix;
-    i.value = S.sound[k];
-    MC.sfx.setGroup(k, S.sound[k]);
-    i.oninput = () => { S.sound[k] = +i.value; MC.sfx.setGroup(k, S.sound[k]); save(); };
+    i.value = sndGet(k);
+    sndSet(k, sndGet(k));
+    i.oninput = () => { sndSet(k, +i.value); i.nextElementSibling.textContent = pct(+i.value); save(); };
+    i.onchange = () => { MC.sfx.unlock(); if (+i.value > 0) SAMPLE[k](); };
   });
-  try { $('mixer').open = localStorage.getItem('monstercam-mixer') === '1'; } catch (e) {}
-  $('mixer').ontoggle = () => { try { localStorage.setItem('monstercam-mixer', $('mixer').open ? '1' : '0'); } catch (e) {} };
+  const sndOpen = (open) => { $('sndPop').hidden = !open; $('sndBtn').setAttribute('aria-expanded', String(open)); };
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-snd-open]')) { sndOpen($('sndPop').hidden); return; }
+    if (e.target.closest('[data-snd-close]') || (!$('sndPop').hidden && !e.target.closest('#sndPop'))) sndOpen(false);
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('sndPop').hidden) sndOpen(false); });
 
   // ---------- Simulator / live events ----------
   const viewer = () => $('viewer').value.trim() || 'viewer';
