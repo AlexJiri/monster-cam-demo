@@ -1081,6 +1081,23 @@
           ctx.fillStyle = ctx.shadowColor = COLORS[i % COLORS.length]; ctx.shadowBlur = on ? 14 : 0;
           ctx.beginPath(); ctx.arc(lx, ly, 4, 0, TAU); ctx.fill();
         });
+        // The reindeer: glowing red eyes that blink now and then, and breath steaming in the cold.
+        const u = W / 1200;
+        this.sceneLayer.eyes.forEach(([ex, ey], i) => {
+          const blink = (now / 1000 + i * 1.7) % 4.3 < 0.12;
+          ctx.globalAlpha = blink ? 0.15 : 0.75 + 0.25 * Math.sin(now / 400 + i);
+          ctx.fillStyle = ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 12;
+          ctx.beginPath(); ctx.ellipse(ex, ey, 3.2 * u, 2 * u, -0.25, 0, TAU); ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+        this.sceneLayer.breath.forEach(([bx, by], i) => {
+          const t = ((now / 2600) + i * 0.45) % 1; // a puff every 2.6 s, drifting out and up as it fades
+          const r = (6 + 22 * t) * u;
+          const g = ctx.createRadialGradient(bx - 30 * t * u, by - 14 * t * u, 0, bx - 30 * t * u, by - 14 * t * u, r);
+          g.addColorStop(0, `rgba(225, 235, 250, ${0.4 * (1 - t)})`); g.addColorStop(1, 'rgba(225, 235, 250, 0)');
+          ctx.globalAlpha = 1; ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(bx - 30 * t * u, by - 14 * t * u, r, 0, TAU); ctx.fill();
+        });
         ctx.shadowBlur = 0; ctx.fillStyle = '#f2f6ff';
         for (let i = 0; i < 80; i++) {
           const speed = 0.04 + ((i * 37) % 10) / 160, size = 1 + ((i * 53) % 3);
@@ -1237,12 +1254,110 @@
           return pts;
         };
         const lights = [...tree(W * 0.09, H * 0.28, W * 0.2), ...tree(W * 0.935, H * 0.45, W * 0.13)];
+        // Krampus's ride, bottom right: a rusty old sleigh and two gaunt monster reindeer harnessed to it,
+        // waiting in the snow (their legs sink into the drift drawn next). Their eyes glow and their breath
+        // steams per frame (drawScene).
+        const u = W / 1200, ground = H * 0.945;
+        const eyes = [], breath = [];
+        const FUR = 'rgba(14, 10, 12, 0.97)', RIM = 'rgba(170, 200, 240, 0.28)', RUST = '#7a3a17';
+        // One reindeer facing left, feet at (x, ground). Drawn in units: body ~80 long, ~150 tall with the antlers.
+        const deer = (x, s) => {
+          const P = (px, py) => [x - px * s, ground + py * s]; // facing left: +px goes left
+          const path = (pts) => { c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo : c.moveTo).call(c, ...P(px, py))); };
+          c.lineCap = 'round'; c.lineJoin = 'round';
+          // legs: long and bony, backward knees, split hooves
+          c.strokeStyle = FUR; c.lineWidth = 4.5 * s;
+          for (const [lx, back] of [[-30, 1], [-20, 1], [22, 0], [31, 0]]) {
+            path([[lx, -52], [lx + (back ? -7 : 5), -30], [lx + (back ? 1 : -1), -12], [lx, 0]]); c.stroke();
+          }
+          // body: sunken belly, sharp spine and hip bones
+          c.fillStyle = FUR;
+          path([[-40, -60], [-36, -72], [-20, -76], [-6, -73], [10, -76], [28, -80], [38, -72], [36, -56], [24, -50], [6, -54], [-14, -50], [-34, -52]]);
+          c.closePath(); c.fill();
+          c.strokeStyle = RIM; c.lineWidth = 1.5 * s;
+          path([[-36, -72], [-20, -76], [-6, -73], [10, -76], [28, -80]]); c.stroke(); // moonlight on the back
+          for (let i = 0; i < 4; i++) { path([[2 + i * 7, -74], [-1 + i * 7, -56]]); c.stroke(); } // ribs showing
+          // stubby tail
+          c.strokeStyle = FUR; c.lineWidth = 4 * s; path([[-40, -64], [-48, -70]]); c.stroke();
+          // neck stretched forward, then a long skull with an open jaw and teeth
+          c.lineWidth = 11 * s; path([[30, -70], [44, -92], [52, -102]]); c.stroke();
+          c.fillStyle = FUR;
+          path([[46, -112], [58, -114], [82, -104], [86, -98], [70, -97], [62, -96]]); c.closePath(); c.fill(); // skull and snout
+          path([[60, -96], [84, -92], [80, -86], [58, -90]]); c.closePath(); c.fill(); // lower jaw hanging open
+          c.fillStyle = 'rgba(230, 225, 205, 0.85)';
+          for (const tx of [68, 74, 80]) { path([[tx, -97], [tx + 2.5, -93], [tx + 5, -97]]); c.closePath(); c.fill(); }
+          c.strokeStyle = RIM; c.lineWidth = 1.2 * s; path([[46, -112], [58, -114], [82, -104]]); c.stroke();
+          // ears and big jagged antlers, sweeping back
+          c.fillStyle = FUR; path([[48, -110], [36, -118], [44, -106]]); c.closePath(); c.fill();
+          c.strokeStyle = FUR;
+          for (const side of [0, 1]) {
+            const o = side ? 7 : 0; // the far antler a little ahead
+            c.lineWidth = 3.2 * s;
+            path([[52 + o, -112], [46 + o, -130], [36 + o, -146], [24 + o, -154]]); c.stroke();
+            c.lineWidth = 2.2 * s;
+            for (const [bx, by, ex, ey] of [[47, -128, 56, -142], [41, -138, 44, -156], [33, -147, 30, -162], [49, -122, 34, -124], [27, -152, 14, -150]]) {
+              path([[bx + o, by], [ex + o, ey]]); c.stroke();
+            }
+          }
+          // harness: collar and a strap round the chest
+          c.strokeStyle = 'rgba(70, 30, 18, 0.95)'; c.lineWidth = 3.5 * s;
+          path([[34, -82], [40, -66]]); c.stroke();
+          path([[24, -78], [22, -52]]); c.stroke();
+          c.fillStyle = 'rgba(150, 110, 50, 0.9)'; c.beginPath(); c.arc(...P(38, -70), 2.5 * s, 0, TAU); c.fill(); // a dull bell on the collar
+          eyes.push(P(57, -106));
+          breath.push(P(86, -95));
+          return { collar: P(36, -70), rump: P(-38, -62) };
+        };
+        // the sleigh, partly in front of the right tree, sitting on the snow drift (drawn after it)
+        const sx = W * 0.79, sw = W * 0.2, sg = H * 0.905, v = u * 1.2;
+        const sleigh = () => {
+          const runner = (dy, alpha) => {
+            c.strokeStyle = `rgba(105, 50, 22, ${alpha})`; c.lineWidth = 5 * v; c.lineCap = 'round';
+            c.beginPath(); c.moveTo(sx + sw, sg - (8 + dy) * v); c.lineTo(sx + sw * 0.12, sg - (8 + dy) * v);
+            c.bezierCurveTo(sx - sw * 0.06, sg - (8 + dy) * v, sx - sw * 0.1, sg - (40 + dy) * v, sx + sw * 0.02, sg - (46 + dy) * v); // front curl
+            c.stroke();
+          };
+          runner(6, 0.7); // the far runner
+          c.fillStyle = RUST;
+          c.beginPath();
+          c.moveTo(sx + sw * 0.1, sg - 26 * v); c.lineTo(sx + sw * 0.98, sg - 26 * v); c.lineTo(sx + sw * 1.02, sg - 112 * v);
+          c.quadraticCurveTo(sx + sw * 0.86, sg - 120 * v, sx + sw * 0.8, sg - 84 * v); // the high seat back
+          c.lineTo(sx + sw * 0.3, sg - 70 * v); c.quadraticCurveTo(sx + sw * 0.12, sg - 68 * v, sx + sw * 0.06, sg - 92 * v); // the curled front
+          c.quadraticCurveTo(sx + sw * 0.02, sg - 50 * v, sx + sw * 0.1, sg - 26 * v);
+          c.closePath(); c.fill();
+          // rust: lighter flakes, dark holes, a broken slat, streaks running down
+          for (let i = 0; i < 26; i++) {
+            c.fillStyle = rnd() < 0.6 ? `rgba(${170 + rnd() * 40}, ${80 + rnd() * 30}, 30, ${0.35 + rnd() * 0.4})` : 'rgba(20, 8, 4, 0.8)';
+            c.beginPath(); c.ellipse(sx + sw * (0.15 + rnd() * 0.8), sg - (30 + rnd() * 50) * v, (2 + rnd() * 6) * v, (1.5 + rnd() * 3) * v, rnd() * 3, 0, TAU); c.fill();
+          }
+          c.strokeStyle = 'rgba(40, 15, 6, 0.9)'; c.lineWidth = 2 * v;
+          for (const k of [0.35, 0.55, 0.75]) { c.beginPath(); c.moveTo(sx + sw * k, sg - 72 * v); c.lineTo(sx + sw * k, sg - 28 * v); c.stroke(); }
+          c.beginPath(); c.moveTo(sx + sw * 0.45, sg - 48 * v); c.lineTo(sx + sw * 0.52, sg - 40 * v); c.lineTo(sx + sw * 0.6, sg - 50 * v); c.stroke(); // crack
+          c.strokeStyle = 'rgba(150, 70, 30, 0.45)'; c.lineWidth = 1.5 * v;
+          for (let i = 0; i < 6; i++) { const rx = sx + sw * (0.2 + rnd() * 0.7); c.beginPath(); c.moveTo(rx, sg - 66 * v); c.lineTo(rx + 2 * v, sg - (36 + rnd() * 20) * v); c.stroke(); }
+          // struts down to the near runner, then the runner itself
+          c.strokeStyle = 'rgba(95, 45, 20, 0.95)'; c.lineWidth = 4 * v;
+          for (const k of [0.25, 0.6, 0.9]) { c.beginPath(); c.moveTo(sx + sw * k, sg - 26 * v); c.lineTo(sx + sw * k, sg - 8 * v); c.stroke(); }
+          runner(0, 0.95);
+        };
+        // the reindeer, one behind the other (legs sinking into the drift drawn next)
+        const s = u * 1.3;
+        const back = deer(sx - 44 * s, s);
+        const front = deer(sx - 44 * s - 130 * s, s);
         // snow drifts along the bottom
         const snow = c.createLinearGradient(0, H * 0.86, 0, H);
         snow.addColorStop(0, 'rgba(225, 235, 250, 0.75)'); snow.addColorStop(1, 'rgba(170, 190, 220, 0.9)');
         c.fillStyle = snow; c.beginPath(); c.moveTo(0, H);
         for (let x = 0; x <= W; x += 20) c.lineTo(x, H * (0.93 - 0.03 * Math.sin(x / 70) - (x < W * 0.2 || x > W * 0.8 ? 0.03 : 0)));
         c.lineTo(W, H); c.closePath(); c.fill();
+        sleigh();
+        // the reindeer's traces back to the sleigh: frayed rope and a rusty chain
+        c.lineWidth = 2.2 * u; c.strokeStyle = 'rgba(90, 40, 20, 0.95)'; c.setLineDash([5 * u, 3 * u]);
+        for (const d of [back, front]) {
+          c.beginPath(); c.moveTo(...d.collar);
+          c.quadraticCurveTo((d.collar[0] + sx) / 2, Math.max(d.collar[1], sg - 40 * v) + 14 * u, sx + sw * 0.08, sg - 40 * v); c.stroke();
+        }
+        c.setLineDash([]);
         // frost in the corners: a pale glow and branching ice crystals
         for (const [fx, fy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
           const fr = c.createRadialGradient(fx, fy, 0, fx, fy, W * 0.22);
@@ -1259,7 +1374,7 @@
           for (let i = 0; i < 4; i++) crystal(fx, fy, base + (i - 1.5) * 0.35, W * (0.06 + rnd() * 0.04), 3);
         }
         vignette('rgba(0, 8, 25, 0.75)');
-        return { cv, key: scene + W, lights };
+        return { cv, key: scene + W, lights: lights.filter(([lx, ly]) => !(lx > sx && ly > sg - 135 * v)), eyes, breath }; // no bulbs over the sleigh
       }
       return { cv, key: scene + W };
     }

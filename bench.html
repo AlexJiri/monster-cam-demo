@@ -39,6 +39,8 @@
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
   .tabs a.play:not(.on) { background: var(--blood); border-color: var(--blood); color: #fff; font-weight: 700; padding: 6px 20px; box-shadow: 0 0 18px rgba(224, 57, 62, 0.55); }
   .tabs a.play:not(.on):hover { filter: brightness(1.12); color: #fff; }
+  .tabs a { white-space: nowrap; }
+  @media (max-width: 480px) { .tabs { flex-wrap: wrap; } .tabs a, .tabs a.play:not(.on) { padding: 5px 11px; font-size: 14px; } }
   .testFrame { width: 100%; height: 760px; border: 1px solid var(--line); border-radius: 12px; background: #000; display: block; margin-top: 12px; }
   .testFrame[hidden] { display: none; } /* `display: block` above would otherwise show an empty white frame */
   header { align-items: center; }
@@ -123,7 +125,7 @@
   <header>
     <h1>Settings</h1>
     <span class="saved" id="saved"></span>
-    <nav class="tabs" aria-label="Pages"><a href="index.html" class="play">▶ Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
+    <nav class="tabs" aria-label="Pages"><a href="index.html">🏠 Lobby</a><a href="index.html#play" class="play">▶ Play</a><a href="bench.html" class="on" aria-current="page">⚙️ Settings &amp; Test</a></nav>
   </header>
 
   <nav class="steps" aria-label="Steps">
@@ -250,10 +252,10 @@
   </section>
 </div>
 
-<script src="src/settings.js?v=1794990277"></script>
-<script src="src/events.js?v=1794990277"></script>
-<script src="src/face.js?v=1794990277"></script>
-<script src="src/mic.js?v=1794990277"></script>
+<script src="src/settings.js?v=1794995245"></script>
+<script src="src/events.js?v=1794995245"></script>
+<script src="src/face.js?v=1794995245"></script>
+<script src="src/mic.js?v=1794995245"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   let S = MC.settings.load();

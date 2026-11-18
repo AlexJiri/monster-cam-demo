@@ -46,6 +46,8 @@
   .tabs a { text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-weight: 500; }
   .tabs a.on { background: var(--lamp); border-color: var(--lamp); color: #1b1400; font-weight: 700; }
   .tabs a:not(.on):hover { color: var(--text); border-color: var(--muted); }
+  .tabs a { white-space: nowrap; }
+  @media (max-width: 480px) { .tabs { flex-wrap: wrap; } .tabs a { padding: 5px 11px; font-size: 14px; } }
   header { align-items: center; }
   /* The gift guide for viewers is drawn on the game canvas (lightson.js drawGuide), under the monster. */
   @media (max-width: 600px) { .helpers .pill { font-size: 11px; } }
@@ -91,9 +93,20 @@
   .keyForm input::placeholder { text-transform: none; letter-spacing: 0; }
   .notice .keyForm { margin-top: 10px; font-size: 15px; font-weight: 400; }
   .notice .keyForm .row { justify-content: center; }
-  .backBtn { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 500; }
   .notice .x { position: absolute; top: 6px; right: 6px; background: transparent; border: 0; color: var(--muted); font-size: 18px; padding: 2px 8px; }
   .notice .x:hover { color: var(--text); }
+  /* After a round: play again, lobby, (test) play for real. */
+  .notice .acts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; font-size: 16px; }
+  .notice .acts a { text-decoration: none; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
+  .notice .acts a:hover { border-color: var(--muted); }
+  .notice .acts .primary { font-size: 18px; }
+  /* "Are you sure?" box (stop the round for the lobby). */
+  .ask { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); padding: 16px; }
+  .ask[hidden] { display: none; }
+  .askBox { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; max-width: 420px; text-align: center; }
+  .askBox p { margin: 0 0 14px; font-size: 18px; font-weight: 700; }
+  .askBox small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .askBox .row { justify-content: center; }
   details[open] > summary { margin-bottom: 8px; }
   .streamHere { display: none; aspect-ratio: 4 / 3; border: 2px dashed var(--line); border-radius: 12px; place-items: center; text-align: center; color: var(--muted); padding: 16px; }
   .streamed .streamHere { display: grid; }
@@ -184,6 +197,9 @@
     <div class="lobbyKey" id="lobbyKey"></div>
   </div>
 </div>
+<div class="ask" id="ask" role="dialog" aria-modal="true" aria-labelledby="askText" hidden>
+  <div class="askBox"><p id="askText"></p><div class="row"><button id="askNo"></button><button class="primary" id="askYes"></button></div></div>
+</div>
 <div class="wrap">
   <header>
     <h1>Lights On</h1>
@@ -268,15 +284,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794990277"></script>
-<script src="src/settings.js?v=1794990277"></script>
-<script src="src/events.js?v=1794990277"></script>
-<script src="src/face.js?v=1794990277"></script>
-<script src="src/curses.js?v=1794990277"></script>
-<script src="src/sfx.js?v=1794990277"></script>
-<script src="src/mic.js?v=1794990277"></script>
-<script src="src/lightson.js?v=1794990277"></script>
-<script src="src/live.js?v=1794990277"></script>
+<script src="src/edition.js?v=1794995245"></script>
+<script src="src/settings.js?v=1794995245"></script>
+<script src="src/events.js?v=1794995245"></script>
+<script src="src/face.js?v=1794995245"></script>
+<script src="src/curses.js?v=1794995245"></script>
+<script src="src/sfx.js?v=1794995245"></script>
+<script src="src/mic.js?v=1794995245"></script>
+<script src="src/lightson.js?v=1794995245"></script>
+<script src="src/live.js?v=1794995245"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -490,7 +506,28 @@
     }).join('');
     $('lobbyKey').innerHTML = paid ? '' : `<h3>🔑 Bought it? Paste your key</h3>${KEY_FORM}`;
   }
-  function openLobby() { if (round.running) { log('🏠 Finish the round first.'); return; } renderLobby(); $('lobby').hidden = false; }
+  // "Are you sure?" in a box over the page. Resolves to true (yes) or false (no, Escape, click outside).
+  function ask(html, yes, no) {
+    return new Promise((done) => {
+      $('askText').innerHTML = html; $('askYes').textContent = yes; $('askNo').textContent = no;
+      $('ask').hidden = false; $('askNo').focus();
+      ask.end = (v) => { $('ask').hidden = true; ask.end = null; done(v); };
+    });
+  }
+  $('askYes').onclick = () => ask.end && ask.end(true);
+  $('askNo').onclick = () => ask.end && ask.end(false);
+  $('ask').onclick = (e) => { if (e.target === $('ask') && ask.end) ask.end(false); };
+  // During a round the lobby asks first: going there stops the round.
+  async function openLobby() {
+    if (starting) return;
+    if (round.running) {
+      const free = !ED.isPaid() && !ED.DEV;
+      const ok = await ask(`Stop the round and go to the lobby?${free ? '<small>This round still counts as one of your free rounds.</small>' : ''}`, '🏠 Stop and go to the lobby', 'Keep playing');
+      if (!ok || !round.running) return;
+      clearRound(); hideNotice(); log('■ Round stopped for the lobby.');
+    }
+    renderLobby(); $('lobby').hidden = false;
+  }
   function closeLobby() { $('lobby').hidden = true; }
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-lobby-open]')) { e.preventDefault(); openLobby(); return; }
@@ -505,9 +542,13 @@
       closeLobby();
     }
   });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('lobby').hidden) closeLobby(); });
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (ask.end) ask.end(false); else if (!$('lobby').hidden) closeLobby();
+  });
+  // #play (the Play tab on Settings & Test, "Play for real" after a test) goes straight to the game.
   if (!PREVIEW) {
-    openLobby();
+    if (location.hash !== '#play') openLobby();
     ED.catalog.refresh().then((changed) => { if (changed && !$('lobby').hidden) renderLobby(); });
   }
   async function startRound() {
@@ -592,11 +633,16 @@
     const names = Object.keys(counts);
     const who = names.length > 1 ? names.map((k) => esc(k) + (counts[k] > 1 ? ` ×${counts[k]}` : '')).join(', ') : '';
     const saved = savers.length ? `<span class="catches">🛡️ Saved by: ${savers.map(esc).join(', ')}</span>` : '';
+    // Next: again, the lobby, and after a test also the real game (inside Settings & Test these open the whole tab).
+    const top = EMBED ? ' target="_top"' : '';
+    const acts = `<div class="acts"><button class="primary" id="againBtn">↻ ${PREVIEW ? 'Test again' : 'Play again'}</button>` +
+      (PREVIEW ? `<a href="index.html#play"${top}>▶ Play for real</a><a href="index.html"${top}>🏠 Lobby</a>${EMBED ? '' : '<a href="bench.html">⚙️ Settings</a>'}`
+        : '<button id="lobbyBtn">🏠 Lobby</button>') + '</div>';
     notice(won
-      ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`
-      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}<button class="primary" id="againBtn">Play again</button>`, won ? 'win' : 'lose');
+      ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}${acts}`
+      : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}${acts}`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
-    if (PREVIEW && !EMBED) $('againBtn').insertAdjacentHTML('afterend', ' <a href="bench.html" class="backBtn">← Back to Settings</a>');
+    if (!PREVIEW) $('lobbyBtn').onclick = openLobby;
     $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
     // Closing the result also gives the streamer their face back (no monster head, no bites).
     $('noticeX').onclick = () => { hideNotice(); game.finalHead = false; game.bites = []; };
@@ -950,10 +996,14 @@
       else if (r < 0.8) MC.bus.emit({ type: 'like', user, count: 10 + Math.floor(Math.random() * 15) });
       else MC.bus.emit({ type: 'comment', user, text: pick(['run!', 'behind you [cry]', 'feed him [heart]', 'monster', '😂']) });
     }, 2200);
-    // The test needs the camera, like the real game; the round starts once it's on.
+    // The test needs the camera, like the real game. Then one tap starts it: phones and browsers keep the game
+    // sounds and the microphone off until a tap inside this page (the click on Settings & Test doesn't count
+    // inside the test frame), which left the first test round silent and deaf.
     (async () => {
       await $('startBtn').onclick();
-      if (face.state.status === 'ready') setTimeout(startRound, 800);
+      if (face.state.status !== 'ready') return;
+      notice(`🧪 Test round<br><small>${PREVIEW_SECONDS} s with fake viewers. Not counted as a round.</small><div class="acts"><button class="primary" id="goTest">▶ Start test</button></div>`);
+      $('goTest').onclick = () => { MC.sfx.unlock(); if (face.mic) face.mic.prime(); startRound(); };
     })();
   }
 

@@ -138,7 +138,7 @@
   const CATALOG_KEY = 'monstercam-catalog';
   const DEFAULT_CATALOG = [
     { id: 'lightson', kind: 'game', title: 'Lights On', icon: '🔦', blurb: 'A monster hunts the room with a lantern. Viewers send gifts to curse you, send it after you or chain it up. Freeze when the light finds you.' },
-    { id: 'xmas', kind: 'pack', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night scene with snow and string lights.' },
+    { id: 'xmas', kind: 'pack', title: 'Christmas Pack', icon: '🎄', blurb: 'Krampus walks the room on hooves, bells jingling. Winter night with snow, string lights and his monster reindeer by a rusty sleigh.' },
     { id: 'freeze', kind: 'soon', title: 'Freeze', icon: '🧊', blurb: 'Reach the finish without moving while the monster watches.' },
     { id: 'swarm', kind: 'soon', title: 'Swarm', icon: '🦇', blurb: 'Every viewer becomes a little monster.' },
     { id: 'duel', kind: 'soon', title: 'Monster Duel', icon: '⚔️', blurb: 'TikTok LIVE battles: gifts send the monster to your opponent.' },
