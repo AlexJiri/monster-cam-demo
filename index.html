@@ -69,7 +69,10 @@
   .lobbyTop p { margin: 2px 0 0; color: var(--muted); }
   .lobbyTop > div { flex: 1; min-width: 0; }
   .keyBtn .short { display: none; }
-  .keyBtn { font-weight: 700; padding: 9px 14px; border-color: var(--lamp); color: var(--lamp); white-space: nowrap; }
+  .keyBtn { padding: 7px 12px; background: transparent; color: var(--muted); white-space: nowrap; }
+  .keyBtn:hover { color: var(--text); }
+  .keyLink { align-self: flex-start; background: transparent; border: 0; padding: 2px 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+  .keyLink:hover { color: var(--lamp); }
   /* Menu on the left (a row of tabs on a phone), the chosen list on the right. */
   .lobbyBody { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px; margin-top: 22px; }
   .lnav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; align-self: start; }
@@ -246,7 +249,7 @@
     <div class="lobbyTop">
       <img src="src/icon-256.png" alt="" width="76" height="76">
       <div><h1>Monster Cam</h1><p>Horror games for TikTok LIVE. Your viewers control the monster.</p></div>
-      <button class="keyBtn" data-key-dlg>🔑 <span class="long">Activate key</span><span class="short">Key</span></button>
+      <button class="keyBtn" data-key-dlg title="Bought a game, pack or bundle? Enter its key here">🔑 <span class="long">Enter a key</span><span class="short">Key</span></button>
     </div>
     <div class="lobbyBody">
       <nav class="lnav" id="lnav" aria-label="Games"></nav>
@@ -353,15 +356,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1795033715"></script>
-<script src="src/settings.js?v=1795033715"></script>
-<script src="src/events.js?v=1795033715"></script>
-<script src="src/face.js?v=1795033715"></script>
-<script src="src/curses.js?v=1795033715"></script>
-<script src="src/sfx.js?v=1795033715"></script>
-<script src="src/mic.js?v=1795033715"></script>
-<script src="src/lightson.js?v=1795033715"></script>
-<script src="src/live.js?v=1795033715"></script>
+<script src="src/edition.js?v=1795034767"></script>
+<script src="src/settings.js?v=1795034767"></script>
+<script src="src/events.js?v=1795034767"></script>
+<script src="src/face.js?v=1795034767"></script>
+<script src="src/curses.js?v=1795034767"></script>
+<script src="src/sfx.js?v=1795034767"></script>
+<script src="src/mic.js?v=1795034767"></script>
+<script src="src/lightson.js?v=1795034767"></script>
+<script src="src/live.js?v=1795034767"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -576,6 +579,8 @@
     const link = ED.catalog.buyLink(c.id);
     return link ? `<a class="buy" href="${esc(link)}" target="_blank" rel="noopener">🛒 ${text}</a>` : `<button class="buy" data-buy-soon>🛒 ${text}</button>`;
   }
+  // Under every Buy: where the key goes once bought (gone once it's owned).
+  const keyLink = (c) => `<button class="keyLink" data-key-dlg="${esc(c.title)}">🔑 Bought it? Enter your key</button>`;
   const chips = (ids, cls = '') => `<div class="chips">${ids.map((id) => {
     const c = ED.CONTENT[id] || { icon: '', name: id };
     return `<span class="chip ${cls}" title="${esc(c.about || '')}">${c.icon} ${esc(c.name)}</span>`;
@@ -598,7 +603,7 @@
       ${owned ? '<span class="badge ok">✓ Owned</span>' : '<span class="badge lock">Free to try</span>'}
       <h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>${inside}
       ${!owned && counter ? `<span class="note">${roundsNote(counter)} · watermark on stream</span>` : ''}
-      <div class="acts">${acts}${page ? '' : '<button data-lobby-game-open>More ›</button>'}</div></div>`;
+      <div class="acts">${acts}${page ? '' : '<button data-lobby-game-open>More ›</button>'}</div>${owned || !known ? '' : keyLink(c)}</div>`;
   }
   function packCard(c) {
     const pack = ED.PACKS[c.id];
@@ -610,13 +615,13 @@
       <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
       ${chips(pack.monsters.concat(pack.scenes), 'new')}
       ${owned ? '' : `<span class="note">${roundsNote(pack.rounds, 'free try today')}</span>`}
-      <div class="acts">${play}${owned ? '' : buyBtn(c)}</div></div>`;
+      <div class="acts">${play}${owned ? '' : buyBtn(c)}</div>${owned ? '' : keyLink(c)}</div>`;
   }
   function bundleCard(c) {
     const owned = ED.owns(c.id);
     return `<div class="card bundle${c.id === 'founder' ? ' founder' : ''}">${owned ? '<span class="badge ok">✓ Owned</span>' : `<span class="badge lock">${c.id === 'founder' ? 'Limited time' : 'Bundle'}</span>`}
       <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
-      ${owned ? '' : `<div class="acts">${buyBtn(c)}</div>`}</div>`;
+      ${owned ? '' : `<div class="acts">${buyBtn(c)}</div>${keyLink(c)}`}</div>`;
   }
   const soonCard = (c) => `<div class="card soon"><span class="badge">Coming soon</span><h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p></div>`;
   const founderBanner = () => cardsOf('bundle').filter((c) => c.id === 'founder' && !ED.owns('founder')).map(bundleCard).join('');
@@ -683,8 +688,12 @@
   }
 
   // ---------- Activate key (lobby button, "Have a key?", a key pasted or copied) ----------
-  function openKeyDlg(key, lead) {
-    $('keyDlgLead').textContent = lead || 'Paste the key from your purchase (the store shows it after you buy and emails it to you). It unlocks a game, a pack or a bundle for good.';
+  // `what`: the card the key is for ("Christmas Pack"), or none from the lobby's top button.
+  function openKeyDlg(key, lead, what) {
+    $('keyDlgTitle').textContent = what ? `🔑 Activate ${what}` : '🔑 Activate a key';
+    $('keyDlgLead').textContent = lead || (what
+      ? `Bought ${what}? Paste the key from your purchase (the store shows it right after you pay and emails it to you). It unlocks ${what} for good, no more limits or watermark.`
+      : 'Bought a game, a pack or a bundle? Paste the key from your purchase (the store shows it right after you pay and emails it to you). It unlocks what you bought for good.');
     const input = $('keyDlg').querySelector('input');
     input.value = key || '';
     $('keyDlg').querySelector('.keyMsg').textContent = '';
@@ -736,7 +745,8 @@
   function closeLobby() { $('lobby').hidden = true; }
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-lobby-open]')) { e.preventDefault(); openLobby(); return; }
-    if (e.target.closest('[data-key-dlg]')) { e.preventDefault(); openKeyDlg(); return; }
+    const kd = e.target.closest('[data-key-dlg]');
+    if (kd) { e.preventDefault(); openKeyDlg('', '', kd.dataset.keyDlg || ''); return; }
     if (e.target.closest('[data-buy-soon]')) { ask('The store opens soon<small>Until then, play the free rounds. Once you buy, paste your key with 🔑 Activate key.</small>', 'OK'); return; }
     const tab = e.target.closest('[data-lobby-tab]');
     if (tab) { lobbyGo({ tab: tab.dataset.lobbyTab }); return; }
