@@ -198,6 +198,7 @@
     eat(now, face) {
       MC.sfx.caught();
       if (this.s.monster === 'zombie') this.zombified++; // each bite turns the streamer a bit more into one of them
+      this.hitDone = false; // the attack's own sound plays once, at its hit
       this.lit = false;
       this.set('eaten', now, { end: now + 1600, eatBox: face && face.box ? { ...face.box } : null });
     }
@@ -432,6 +433,7 @@
       // The scene's edges (walls, trees, pipes) stay faintly visible through the dark.
       if (dark && this.sceneLayer && this.s.scene && this.s.scene !== 'none') {
         ctx.save(); ctx.globalAlpha = 0.4; ctx.drawImage(this.sceneLayer.cv, 0, 0); ctx.restore();
+        this.drawSceneGlow(now, W, H);
       }
       this.drawBites(now, face, W, H);
       if (this.zombified) this.drawZombified(now, face, W, H);
@@ -1100,6 +1102,70 @@
       }
     }
 
+    // Lights of the scene that show through the dark (drawn after it): the furnace, eyes in the dark, a lit window.
+    drawSceneGlow(now, W, H) {
+      const L = this.sceneLayer, scene = this.s.scene;
+      if (!L || L.key !== scene + W) return;
+      const ctx = this.ctx, u = W / 1200;
+      const eyes = (x, y, gap, color, r = 3.2) => {
+        ctx.fillStyle = ctx.shadowColor = color; ctx.shadowBlur = 12;
+        for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + d * gap, y, r * u, r * 0.7 * u, 0, 0, TAU); ctx.fill(); }
+      };
+      ctx.save();
+      if (scene === 'basement' && L.grate) {
+        const [gx, gy, gw, gh] = L.grate, f = 0.6 + 0.25 * Math.sin(now / 130) + 0.15 * Math.sin(now / 47);
+        const g = ctx.createLinearGradient(0, gy, 0, gy + gh);
+        g.addColorStop(0, 'rgba(255, 120, 30, ' + (0.5 * f) + ')'); g.addColorStop(1, 'rgba(255, 60, 10, ' + (0.8 * f) + ')');
+        ctx.fillStyle = g; ctx.fillRect(gx, gy, gw, gh);
+        ctx.fillStyle = 'rgba(20, 10, 5, 0.9)'; for (let i = 1; i < 6; i++) ctx.fillRect(gx + (gw * i) / 6 - 2, gy, 4, gh); // the bars
+        const glow = ctx.createRadialGradient(gx + gw / 2, gy + gh, 0, gx + gw / 2, gy + gh, W * 0.14);
+        glow.addColorStop(0, 'rgba(255, 110, 30, ' + (0.22 * f) + ')'); glow.addColorStop(1, 'rgba(255, 110, 30, 0)');
+        ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = glow; ctx.fillRect(gx - W * 0.14, gy - W * 0.1, gw + W * 0.28, W * 0.24);
+        ctx.globalCompositeOperation = 'source-over';
+        // a rat watching from the dark under the stairs, now and then
+        const r = (now % 9000) / 9000;
+        if (r > 0.6 && r < 0.85 && !((now % 2600) < 120)) { ctx.globalAlpha = Math.min(1, (r - 0.6) * 20, (0.85 - r) * 20); eyes(L.rat[0], L.rat[1], 5 * u, '#ff3020', 2.4); }
+      }
+      if (scene === 'winter' && L.lights) { // the string lights on the trees glow through the dark too
+        const COLORS = ['#ff3b3b', '#3bff7a', '#ffd23b', '#5ab4ff'];
+        L.lights.forEach(([lx, ly], i) => {
+          const on = i === 5 ? this.flicker(now) === 1 && Math.sin(now / 90) > -0.2 : Math.sin(now / 600 + i * 2.1) > -0.4;
+          if (!on) return;
+          ctx.globalAlpha = 0.85; ctx.fillStyle = ctx.shadowColor = COLORS[i % COLORS.length]; ctx.shadowBlur = 12;
+          ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, TAU); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+      }
+      if (scene === 'winter' && L.eyes) { // the reindeer's red eyes, blinking out of step
+        L.eyes.forEach(([ex, ey], i) => { if ((now / 1000 + i * 1.7) % 4.3 >= 0.12) { ctx.globalAlpha = 0.7; ctx.fillStyle = ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.ellipse(ex, ey, 3.2 * u, 2 * u, -0.25, 0, TAU); ctx.fill(); } });
+        ctx.globalAlpha = 1;
+      }
+      if (scene === 'forest' && L.owl) {
+        const blink = (now % 5200) < 140;
+        if (!blink) eyes(L.owl[0], L.owl[1], 5.5 * u, '#ffcc33', 3.4);
+      }
+      if (scene === 'hospital' && L.window) {
+        // the corridor light through the door's window; now and then a figure walks past it
+        const [wx, wy, ww, wh] = L.window, f = this.flicker(now);
+        ctx.fillStyle = 'rgba(200, 255, 225, ' + (0.35 * f) + ')'; ctx.fillRect(wx, wy, ww, wh);
+        const t = (now % 16000) / 16000;
+        if (t < 0.12) {
+          const k = t / 0.12, px = wx - ww * 0.5 + (ww * 2) * k;
+          ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
+          ctx.fillStyle = 'rgba(5, 10, 8, 0.95)';
+          ctx.beginPath(); ctx.arc(px, wy + wh * 0.45, ww * 0.22, 0, TAU); ctx.fill();
+          ctx.fillRect(px - ww * 0.32, wy + wh * 0.7, ww * 0.64, wh * 0.4);
+          ctx.restore();
+        }
+        // sparks from the failing tube light when it flickers
+        if (f < 1) {
+          ctx.fillStyle = '#e8ffd0'; ctx.shadowColor = '#c8ffb0'; ctx.shadowBlur = 8;
+          for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(W * (0.4 + Math.random() * 0.2), H * (0.03 + Math.random() * 0.08), 1.6, 0, TAU); ctx.fill(); }
+        }
+      }
+      ctx.restore();
+    }
+
     // ---------- scenes: an atmosphere over the streamer's own room ----------
     // Static parts are drawn once into a layer; light and flicker are added per frame.
     sceneLight(now) {
@@ -1200,6 +1266,45 @@
         }
         ctx.restore();
       }
+      const L = this.sceneLayer;
+      if (scene === 'basement' && L.drip) {
+        // a drop every 1.8 s from the leaking joint, splashing in the puddle; dust drifting in the bulb's light
+        const t = (now % 1800) / 1800, [dx, dy] = L.drip, floor = H * 0.97;
+        ctx.save(); ctx.fillStyle = 'rgba(170, 200, 220, 0.8)';
+        if (t < 0.15) { ctx.beginPath(); ctx.arc(dx, dy + 3, 2 + t * 20, 0, TAU); ctx.fill(); }
+        else if (t < 0.55) { const k = (t - 0.15) / 0.4; ctx.beginPath(); ctx.ellipse(dx, dy + (floor - dy) * k * k, 2.5, 4, 0, 0, TAU); ctx.fill(); }
+        else { const k = (t - 0.55) / 0.45; ctx.strokeStyle = 'rgba(170, 200, 220, ' + (0.6 * (1 - k)) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(dx, floor, 6 + 40 * k, 2 + 6 * k, 0, 0, TAU); ctx.stroke(); }
+        ctx.fillStyle = 'rgba(255, 230, 180, 0.5)';
+        for (let i = 0; i < 24; i++) {
+          const x = W * (0.38 + 0.24 * ((i * 0.618 + now / 40000 * (1 + (i % 3))) % 1)), y = H * (0.12 + 0.5 * ((i * 0.371 + now / 60000 * (1 + (i % 2))) % 1));
+          ctx.globalAlpha = 0.25 + 0.35 * Math.sin(now / 900 + i) ** 2;
+          ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (scene === 'hospital' && L.iv) {
+        // the IV dripping, a drop every 1.4 s
+        const t = (now % 1400) / 1400, [ix, iy] = L.iv;
+        ctx.save(); ctx.fillStyle = 'rgba(220, 70, 70, 0.8)';
+        ctx.beginPath(); ctx.arc(ix, iy + 4 + t * 16, 2.2, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      if (scene === 'forest') {
+        // now and then a few bats flap across the top
+        const t = (now % 14000) / 14000;
+        if (t < 0.3) {
+          const k = t / 0.3;
+          ctx.save(); ctx.fillStyle = 'rgba(5, 6, 8, 0.95)';
+          for (let i = 0; i < 3; i++) {
+            const bx = W * (1.1 - 1.3 * k - i * 0.05), by = H * (0.12 + i * 0.04 + 0.02 * Math.sin(now / 150 + i)), flap = Math.sin(now / 60 + i * 2);
+            ctx.beginPath(); ctx.moveTo(bx, by);
+            ctx.quadraticCurveTo(bx - 10, by - 10 * flap, bx - 20, by + 2); ctx.quadraticCurveTo(bx - 10, by - 2, bx, by + 4);
+            ctx.quadraticCurveTo(bx + 10, by - 2, bx + 20, by + 2); ctx.quadraticCurveTo(bx + 10, by - 10 * flap, bx, by);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
       if (scene === 'basement') {
         // the bulb, swinging a little on its cord
         const sw = Math.sin(now / 900) * W * 0.02, bx = W / 2 + sw, by = H * 0.09;
@@ -1220,6 +1325,27 @@
       };
       let seed = 7;
       const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280); // same picture every time
+      const u = W / 1200; // sizes in pixels at 1200 wide
+      const extra = {}; // places the per-frame drawing needs (drips, eyes, glows)
+      // A cobweb in a top corner (side -1 = left, 1 = right).
+      const cobweb = (side, size) => {
+        const x0 = side < 0 ? 0 : W;
+        c.strokeStyle = 'rgba(200, 200, 200, 0.22)'; c.lineWidth = 1;
+        const rays = 6;
+        for (let i = 0; i <= rays; i++) {
+          const a = (Math.PI / 2) * (i / rays);
+          c.beginPath(); c.moveTo(x0, 0); c.lineTo(x0 - side * Math.cos(a) * size, Math.sin(a) * size); c.stroke();
+        }
+        for (let r = size * 0.25; r < size; r += size * 0.2) {
+          c.beginPath();
+          for (let i = 0; i <= rays; i++) {
+            const a = (Math.PI / 2) * (i / rays), sag = i % 2 ? 0.9 : 1;
+            const px = x0 - side * Math.cos(a) * r * sag, py = Math.sin(a) * r * sag;
+            if (i) c.lineTo(px, py); else c.moveTo(px, py);
+          }
+          c.stroke();
+        }
+      };
       if (scene === 'basement') {
         c.fillStyle = 'rgba(60, 35, 15, 0.18)'; c.fillRect(0, 0, W, H); // warm, dusty
         // brick walls at the sides
@@ -1231,9 +1357,44 @@
             }
           }
         }
-        // pipes along the ceiling
+        // pipes along the ceiling, with a valve wheel and a joint that drips
         c.strokeStyle = 'rgba(40, 40, 45, 0.9)'; c.lineCap = 'round';
         for (const [y, wdt] of [[H * 0.03, 14], [H * 0.07, 9]]) { c.lineWidth = wdt; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+        c.strokeStyle = 'rgba(120, 40, 30, 0.8)'; c.lineWidth = 3 * u;
+        c.beginPath(); c.arc(W * 0.3, H * 0.03, 14 * u, 0, TAU); c.stroke();
+        for (let i = 0; i < 4; i++) { const a = (i / 4) * TAU; c.beginPath(); c.moveTo(W * 0.3, H * 0.03); c.lineTo(W * 0.3 + Math.cos(a) * 14 * u, H * 0.03 + Math.sin(a) * 14 * u); c.stroke(); }
+        c.fillStyle = 'rgba(55, 55, 60, 0.95)'; c.fillRect(W * 0.62 - 8 * u, H * 0.07 - 9 * u, 16 * u, 18 * u);
+        extra.drip = [W * 0.62, H * 0.07 + 9 * u];
+        // wooden stairs coming down on the left, with a rail
+        c.fillStyle = 'rgba(28, 18, 11, 0.95)';
+        for (let i = 0; i < 9; i++) {
+          const x = W * (i * 0.024), y = H * (0.5 + i * 0.056);
+          c.fillRect(x, y, W * 0.07, H * 0.018);
+          c.fillRect(x + W * 0.005, y + H * 0.018, W * 0.008, H - y);
+        }
+        c.strokeStyle = 'rgba(28, 18, 11, 0.95)'; c.lineWidth = 5 * u;
+        c.beginPath(); c.moveTo(0, H * 0.4); c.lineTo(W * 0.215, H * 0.86); c.stroke();
+        for (let i = 0; i < 5; i++) { const x = W * (0.02 + i * 0.045), y = H * (0.43 + i * 0.096); c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + H * 0.1); c.stroke(); }
+        // shelves on the right wall: jars and bottles
+        for (const sy of [0.3, 0.46]) {
+          c.fillStyle = 'rgba(35, 22, 12, 0.95)'; c.fillRect(W * 0.8, H * sy, W * 0.19, H * 0.014);
+          for (let i = 0; i < 5; i++) {
+            const jx = W * (0.81 + i * 0.036), jh = H * (0.05 + rnd() * 0.04), jw = W * (0.018 + rnd() * 0.01);
+            c.fillStyle = 'rgba(' + Math.round(60 + rnd() * 40) + ',' + Math.round(55 + rnd() * 30) + ',' + Math.round(45 + rnd() * 20) + ',0.75)';
+            if (rnd() < 0.5) { c.beginPath(); c.roundRect(jx, H * sy - jh, jw, jh, 3 * u); c.fill(); }
+            else { c.fillRect(jx + jw * 0.25, H * sy - jh, jw * 0.5, jh * 0.3); c.beginPath(); c.roundRect(jx, H * sy - jh * 0.75, jw, jh * 0.75, 4 * u); c.fill(); }
+          }
+        }
+        // an old furnace in the corner, its grate glowing (drawn per frame, through the dark)
+        const fx = W * 0.84, fy = H * 0.66, fw = W * 0.15, fh = H * 0.34;
+        c.fillStyle = 'rgba(22, 20, 20, 0.97)'; c.beginPath(); c.roundRect(fx, fy, fw, fh, 10 * u); c.fill();
+        c.fillRect(fx + fw * 0.35, H * 0.1, fw * 0.18, fy - H * 0.1); // its flue up to the ceiling
+        c.fillStyle = 'rgba(8, 6, 6, 1)'; c.fillRect(fx + fw * 0.2, fy + fh * 0.4, fw * 0.6, fh * 0.28);
+        extra.grate = [fx + fw * 0.2, fy + fh * 0.4, fw * 0.6, fh * 0.28];
+        // a puddle under the drip and cobwebs up in the corners
+        c.fillStyle = 'rgba(20, 30, 40, 0.35)'; c.beginPath(); c.ellipse(W * 0.62, H * 0.975, W * 0.07, H * 0.018, 0, 0, TAU); c.fill();
+        cobweb(-1, W * 0.12); cobweb(1, W * 0.1);
+        extra.rat = [W * 0.27, H * 0.955];
         vignette('rgba(20, 10, 0, 0.75)');
       } else if (scene === 'forest') {
         // A night forest round the streamer: moon top left, tree trunks at the sides, grass and ferns at the bottom.
@@ -1246,6 +1407,22 @@
         c.fillStyle = 'rgba(235, 242, 255, 0.95)'; c.beginPath(); c.arc(mx, my, W * 0.03, 0, TAU); c.fill();
         c.fillStyle = 'rgba(180, 195, 215, 0.6)';
         for (const [dx, dy, rr] of [[-0.008, -0.006, 0.006], [0.01, 0.008, 0.004], [0.002, 0.014, 0.003]]) { c.beginPath(); c.arc(mx + dx * W, my + dy * W, rr * W, 0, TAU); c.fill(); }
+        // far trees in the haze behind (none right behind the streamer), then a band of mist
+        const farTree = (x, base, h, color) => {
+          c.strokeStyle = color; c.lineCap = 'round';
+          c.lineWidth = h * 0.035; c.beginPath(); c.moveTo(x, base); c.lineTo(x + h * 0.02, base - h); c.stroke();
+          for (let i = 0; i < 5; i++) {
+            const y = base - h * (0.35 + i * 0.13), dir = i % 2 ? 1 : -1, len = h * (0.22 - i * 0.03);
+            c.lineWidth = h * 0.012; c.beginPath(); c.moveTo(x + h * 0.01, y); c.quadraticCurveTo(x + dir * len * 0.5, y - h * 0.02, x + dir * len, y - h * 0.08); c.stroke();
+          }
+        };
+        for (let x = W * 0.02; x < W; x += W * (0.05 + rnd() * 0.04)) {
+          if (x > W * 0.34 && x < W * 0.66) continue;
+          farTree(x, H * (0.82 + rnd() * 0.05), H * (0.45 + rnd() * 0.2), 'rgba(25, 40, 50, 0.45)');
+        }
+        const mist = c.createLinearGradient(0, H * 0.6, 0, H * 0.95);
+        mist.addColorStop(0, 'rgba(150, 175, 190, 0)'); mist.addColorStop(0.6, 'rgba(150, 175, 190, 0.16)'); mist.addColorStop(1, 'rgba(150, 175, 190, 0.05)');
+        c.fillStyle = mist; c.fillRect(0, H * 0.6, W, H * 0.4);
         // trunks with bark and bare branches, near the edges
         const dark = 'rgba(6, 10, 9, 0.95)';
         c.lineCap = 'round';
@@ -1268,6 +1445,23 @@
             c.quadraticCurveTo(x + dir * len * 0.6, y - H * 0.03, x + dir * len, y - H * (0.07 + rnd() * 0.06)); c.stroke();
           }
         }
+        // a dead branch reaching in from the left with an owl on it (its eyes glow, per frame), moss hanging down
+        c.strokeStyle = dark; c.lineWidth = 9 * u;
+        c.beginPath(); c.moveTo(W * 0.14, H * 0.3); c.quadraticCurveTo(W * 0.2, H * 0.28, W * 0.26, H * 0.31); c.stroke();
+        c.fillStyle = dark;
+        const ox = W * 0.215, oy = H * 0.255;
+        c.beginPath(); c.ellipse(ox, oy, 15 * u, 22 * u, 0, 0, TAU); c.fill();
+        c.beginPath(); c.arc(ox, oy - 22 * u, 13 * u, 0, TAU); c.fill();
+        for (const d of [-1, 1]) { c.beginPath(); c.moveTo(ox + d * 6 * u, oy - 31 * u); c.lineTo(ox + d * 12 * u, oy - 42 * u); c.lineTo(ox + d * 12 * u, oy - 28 * u); c.fill(); }
+        extra.owl = [ox, oy - 23 * u];
+        c.strokeStyle = 'rgba(40, 60, 45, 0.6)'; c.lineWidth = 2 * u;
+        for (const [mx0, my0] of [[W * 0.17, H * 0.295], [W * 0.245, H * 0.305], [W * 0.88, H * 0.22], [W * 0.82, H * 0.3]]) {
+          for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(mx0 + i * 4 * u, my0); c.quadraticCurveTo(mx0 + i * 4 * u + 6 * u, my0 + H * 0.05, mx0 + i * 3 * u, my0 + H * (0.07 + rnd() * 0.06)); c.stroke(); }
+        }
+        // an old wooden cross leaning in the grass, right
+        c.save(); c.translate(W * 0.74, H * 0.97); c.rotate(0.18);
+        c.fillStyle = 'rgba(20, 18, 14, 0.95)'; c.fillRect(-5 * u, -H * 0.17, 10 * u, H * 0.17); c.fillRect(-26 * u, -H * 0.13, 52 * u, 9 * u);
+        c.restore();
         // grass and ferns along the bottom
         c.fillStyle = 'rgba(4, 12, 8, 0.95)';
         c.beginPath(); c.moveTo(0, H);
@@ -1324,6 +1518,32 @@
         c.fillStyle = 'rgba(225, 255, 240, 0.9)'; c.fillRect(W * 0.38, H * 0.01, W * 0.24, 7);
         // stains on the tiles
         c.fillStyle = 'rgba(80, 45, 25, 0.28)'; c.beginPath(); c.ellipse(W * 0.06, H * 0.75, 30, 18, 0.4, 0, TAU); c.fill();
+        // a door behind, left of the streamer, with a small window onto the lit corridor (drawn per frame)
+        const dx = W * 0.215, dy = H * 0.24, dw = W * 0.1, dh = H * 0.66;
+        c.fillStyle = 'rgba(45, 60, 58, 0.9)'; c.fillRect(dx, dy, dw, dh);
+        c.strokeStyle = 'rgba(20, 28, 26, 0.95)'; c.lineWidth = 4 * u; c.strokeRect(dx, dy, dw, dh);
+        c.fillStyle = 'rgba(150, 160, 160, 0.8)'; c.fillRect(dx + dw * 0.78, dy + dh * 0.5, dw * 0.12, 5 * u); // handle
+        extra.window = [dx + dw * 0.2, dy + dh * 0.1, dw * 0.6, dh * 0.2];
+        c.fillStyle = 'rgba(5, 10, 8, 1)'; c.fillRect(extra.window[0], extra.window[1], extra.window[2], extra.window[3]);
+        // a wheelchair in front of the curtain
+        const wx = W * 0.79, wy = H * 0.98;
+        c.strokeStyle = 'rgba(30, 34, 36, 0.95)'; c.lineWidth = 5 * u;
+        c.beginPath(); c.arc(wx, wy - 50 * u, 46 * u, 0, TAU); c.stroke();
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; c.beginPath(); c.moveTo(wx, wy - 50 * u); c.lineTo(wx + Math.cos(a) * 44 * u, wy - 50 * u + Math.sin(a) * 44 * u); c.stroke(); }
+        c.lineWidth = 7 * u;
+        c.beginPath(); c.moveTo(wx - 30 * u, wy - 150 * u); c.lineTo(wx - 20 * u, wy - 70 * u); c.lineTo(wx + 50 * u, wy - 70 * u); c.lineTo(wx + 60 * u, wy - 20 * u); c.stroke();
+        c.beginPath(); c.moveTo(wx - 30 * u, wy - 150 * u); c.lineTo(wx - 45 * u, wy - 150 * u); c.stroke();
+        c.beginPath(); c.arc(wx + 62 * u, wy - 10 * u, 9 * u, 0, TAU); c.stroke();
+        // a bloody handprint dragged down the curtain
+        c.fillStyle = 'rgba(120, 15, 15, 0.45)';
+        const hx = W * 0.9, hy = H * 0.42;
+        c.beginPath(); c.ellipse(hx, hy, 16 * u, 20 * u, 0.1, 0, TAU); c.fill();
+        for (let i = 0; i < 4; i++) { c.beginPath(); c.ellipse(hx - 12 * u + i * 8 * u, hy - 28 * u - (i % 3) * 4 * u, 4 * u, 11 * u, -0.2 + i * 0.12, 0, TAU); c.fill(); }
+        c.fillRect(hx - 8 * u, hy + 10 * u, 5 * u, H * 0.12); c.fillRect(hx + 2 * u, hy + 12 * u, 4 * u, H * 0.08);
+        // a clipboard under the monitor
+        c.fillStyle = 'rgba(70, 55, 35, 0.9)'; c.fillRect(W * 0.04, H * 0.53, W * 0.05, H * 0.09);
+        c.fillStyle = 'rgba(220, 225, 215, 0.6)'; c.fillRect(W * 0.045, H * 0.545, W * 0.04, H * 0.07);
+        extra.iv = [W * 0.17 - W * 0.029, H * 0.26];
         vignette('rgba(0, 18, 10, 0.72)');
       } else if (scene === 'winter') {
         // Christmas Pack: a frozen winter night round the streamer. Dark pine trees with string lights at the sides
@@ -1491,7 +1711,7 @@
         vignette('rgba(0, 8, 25, 0.75)');
         return { cv, key: scene + W, lights: lights.filter(([lx, ly]) => !(lx > sx && ly > sg - 135 * v)), eyes, breath }; // no bulbs over the sleigh
       }
-      return { cv, key: scene + W };
+      return { cv, key: scene + W, ...extra };
     }
 
     // Void: dark swirling holes in the room. Before a creature comes out its hole pulses; then it opens wide,
@@ -2070,6 +2290,7 @@
     // Santa caught you: the gift sack swings in from the side and slams into your face, presents fly everywhere.
     drawSackSlam(now, W, H) {
       const ctx = this.ctx, t = now - this.t0, hit = 480;
+      if (t > hit && !this.hitDone) { this.hitDone = true; MC.sfx.thud(); }
       const b = this.eatBox ? { x: 1 - this.eatBox.x - this.eatBox.w, y: this.eatBox.y, w: this.eatBox.w, h: this.eatBox.h } : { x: 0.3, y: 0.25, w: 0.4, h: 0.5 };
       const fx = (b.x + b.w / 2) * W, fy = (b.y + b.h / 2) * H;
       ctx.save();
@@ -2102,6 +2323,7 @@
     // Rudolf caught you: he charges straight at the camera, antlers first, red nose blazing; the screen cracks.
     drawAntlerCharge(now, W, H) {
       const ctx = this.ctx, t = now - this.t0, hit = 450;
+      if (t > hit && !this.hitDone) { this.hitDone = true; MC.sfx.crack(); }
       const k = Math.min(1, t / hit), s = lerp(H * 0.08, H * 0.75, k * k * k), cx = W / 2, cy = H * 0.55;
       ctx.save();
       if (t > hit && t < hit + 400) ctx.translate(rand(-18, 18), rand(-18, 18));
@@ -2141,6 +2363,7 @@
     // The zombie caught you: rotting hands reach up from the bottom of the screen and grab your face; green flash.
     drawZombieGrab(now, W, H) {
       const ctx = this.ctx, t = now - this.t0, grab = 520;
+      if (t > grab && !this.hitDone) { this.hitDone = true; MC.sfx.groan(0.9, 1); }
       const b = this.eatBox ? { x: 1 - this.eatBox.x - this.eatBox.w, y: this.eatBox.y, w: this.eatBox.w, h: this.eatBox.h } : { x: 0.3, y: 0.25, w: 0.4, h: 0.5 };
       const fx = (b.x + b.w / 2) * W, fy = (b.y + b.h / 2) * H, fw = Math.max(b.w * W, W * 0.2);
       const k = Math.min(1, t / grab), e = 1 - (1 - k) ** 3;

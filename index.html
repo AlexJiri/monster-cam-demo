@@ -116,6 +116,30 @@
   /* Buy: the most visible button on every card that isn't owned yet. */
   a.buy, button.buy { display: inline-block; background: linear-gradient(180deg, #ffd166 0%, #e0a21c 100%); color: #1b1200; font-weight: 800; border: 0; border-radius: 10px; padding: 9px 18px; text-decoration: none; box-shadow: 0 4px 18px rgba(242, 193, 78, 0.28); }
   a.buy:hover, button.buy:hover { filter: brightness(1.08); }
+  /* Store tiles: cover on top, short text, Owned / price on the cover. */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .tile[data-lobby-game] { cursor: pointer; }
+  .tile[data-lobby-game]:hover { border-color: #6b4a30; }
+  .tile .cover { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(135deg, #22263a, #12141b) center / cover; display: grid; place-items: center; }
+  .tile .cover .big { font-size: 54px; opacity: 0.55; }
+  .tile.soon { opacity: 0.65; }
+  .tag { position: absolute; top: 8px; left: 8px; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 10px; background: rgba(0, 0, 0, 0.7); color: #fff; }
+  .tag.ok { color: var(--moss); }
+  .tag.price { background: var(--lamp); color: #1b1200; }
+  .tag.packs { left: auto; right: 8px; }
+  .tile .tb { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .tile h3 { margin: 0; font-size: 16px; }
+  .tile p { margin: 0; font-size: 13px; color: #c3c7d1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tile .note { font-size: 12px; color: var(--muted); }
+  .tile .acts { margin-top: auto; padding-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tile .acts .primary, .tile .acts .buy { padding: 7px 14px; font-size: 14px; }
+  .hero { aspect-ratio: 21 / 8; border-radius: 14px; background: center 20% / cover; margin-bottom: 12px; border: 1px solid var(--line); }
+  .strip { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-radius: 14px; background: linear-gradient(110deg, #3d2c08 0%, #241a36 60%, #171a22 100%); border: 1px solid #7a5a16; }
+  .strip .ic { font-size: 30px; }
+  .strip > div { flex: 1; min-width: 200px; }
+  .strip p { margin: 2px 0 0; color: #d8cfe0; font-size: 14px; }
+  .strip .keyLink { flex-basis: 100%; text-align: left; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; color: #d6d9e0; }
   .chip.new { border-color: #24453a; }
@@ -129,6 +153,14 @@
   .duelForm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .duelForm input { width: 11em; text-transform: uppercase; letter-spacing: 2px; font-size: 16px; padding: 6px 8px; }
   .duelForm input::placeholder { text-transform: none; letter-spacing: 0; }
+  .duelCode { font: 700 44px/1.1 ui-monospace, Consolas, monospace; letter-spacing: 10px; color: var(--lamp); background: #0d0f14; border: 1px dashed var(--lamp); border-radius: 12px; padding: 10px 18px; align-self: flex-start; }
+  .duelBox { background: #1d1530; border: 1px solid #4a3a72; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .duelBox .row { justify-content: space-between; }
+  .duelBox .code { color: var(--lamp); letter-spacing: 2px; font-size: 16px; }
+  .duelBox .hint { margin: 4px 0 0; }
+  .pill.duelHud { background: rgba(60, 30, 110, 0.85); }
+  .duelResult { display: block; font-size: 22px; margin-bottom: 4px; }
+  .duelResult.won { color: var(--moss); } .duelResult.lost { color: #ff8a8d; } .duelResult.draw { color: var(--lamp); }
   .back { background: transparent; border: 0; color: var(--muted); padding: 0; margin: 0 0 12px; font-size: 15px; }
   .back:hover { color: var(--text); }
   .askBox { position: relative; }
@@ -302,6 +334,7 @@
     <div class="hud">
       <span class="pill lives" id="lives"></span>
       <span class="pill timer" id="timer" hidden></span>
+      <span class="pill duelHud" id="duelHud" hidden></span>
       <span class="pill" id="status">Camera off</span>
     </div>
     <div class="helpers">
@@ -338,6 +371,7 @@
     </section>
     <section class="step" id="step3">
       <h2><b>3</b> Play</h2>
+      <div class="duelBox" id="duelBox" hidden></div>
       <div class="picker" id="pickMonster" role="group" aria-label="Monster"></div>
       <div class="picker" id="pickScene" role="group" aria-label="Scene"></div>
       <p class="hint pickAbout" id="pickAbout"></p>
@@ -373,15 +407,16 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1795037836"></script>
-<script src="src/settings.js?v=1795037836"></script>
-<script src="src/events.js?v=1795037836"></script>
-<script src="src/face.js?v=1795037836"></script>
-<script src="src/curses.js?v=1795037836"></script>
-<script src="src/sfx.js?v=1795037836"></script>
-<script src="src/mic.js?v=1795037836"></script>
-<script src="src/lightson.js?v=1795037836"></script>
-<script src="src/live.js?v=1795037836"></script>
+<script src="src/edition.js?v=1795039429"></script>
+<script src="src/duel.js?v=1795039429"></script>
+<script src="src/settings.js?v=1795039429"></script>
+<script src="src/events.js?v=1795039429"></script>
+<script src="src/face.js?v=1795039429"></script>
+<script src="src/curses.js?v=1795039429"></script>
+<script src="src/sfx.js?v=1795039429"></script>
+<script src="src/mic.js?v=1795039429"></script>
+<script src="src/lightson.js?v=1795039429"></script>
+<script src="src/live.js?v=1795039429"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -462,6 +497,10 @@
     catches.push({ by, why });
     banner(by ? `🩸 ${esc(by)} got the streamer!` : '🩸 The hunter got the streamer!');
     log(`🩸 Caught: ${why}${by ? ` (thanks to ${esc(by)})` : ''}. Lives left: ${lives}`);
+    if (DU.state === 'running') {
+      MC.duel.send('lives', { lives, max: S.lives });
+      if (!lives) { DU.result = 'lost'; MC.duel.send('end', { lost: true }); }
+    }
     if (!lives) setTimeout(() => endRound(false), 1600);
     else if (S.reviveSeconds > 0) setTimeout(() => banner(`💫 Revived! Safe for ${S.reviveSeconds} s`, true), 1400);
     return true;
@@ -581,6 +620,152 @@
   let calWasOn = false;
   let starting = false;
 
+  // ---------- Duel ----------
+  // Two streamers, same game, each with their own monster, scene and viewers. Both press ⚔️ Ready, the host starts
+  // a countdown for both, and the round runs on each side with the host's length. During it, every gift that would
+  // hurt the streamer goes to the opponent instead (chains and cleanses stay home). Lives are shared as they change;
+  // losing the last life loses the duel, and at the end of the time more lives wins. A free player needs a free round
+  // left on the game (the duel round uses it). State: off | waiting (hosting, nobody yet) | paired | countdown |
+  // running. DU.result: won | lost | draw (for the result screen).
+  const DU = { state: 'off', opponent: '', oppMonster: '', oppLives: null, oppMax: 0, meReady: false, themReady: false, seconds: 0, result: null, link: true };
+  const myName = () => (liveUser || $('ttUser').value.trim() || 'Streamer').replace(/^@/, '');
+  const duelCanPlay = () => ED.owns(ED.GAME) || ED.DEV || ED.rounds.left() > 0;
+  function renderDuel() {
+    const on = DU.state !== 'off';
+    $('duelBox').hidden = !on;
+    $('duelHud').hidden = !on || !DU.opponent;
+    if (on) {
+      const opp = DU.opponent ? '@' + esc(DU.opponent) : 'your opponent';
+      const status = !DU.link ? '📡 Reconnecting to the duel…'
+        : DU.state === 'waiting' ? `Waiting for your opponent. Your code: <b class="code">${esc(MC.duel.code || '')}</b>`
+        : DU.state === 'paired' ? (DU.meReady ? `Waiting for ${opp} to press Ready…` : `Pick your monster and scene, then press ⚔️ Ready.${DU.themReady ? ` ${opp} is ready!` : ''}`)
+        : DU.state === 'countdown' ? 'Get ready…' : 'Duel on: your viewers\' gifts hit your opponent.';
+      $('duelBox').innerHTML = `<div class="row"><b>⚔️ Duel vs ${opp}</b>${DU.oppMonster ? `<span class="hint" style="margin:0">${esc(DU.oppMonster)}</span>` : ''}<button data-duel-leave>Leave</button></div><p class="hint">${status}</p>`;
+      const n = DU.oppLives, max = DU.oppMax || S.lives;
+      $('duelHud').textContent = `⚔️ ${DU.opponent ? '@' + DU.opponent : ''} ${n == null ? '' : '❤️'.repeat(n) + '🖤'.repeat(Math.max(0, max - n))}`;
+    }
+    // Without a TikTok LIVE connected, the test viewer buttons let a duel be tried out by hand.
+    if (!PREVIEW) $('testBox').hidden = !(on && !liveUser);
+    if (!round.running) $('roundBtn').textContent = DU.state === 'paired' ? (DU.meReady ? '✋ Not ready' : '⚔️ Ready') : DU.state === 'waiting' ? '⚔️ Waiting…' : '▶ Start round';
+    updateRoundBtn();
+  }
+  function toggleReady() {
+    if (!DU.meReady && !duelCanPlay()) { noRoundsLeft(ED.rounds.nextAt()); return; }
+    DU.meReady = !DU.meReady;
+    const m = ED.CONTENT[S.monster] || {};
+    MC.duel.send(DU.meReady ? 'ready' : 'unready', { monster: `${m.icon || ''} ${m.name || ''}`.trim() });
+    renderDuel();
+    if (DU.meReady && DU.themReady && MC.duel.isHost) beginDuel();
+  }
+  // The host starts both rounds.
+  function beginDuel() {
+    MC.duel.send('start', { seconds: S.roundSeconds });
+    countdown(S.roundSeconds);
+  }
+  function countdown(seconds) {
+    DU.state = 'countdown'; DU.seconds = seconds; DU.result = null; DU.oppLives = null;
+    renderDuel(); hideNotice();
+    let n = 3;
+    notice(`⚔️ Duel vs @${esc(DU.opponent)}<big>${n}</big>`);
+    MC.sfx.click();
+    const t = setInterval(() => {
+      if (--n > 0) { notice(`⚔️ Duel vs @${esc(DU.opponent)}<big>${n}</big>`); MC.sfx.click(); return; }
+      clearInterval(t);
+      if (DU.state !== 'countdown') return; // left during the countdown
+      DU.state = 'running'; DU.meReady = DU.themReady = false;
+      renderDuel();
+      startRound();
+    }, 1000);
+  }
+  // After a duel round: back to "paired" for a rematch (or off if the opponent left).
+  function duelOver() {
+    if (DU.state === 'off') return;
+    DU.state = MC.duel.active && DU.opponent ? 'paired' : 'off';
+    DU.meReady = DU.themReady = false;
+    renderDuel();
+  }
+  function duelReset() {
+    Object.assign(DU, { state: 'off', opponent: '', oppMonster: '', oppLives: null, oppMax: 0, meReady: false, themReady: false, link: true });
+    renderDuel();
+    if (!$('lobby').hidden) renderLobby();
+  }
+  MC.duel.on('link', (up) => { DU.link = up; renderDuel(); });
+  MC.duel.on('hello', (d) => {
+    if (d.opponent) DU.opponent = d.opponent;
+    if (DU.state === 'off' || DU.state === 'waiting') DU.state = DU.opponent ? 'paired' : 'waiting';
+    renderDuel();
+  });
+  MC.duel.on('joined', (d) => {
+    DU.opponent = d.name; DU.state = 'paired';
+    banner(`⚔️ @${esc(d.name)} joined your duel!`, true); MC.sfx.growl(0.6, 0.7);
+    log(`⚔️ @${esc(d.name)} joined the duel. Pick your monster and scene, then press Ready.`);
+    renderDuel();
+    if (!$('lobby').hidden) { renderLobby(); setTimeout(closeLobby, 1500); }
+  });
+  MC.duel.on('ready', (d) => {
+    DU.themReady = true; DU.oppMonster = d.monster || '';
+    feed(`⚔️ @${esc(DU.opponent)} is ready${d.monster ? ` with ${esc(d.monster)}` : ''}`);
+    renderDuel();
+    if (DU.meReady && MC.duel.isHost && DU.state === 'paired') beginDuel();
+  });
+  MC.duel.on('unready', () => { DU.themReady = false; renderDuel(); });
+  MC.duel.on('start', (d) => { if (DU.state === 'paired') countdown(Math.max(30, Math.min(900, +d.seconds || 300))); });
+  MC.duel.on('attack', (d) => {
+    if (DU.state !== 'running' || !round.running) return;
+    const users = [].concat(d.users || []).slice(0, 3).map((u) => `${String(u).slice(0, 24)} (@${DU.opponent})`);
+    applyEffect(String(d.effect || ''), users.length ? users : [`@${DU.opponent}`], String(d.what || 'a gift').slice(0, 40), true);
+  });
+  MC.duel.on('lives', (d) => { DU.oppLives = Math.max(0, Math.min(9, +d.lives || 0)); DU.oppMax = Math.max(1, Math.min(9, +d.max || S.lives)); renderDuel(); });
+  MC.duel.on('end', (d) => {
+    if (DU.state !== 'running') return;
+    if (d.lost) { DU.result = 'won'; banner(`🏆 @${esc(DU.opponent)} ${d.why === 'gave up' ? 'gave up' : 'was eaten'}!`, true); if (round.running) endRound(true); else duelOver(); }
+  });
+  MC.duel.on('left', (d) => {
+    const who = DU.opponent ? '@' + esc(DU.opponent) : 'Your opponent';
+    if (d && d.why === 'gone' && !DU.opponent) { log('⚔️ That duel is no longer on the server.'); MC.duel.leave(); duelReset(); return; }
+    feed(`⚔️ ${who} left the duel`); log(`⚔️ ${who} left the duel.${round.running ? ' This round goes on as a normal round.' : ''}`);
+    if (DU.state === 'running' && round.running) { DU.result = 'won'; endRound(true); }
+    DU.opponent = ''; DU.oppLives = null;
+    MC.duel.leave(); duelReset();
+  });
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-duel-leave]')) {
+      if (DU.state === 'running' && round.running && !(await ask('Leave the duel?<small>The round goes on as a normal round; your opponent wins the duel.</small>', 'Leave the duel', 'Stay'))) return;
+      if (DU.state === 'running') MC.duel.send('end', { lost: true, why: 'gave up' });
+      await MC.duel.leave(); DU.result = null; duelReset(); log('⚔️ You left the duel.');
+      return;
+    }
+    if (e.target.closest('[data-duel-host]')) {
+      const msg = $('duelMsg');
+      if (!duelCanPlay()) { msg.textContent = '❌ No free rounds left today for this game. A duel round uses one.'; return; }
+      msg.textContent = 'Creating the duel…';
+      try { await MC.duel.host(myName()); DU.state = 'waiting'; renderDuel(); renderLobby(); }
+      catch (err) { msg.textContent = '⚠️ ' + err.message; }
+      return;
+    }
+    if (e.target.closest('[data-duel-join]')) {
+      const msg = $('duelMsg'), code = $('duelCode').value.trim();
+      if (!/^[a-z0-9]{5}$/i.test(code)) { msg.textContent = 'Type the 5-letter code your opponent gave you.'; $('duelCode').focus(); return; }
+      if (!duelCanPlay()) { msg.textContent = '❌ No free rounds left today for this game. A duel round uses one.'; return; }
+      msg.textContent = 'Joining…';
+      try {
+        DU.opponent = await MC.duel.join(code, myName()); DU.state = 'paired';
+        renderDuel(); closeLobby();
+        banner(`⚔️ You joined @${esc(DU.opponent)}'s duel!`, true);
+        log(`⚔️ Joined @${esc(DU.opponent)}'s duel. Pick your monster and scene, then press Ready.`);
+      } catch (err) { msg.textContent = '⚠️ ' + err.message; }
+      return;
+    }
+    if (e.target.closest('[data-duel-copy]')) {
+      try { await navigator.clipboard.writeText(MC.duel.code); e.target.closest('[data-duel-copy]').textContent = '✓ Copied'; } catch (err) {}
+      return;
+    }
+    if (e.target.closest('[data-duel-go]')) closeLobby();
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'duelCode') document.querySelector('[data-duel-join]').click(); });
+  // Back from Settings in the middle of a duel: reconnect to it.
+  if (!PREVIEW && MC.duel.resume()) { DU.state = 'waiting'; log('⚔️ Reconnecting to your duel…'); }
+
   // ---------- Monster and scene, picked next to Start round ----------
   // Start round stays grey until both are picked (each time the game is opened from the lobby). The test round
   // starts with the last ones picked. A pack's monster or scene not bought shows a lock: playable while it has a
@@ -593,7 +778,7 @@
     return base.concat(...Object.values(ED.PACKS).filter((p) => p.game === ED.GAME).map((p) => p[kind + 's']));
   };
   function updateRoundBtn() {
-    $('roundBtn').disabled = !round.running && (!camReady || !picked.monster || !picked.scene);
+    $('roundBtn').disabled = !round.running && (!camReady || !picked.monster || !picked.scene || DU.state === 'waiting' || DU.state === 'countdown');
   }
   function renderPicker() {
     for (const kind of ['monster', 'scene']) {
@@ -672,27 +857,38 @@
       ${!owned && counter ? `<span class="note">${roundsNote(counter)} · watermark on stream</span>` : ''}
       <div class="acts">${acts}${page ? '' : '<button data-lobby-game-open>More ›</button>'}</div>${owned || !known ? '' : keyLink(c)}</div>`;
   }
-  function packCard(c) {
-    const pack = ED.PACKS[c.id];
-    if (!pack) return ''; // a pack this version of the app doesn't have yet
-    const owned = ED.owns(pack.product);
-    const left = pack.rounds.left();
-    const play = `<button ${owned ? 'class="primary" ' : ''}data-lobby-pack="${esc(pack.id)}" ${owned || left > 0 ? '' : 'disabled'}>▶ ${owned ? 'Play' : 'Try'} it</button>`;
-    return `<div class="card pack">${owned ? '<span class="badge ok">✓ Owned</span>' : '<span class="badge lock">Pack</span>'}
-      <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
-      ${chips(pack.monsters.concat(pack.scenes), 'new')}
-      ${owned ? '' : `<span class="note">${roundsNote(pack.rounds, 'free try today')}</span>`}
-      <div class="acts">${play}${owned ? '' : buyBtn(c)}</div>${owned ? '' : keyLink(c)}</div>`;
-  }
-  function bundleCard(c) {
-    const owned = ED.owns(c.id);
-    return `<div class="card bundle${c.id === 'founder' ? ' founder' : ''}">${owned ? '<span class="badge ok">✓ Owned</span>' : `<span class="badge lock">${c.id === 'founder' ? 'Limited time' : 'Bundle'}</span>`}
-      <h2><span class="ic">${esc(c.icon || '🎁')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p>
-      ${owned ? '' : `<div class="acts">${buyBtn(c)}</div>${keyLink(c)}`}</div>`;
-  }
-  const soonCard = (c) => `<div class="card soon"><span class="badge">Coming soon</span><h2><span class="ic">${esc(c.icon || '🎮')}</span>${esc(c.title)}</h2><p>${esc(c.blurb || '')}</p></div>`;
-  const founderBanner = () => cardsOf('bundle').filter((c) => c.id === 'founder' && !ED.owns('founder')).map(bundleCard).join('');
+  // Founder Pass as one slim strip on top (gone once owned).
+  const founderBanner = () => cardsOf('bundle').filter((c) => c.id === 'founder' && !ED.owns('founder')).map((c) =>
+    `<div class="strip"><span class="ic">${esc(c.icon || '👑')}</span><div><b>${esc(c.title)}</b><p>${esc(c.blurb || '')}</p></div>${buyBtn(c)}${keyLink(c)}</div>`).join('');
   const grid = (html) => (html ? `<div class="cards">${html}</div>` : '');
+  const tiles = (html) => (html ? `<div class="tiles">${html}</div>` : '');
+  // A cover picture: the catalog's own (set on the server) or the one that comes with the app.
+  const coverOf = (c) => (/^https:\/\//.test(c.cover || '') ? c.cover : ED.COVERS[c.id] || '');
+  // The store's compact tile: cover, title, two lines of text, Owned / price, what to do. A game's tile opens its
+  // page (its packs are only listed there, so the store stays short however many there are).
+  function tile(c) {
+    const soon = c.kind === 'soon', pack = c.kind === 'pack' ? ED.PACKS[c.id] : null;
+    if (c.kind === 'pack' && !pack) return ''; // a pack this version of the app doesn't have yet
+    const known = c.kind === 'game' ? ED.GAMES[c.id] : null;
+    const owned = !soon && ED.owns(pack ? pack.product : c.id);
+    const counter = pack ? pack.rounds : c.id === ED.GAME ? ED.rounds : null;
+    const packsN = c.kind === 'game' ? cardsOf('pack').filter((p) => ED.PACKS[p.id] && ED.PACKS[p.id].game === c.id).length : 0;
+    const cover = coverOf(c);
+    const tag = soon ? '<span class="tag">Coming soon</span>' : owned ? '<span class="tag ok">✓ Owned</span>'
+      : c.kind === 'game' ? '<span class="tag">Free to try</span>' : `<span class="tag price">${c.price ? esc(c.price) : c.kind === 'pack' ? 'Pack' : 'Bundle'}</span>`;
+    let acts = '';
+    if (c.kind === 'game') {
+      acts = !known ? '<span class="note">Update the app to play it.</span>' : owned ? '<button class="primary" data-lobby-play>▶ Play</button>'
+        : `<button class="primary" data-lobby-play ${counter && counter.left() > 0 ? '' : 'disabled'}>▶ Try free</button>${buyBtn(c)}`;
+    } else if (pack) {
+      acts = `<button ${owned ? 'class="primary" ' : ''}data-lobby-pack="${esc(pack.id)}" ${owned || pack.rounds.left() > 0 ? '' : 'disabled'}>▶ ${owned ? 'Play' : 'Try'}</button>${owned ? '' : buyBtn(c)}`;
+    } else if (!soon && !owned) acts = buyBtn(c);
+    return `<div class="tile ${c.kind}"${c.kind === 'game' ? ` data-lobby-game="${esc(c.id)}"` : ''}>
+      <div class="cover"${cover ? ` style="background-image:url('${esc(cover)}')"` : ''}>${cover ? '' : `<span class="big">${esc(c.icon || '🎮')}</span>`}${tag}${packsN ? `<span class="tag packs">+${packsN} pack${packsN > 1 ? 's' : ''}</span>` : ''}</div>
+      <div class="tb"><h3>${esc(c.icon || '')} ${esc(c.title)}</h3><p>${esc(c.blurb || '')}</p>
+      ${!owned && counter && !soon ? `<span class="note">${roundsNote(counter, pack ? 'free try today' : 'free rounds today')}</span>` : ''}
+      ${acts ? `<div class="acts">${acts}</div>` : ''}${!soon && !owned && (known || pack || c.kind === 'bundle') ? keyLink(c) : ''}</div></div>`;
+  }
 
   const LOBBY_VIEWS = {
     mine() {
@@ -701,41 +897,61 @@
         return `<div class="empty"><b>No games yet</b>The games and packs you buy show up here.<br>
           <button class="primary" data-lobby-tab="free">🆓 Try a game for free</button> <button data-key-dlg>🔑 I have a key</button></div>`;
       }
-      return grid(games.map((c) => gameCard(c)).join('')) + (packs.length ? `<h3 class="sec">Packs</h3>${grid(packs.map(packCard).join(''))}` : '');
+      return tiles(games.concat(packs).map(tile).join(''));
     },
     free() {
       const games = cardsOf('game').filter((c) => !ED.owns(c.id));
       if (!games.length) return '<div class="empty"><b>You own every game 🎉</b>Thank you! New ones show up here first.</div>';
       return `<p class="lead">${roundsRule()[0].toUpperCase() + roundsRule().slice(1)}. The free version shows a watermark on stream.</p>` +
-        grid(games.map((c) => gameCard(c)).join(''));
+        tiles(games.map(tile).join(''));
     },
+    // The store: games (their packs are on their page), bundles, then what's coming.
     all() {
       const bundles = cardsOf('bundle').filter((c) => c.id !== 'founder');
-      return grid(founderBanner()) +
-        `<h3 class="sec">Games</h3>${grid(cardsOf('game').map((c) => gameCard(c)).join(''))}` +
-        (cardsOf('pack').length ? `<h3 class="sec">Packs</h3>${grid(cardsOf('pack').map(packCard).join(''))}` : '') +
-        (bundles.length ? `<h3 class="sec">Bundles</h3>${grid(bundles.map(bundleCard).join(''))}` : '') +
-        (cardsOf('soon').length ? `<h3 class="sec">Coming soon</h3>${grid(cardsOf('soon').map(soonCard).join(''))}` : '');
+      return founderBanner() +
+        `<h3 class="sec">Games</h3>${tiles(cardsOf('game').map(tile).join(''))}` +
+        (bundles.length ? `<h3 class="sec">Bundles</h3>${tiles(bundles.map(tile).join(''))}` : '') +
+        (cardsOf('soon').length ? `<h3 class="sec">Coming soon</h3>${tiles(cardsOf('soon').map(tile).join(''))}` : '');
     },
+    // Duel: host (get a code) or join (type the opponent's code). Same game on both sides; the free version too, while
+    // it has a free round left (the duel round uses it).
     duel() {
-      const games = cardsOf('game').filter((c) => ED.GAMES[c.id] && ED.GAMES[c.id].duel);
-      return `<div class="cards"><div class="card duel"><span class="badge">Coming soon</span>
-        <h2><span class="ic">⚔️</span>Duel</h2>
-        <p>Challenge another streamer playing the same game. Your viewers' gifts send the monster to your opponent, theirs send it to you. The last one standing wins.</p>
-        <span class="note">Free version too: hosting or joining a duel uses one of that game's free rounds.</span>
-        <p class="what">Game</p><div class="chips">${games.map((c) => `<span class="chip">${esc(c.icon || '')} ${esc(c.title)}</span>`).join('')}</div>
-        <div class="acts"><button class="primary" disabled>⚔️ Host a duel</button>
-        <span class="duelForm"><input type="text" placeholder="Invite code" aria-label="Invite code" disabled><button disabled>Join</button></span></div>
-        </div></div>`;
+      const game = cardsOf('game').find((c) => c.id === ED.GAME) || { title: 'Lights On', icon: '🔦' };
+      const opp = DU.opponent ? '@' + esc(DU.opponent) : '';
+      const head = `<h2><span class="ic">⚔️</span>Duel · ${esc(game.icon || '')} ${esc(game.title)}</h2>`;
+      if (DU.state === 'waiting') {
+        return `<div class="cards"><div class="card duel">${head}
+          <p>Give this code to your opponent: say it on your live or send it in a message. They type it in their Duel tab.</p>
+          <div class="duelCode">${esc(MC.duel.code || '')}</div>
+          <div class="acts"><button data-duel-copy>📋 Copy code</button><button data-duel-leave>Cancel</button></div>
+          <span class="note">⏳ Waiting for your opponent… You can go to the game meanwhile: pick your monster and scene.</span>
+          <div class="acts"><button class="primary" data-duel-go>▶ To the game</button></div></div></div>`;
+      }
+      if (DU.state !== 'off') {
+        return `<div class="cards"><div class="card duel">${head}<p>⚔️ You're in a duel with <b>${opp || 'your opponent'}</b>.</p>
+          <div class="acts"><button class="primary" data-duel-go>▶ To the game</button><button data-duel-leave>Leave the duel</button></div></div></div>`;
+      }
+      const can = duelCanPlay();
+      return `<div class="cards"><div class="card duel">${head}
+        <p>Challenge another streamer playing the same game. Your viewers' gifts send the monster to your opponent, theirs send it to you. Each of you picks your own monster and scene. Lose all your lives and you lose; at the end of the time, more lives wins.</p>
+        <span class="note">${can ? (ED.owns(ED.GAME) || ED.DEV ? '✓ Unlimited duels with the full version.' : `Free version too: a duel round uses one of your free rounds (${ED.rounds.left()} left today).`) : '❌ No free rounds left today. A duel round uses one.'}</span>
+        <h3 class="sec">Start a duel</h3>
+        <div class="acts"><button class="primary" data-duel-host ${can ? '' : 'disabled'}>⚔️ Host a duel</button><span class="note">You get a code to give your opponent.</span></div>
+        <h3 class="sec">Join a duel</h3>
+        <div class="acts duelForm"><input type="text" id="duelCode" placeholder="Code, e.g. K7P2Q" maxlength="5" autocomplete="off" spellcheck="false" aria-label="Duel code"><button class="primary" data-duel-join ${can ? '' : 'disabled'}>Join</button></div>
+        <p class="hint" id="duelMsg" role="status"></p>
+        <span class="note">Tip: connect your TikTok LIVE first, so your opponent sees your username.</span>
+      </div></div>`;
     },
     // A game's own page: what's in it, its packs, play / try / buy.
     game(id) {
       const c = cardsOf('game').find((x) => x.id === id);
       if (!c) return LOBBY_VIEWS.all();
       const packs = cardsOf('pack').filter((p) => ED.PACKS[p.id] && ED.PACKS[p.id].game === id);
-      return `<button class="back" data-lobby-back>‹ Back</button>${grid(gameCard(c, true))}` +
-        (packs.length ? `<h3 class="sec">Packs for ${esc(c.title)}</h3>${grid(packs.map(packCard).join(''))}` : '') +
-        (founderBanner() ? `<h3 class="sec">Get everything</h3>${grid(founderBanner())}` : '');
+      const cover = coverOf(c);
+      return `<button class="back" data-lobby-back>‹ Back</button>${cover ? `<div class="hero" style="background-image:url('${esc(cover)}')"></div>` : ''}${grid(gameCard(c, true))}` +
+        (packs.length ? `<h3 class="sec">Packs for ${esc(c.title)}</h3>${tiles(packs.map(tile).join(''))}` : '') +
+        (founderBanner() ? `<h3 class="sec">Get everything</h3>${founderBanner()}` : '');
     },
   };
   function renderLobby() {
@@ -872,7 +1088,11 @@
       if (r.allowed && pack) await pack.rounds.use(liveUser);
       starting = false;
       renderEdition();
-      if (!r.allowed) { noRoundsLeft(r.nextAt); return; }
+      if (!r.allowed) {
+        noRoundsLeft(r.nextAt);
+        if (DU.state === 'running') { DU.result = 'lost'; MC.duel.send('end', { lost: true, why: 'no free rounds' }); duelOver(); }
+        return;
+      }
     }
     MC.sfx.unlock();
     lives = S.lives; renderLives();
@@ -887,7 +1107,8 @@
     // No calibrating mid-round: it would cover the game with its messages.
     calWasOn = !$('calBtn').disabled; $('calBtn').disabled = true;
     reviveUntil = 0;
-    round.ends = performance.now() + (PREVIEW ? PREVIEW_SECONDS : S.roundSeconds) * 1000;
+    round.ends = performance.now() + (PREVIEW ? PREVIEW_SECONDS : DU.state === 'running' ? DU.seconds : S.roundSeconds) * 1000;
+    if (DU.state === 'running') MC.duel.send('lives', { lives, max: S.lives });
     game.start(performance.now());
     $('timer').hidden = false;
     $('roundBtn').textContent = '■ Stop round';
@@ -910,7 +1131,7 @@
     renderLikes();
     $('timer').hidden = true;
     $('roundBtn').textContent = '▶ Start round';
-    renderPicker();
+    renderPicker(); renderDuel();
   }
   let finaleTimer = 0;
   function endRound(won) {
@@ -947,6 +1168,12 @@
       ? `<big>You survived!</big>${saved}${dare ? `<span class="dare">${esc(dare)}</span>` : ''}${acts}`
       : `<big>Eaten!</big><span class="dare">🏆 ${eater}</span>${who ? `<span class="catches">Caught by: ${who}</span>` : ''}${saved}${dare ? `<span class="dare">Dare: ${esc(dare)}</span>` : ''}${acts}`, won ? 'win' : 'lose');
     $('againBtn').onclick = startRound;
+    if (DU.result) {
+      const opp = '@' + esc(DU.opponent || 'opponent');
+      $('notice').insertAdjacentHTML('afterbegin', `<span class="duelResult ${DU.result}">${{ won: `⚔️ You beat ${opp}!`, lost: `⚔️ ${opp} wins the duel`, draw: `⚔️ Draw with ${opp}` }[DU.result]}</span>`);
+      duelOver();
+      if (DU.state === 'paired') { $('againBtn').textContent = '⚔️ Rematch'; $('againBtn').onclick = () => { hideNotice(); toggleReady(); }; }
+    }
     if (!PREVIEW) $('lobbyBtn').onclick = openLobby;
     $('notice').insertAdjacentHTML('afterbegin', '<button class="x" id="noticeX" aria-label="Close" title="Close">✕</button>');
     // Closing the result also gives the streamer their face back (no monster head, no bites).
@@ -954,7 +1181,10 @@
     log(won ? `🏆 Survived. ${esc(dare)}` : `💀 Eaten. Dare: ${esc(dare)}`);
   }
   $('roundBtn').onclick = () => {
-    if (round.running) { clearRound(); hideNotice(); log('■ Round stopped.'); }
+    if (round.running) {
+      if (DU.state === 'running') { MC.duel.send('end', { lost: true, why: 'gave up' }); DU.result = 'lost'; duelOver(); }
+      clearRound(); hideNotice(); log('■ Round stopped.');
+    } else if (DU.state === 'paired') toggleReady();
     else startRound();
   };
 
@@ -973,7 +1203,13 @@
       const secs = Math.ceil(left / 1000);
       $('timer').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
       $('timer').classList.toggle('low', left < 10000);
-      if (left <= 0 && lives) endRound(true);
+      if (left <= 0 && lives) {
+        if (DU.state === 'running') {
+          DU.result = DU.oppLives == null || lives > DU.oppLives ? 'won' : lives < DU.oppLives ? 'lost' : 'draw';
+          MC.duel.send('end', { lost: false, lives });
+          endRound(DU.result !== 'lost');
+        } else endRound(true);
+      }
     }
     // The game draws the active curses on the streamer: light on the eyes / mouth, the monster's ears, frost.
     game.curses = round.running ? curses.active.map((c) => ({ type: c.type, on: now >= c.starts })) : [];
@@ -1088,10 +1324,18 @@
   // What a gift (or a full taps bar) does. `users`: who sent it (the top tappers for taps).
   const TAPS = MC.settings.TAPS;
   const tapsRule = () => S.gifts.find((g) => g.gift === TAPS && g.every > 0) || null;
-  function applyEffect(effect, users, what) {
+  function applyEffect(effect, users, what, fromDuel = false) {
     const now = performance.now();
     const names = users.map(esc);
     const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}` : names[0];
+    // Duel: what would hurt the streamer goes to the opponent instead (chains and cleanses stay here).
+    if (!fromDuel && DU.state === 'running' && effect !== 'shield' && effect !== 'cleanse') {
+      MC.duel.send('attack', { effect, users, what });
+      banner(`⚔️ ${who} sent ${esc(what)} to @${esc(DU.opponent)}!`, true);
+      feed(`⚔️ <b>${who}</b> → @${esc(DU.opponent)}: ${esc(what)}`);
+      log(`⚔️ ${who} sent ${esc(what)} (${effect}) to @${esc(DU.opponent)}.`);
+      return;
+    }
     const by = users.join(' + '); // credit for catches
     if (effect === 'shield') { chain(users, now); return; }
     if (effect === 'cleanse') {

@@ -173,6 +173,9 @@
     lightson: { monsters: ['hunter', 'void', 'zombie'], scenes: ['none', 'basement', 'forest', 'hospital'], packs: ['xmas'], duel: true },
   };
 
+  // Cover pictures for the store (a catalog card's own `cover` link, set on the server, comes first).
+  const COVERS = { lightson: 'src/covers/lightson.jpg', xmas: 'src/covers/xmas.jpg' };
+
   // ---------- Packs ----------
   // Extra monsters and scenes for one game, sold apart (`product`: what their keys unlock). Until bought, a pack
   // can be tried for a round a day (counted apart from the game's free rounds, and on top of them).
@@ -255,7 +258,7 @@
   }
 
   MC.edition = {
-    VERSION, GAME, DEV, FREE_ROUNDS, FIRST_DAY_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, owns, license, rounds,
-    CONTENT, GAMES, PACKS, packFor, productOf, productName, catalog, checkVersion, watermark,
+    VERSION, GAME, DEV, FREE_ROUNDS, FIRST_DAY_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, owns, license, rounds, server,
+    CONTENT, GAMES, PACKS, COVERS, packFor, productOf, productName, catalog, checkVersion, watermark,
   };
 })(window.MC = window.MC || {});
