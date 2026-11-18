@@ -227,15 +227,15 @@
   </div>
 </div>
 
-<script src="src/edition.js?v=1794989059"></script>
-<script src="src/settings.js?v=1794989059"></script>
-<script src="src/events.js?v=1794989059"></script>
-<script src="src/face.js?v=1794989059"></script>
-<script src="src/curses.js?v=1794989059"></script>
-<script src="src/sfx.js?v=1794989059"></script>
-<script src="src/mic.js?v=1794989059"></script>
-<script src="src/lightson.js?v=1794989059"></script>
-<script src="src/live.js?v=1794989059"></script>
+<script src="src/edition.js?v=1794989687"></script>
+<script src="src/settings.js?v=1794989687"></script>
+<script src="src/events.js?v=1794989687"></script>
+<script src="src/face.js?v=1794989687"></script>
+<script src="src/curses.js?v=1794989687"></script>
+<script src="src/sfx.js?v=1794989687"></script>
+<script src="src/mic.js?v=1794989687"></script>
+<script src="src/lightson.js?v=1794989687"></script>
+<script src="src/live.js?v=1794989687"></script>
 <script>
   // The stage can move into the stream window, so look for its elements there too.
   const STAGE = document.querySelector('.stage');
@@ -340,8 +340,11 @@
     if (ED.DEV) { $('edition').innerHTML = `Developer copy ${v}: unlimited rounds (the free version gets ${ED.FREE_ROUNDS})`; return; }
     const left = ED.rounds.left();
     const next = ED.rounds.nextAt();
+    // The pack in use (Krampus or the winter scene picked): its own free rounds.
+    const pack = ED.packFor(S);
+    const packText = pack ? ` · 🎄 ${pack.rounds.left()}/${pack.rounds.max} ${esc(pack.name)} round today` : '';
     $('edition').innerHTML = `Free version ${v}: ${left}/${ED.FREE_ROUNDS} rounds left` +
-      (next ? ` · next free round ${when(next)}` : '') + upd + ' · <a href="#" data-key-open>Have a key?</a>';
+      (next ? ` · next free round ${when(next)}` : '') + packText + upd + ' · <a href="#" data-key-open>Have a key?</a>';
   }
   ED.checkVersion().then((r) => { update = r; renderEdition(); });
   setInterval(renderEdition, 30000); // the cooldown runs out while the page is open
@@ -357,6 +360,9 @@
   const KEY_FORM = '<div class="keyForm"><div class="row"><input type="text" placeholder="MC-XXXX-XXXX-XXXX" aria-label="License key" autocomplete="off" spellcheck="false"><button class="primary" data-unlock>Unlock</button></div><small class="keyMsg"></small></div>';
   function noRoundsLeft(nextAt) {
     notice(`No free rounds left<br><small>Next free round ${when(nextAt)}. The full version has unlimited rounds and no watermark.</small>${KEY_FORM}`);
+  }
+  function packUsedUp(pack) {
+    notice(`🎄 Today's free ${esc(pack.name)} round is used<br><small>Next one ${when(pack.rounds.nextAt())}. Pick another monster and scene in Settings to keep playing, or unlock the full version: the ${esc(pack.name)} is included.</small>${KEY_FORM}`);
   }
 
   // ---------- App update (desktop app) ----------
@@ -417,8 +423,14 @@
     if (!PREVIEW) {
       if (!canStartRound()) return;
       // Free version: uses a round online for the connected TikTok username (local count when offline).
+      // With a pack's monster or scene it also uses one of that pack's free rounds (checked first, so a
+      // used-up pack doesn't cost a normal round).
       starting = true;
+      const pack = ED.isPaid() || ED.DEV ? null : ED.packFor(S);
+      if (pack) await pack.rounds.refresh(liveUser);
+      if (pack && pack.rounds.left() <= 0) { starting = false; packUsedUp(pack); return; }
       const r = await ED.rounds.use(liveUser);
+      if (r.allowed && pack) await pack.rounds.use(liveUser);
       starting = false;
       renderEdition();
       if (!r.allowed) { noRoundsLeft(r.nextAt); return; }
@@ -735,9 +747,10 @@
       // Free rounds now count for this account online; the key (if any) is logged with it.
       liveUser = $('ttUser').value.trim().replace(/^@/, '').toLowerCase() || null;
       ED.rounds.refresh(liveUser).then(renderEdition);
+      Object.values(ED.PACKS).forEach((p) => p.rounds.refresh(liveUser).then(renderEdition));
       ED.license.recheck(liveUser).then(renderEdition);
     } else if (['idle', 'offline', 'error', 'nobridge'].includes(st.state)) {
-      if (liveUser) { liveUser = null; ED.rounds.refresh(null).then(renderEdition); }
+      if (liveUser) { liveUser = null; ED.rounds.refresh(null).then(renderEdition); Object.values(ED.PACKS).forEach((p) => p.rounds.refresh(null)); }
     }
     done('step1', st.state === 'connected');
   });

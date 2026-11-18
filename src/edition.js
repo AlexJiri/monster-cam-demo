@@ -73,46 +73,63 @@
   const isPaid = () => PAID || !!license.get();
 
   // ---------- Free rounds ----------
-  // Local list: start times of the rounds played here in the last COOLDOWN_HOURS (fallback and offline count).
-  const local = {
-    list() {
-      const since = Date.now() - COOLDOWN_HOURS * 3600e3;
-      return (store.get(KEY) || []).filter((t) => t > since);
-    },
-    left() { return Math.max(0, FREE_ROUNDS - this.list().length); },
-    nextAt() { const l = this.list(); return l.length < FREE_ROUNDS ? 0 : Math.min(...l) + COOLDOWN_HOURS * 3600e3; },
-    use() { const l = this.list(); l.push(Date.now()); store.set(KEY, l); },
-  };
-  let online = null; // last answer from the server for the connected username: { user, left, nextAt }
+  // A counter of free rounds: `max` per COOLDOWN_HOURS, counted on the server under `game` per TikTok username,
+  // with a local list (start times, saved under `storeKey`) as the fallback and offline count.
+  function counter(game, max, storeKey) {
+    const local = {
+      list() {
+        const since = Date.now() - COOLDOWN_HOURS * 3600e3;
+        return (store.get(storeKey) || []).filter((t) => t > since);
+      },
+      left() { return Math.max(0, max - this.list().length); },
+      nextAt() { const l = this.list().sort((a, b) => a - b); return l.length < max ? 0 : l[l.length - max] + COOLDOWN_HOURS * 3600e3; },
+      use() { const l = this.list(); l.push(Date.now()); store.set(storeKey, l); },
+    };
+    let online = null; // last answer from the server for the connected username: { user, left, nextAt }
+    return {
+      max,
+      left() { return isPaid() || DEV ? Infinity : online ? online.left : local.left(); },
+      // When the next free round becomes available (ms timestamp), or 0 if one is available now.
+      nextAt() { return this.left() > 0 ? 0 : online ? online.nextAt : local.nextAt(); },
+      // Refresh the online count for the TikTok username the game is connected to (null = not connected).
+      async refresh(username) {
+        const user = cleanUser(username);
+        if (!user) { online = null; return; }
+        const r = await call('/v1/rounds/status', { game, username: user });
+        online = r ? { user, left: r.left, nextAt: r.nextAt } : null;
+      },
+      // Use up a free round. Resolves to { allowed, left, nextAt }. Online for a connected username;
+      // otherwise (or offline) the local count decides.
+      async use(username) {
+        if (isPaid() || DEV) return { allowed: true, left: Infinity, nextAt: 0 };
+        const user = cleanUser(username);
+        const r = user ? await call('/v1/rounds/use', { game, username: user }) : null;
+        if (r) {
+          online = { user, left: r.left, nextAt: r.nextAt };
+          if (r.allowed) local.use(); // keep the local count in step for offline use
+          return { allowed: r.allowed, left: r.left, nextAt: r.nextAt };
+        }
+        online = null;
+        if (local.left() <= 0) return { allowed: false, left: 0, nextAt: local.nextAt() };
+        local.use();
+        return { allowed: true, left: local.left(), nextAt: local.nextAt() };
+      },
+    };
+  }
+  const rounds = counter(GAME, FREE_ROUNDS, KEY);
 
-  const rounds = {
-    left() { return isPaid() || DEV ? Infinity : online ? online.left : local.left(); },
-    // When the next free round becomes available (ms timestamp), or 0 if one is available now.
-    nextAt() { return this.left() > 0 ? 0 : online ? online.nextAt : local.nextAt(); },
-    // Refresh the online count for the TikTok username the game is connected to (null = not connected).
-    async refresh(username) {
-      const user = cleanUser(username);
-      if (!user) { online = null; return; }
-      const r = await call('/v1/rounds/status', { username: user });
-      online = r ? { user, left: r.left, nextAt: r.nextAt } : null;
-    },
-    // Use up a free round. Resolves to { allowed, left, nextAt }. Online for a connected username;
-    // otherwise (or offline) the local count decides.
-    async use(username) {
-      if (isPaid() || DEV) return { allowed: true, left: Infinity, nextAt: 0 };
-      const user = cleanUser(username);
-      const r = user ? await call('/v1/rounds/use', { username: user }) : null;
-      if (r) {
-        online = { user, left: r.left, nextAt: r.nextAt };
-        if (r.allowed) local.use(); // keep the local count in step for offline use
-        return { allowed: r.allowed, left: r.left, nextAt: r.nextAt };
-      }
-      online = null;
-      if (local.left() <= 0) return { allowed: false, left: 0, nextAt: local.nextAt() };
-      local.use();
-      return { allowed: true, left: local.left(), nextAt: local.nextAt() };
+  // ---------- Packs ----------
+  // Extra content, included in the full version. The free version may try each pack for a few rounds
+  // (counted apart from the normal free rounds, and on top of them).
+  const PACKS = {
+    xmas: {
+      name: 'Christmas Pack',
+      monsters: ['krampus'], scenes: ['winter'],
+      rounds: counter(`${GAME}-xmas`, 1, 'monstercam-xmas-rounds'), // 1 free round a day
     },
   };
+  // The pack a game setup uses (monster or scene from a pack), or null.
+  const packFor = (s) => Object.values(PACKS).find((p) => p.monsters.includes(s.monster) || p.scenes.includes(s.scene)) || null;
 
   // Resolves to { required, available, download } or null when offline (offline never blocks the game).
   async function checkVersion() {
@@ -141,5 +158,5 @@
     ctx.restore();
   }
 
-  MC.edition = { VERSION, GAME, DEV, FREE_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, license, rounds, checkVersion, watermark };
+  MC.edition = { VERSION, GAME, DEV, FREE_ROUNDS, COOLDOWN_HOURS, get PAID() { return isPaid(); }, isPaid, license, rounds, PACKS, packFor, checkVersion, watermark };
 })(window.MC = window.MC || {});
